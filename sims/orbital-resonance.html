@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbital resonance</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2;
+    --star: #E8A317; --perturber: #7A4B22; --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D;
+    --conj: #D9651B; --hot: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 18px; max-width: 66ch; }
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 18px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-width: 0; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+  section[hidden] { display: none; }
+
+  .transport { display: flex; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; flex-wrap: wrap; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { min-width: 0; padding: 5px 11px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .transport .grow { flex: 1; }
+  label.check { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px;
+    padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 12px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .stack { margin-top: 12px; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+  @media (max-width: 600px) { .tabs button { padding: 8px 10px; font-size: 14px; } .tabs button span { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Orbital resonance</h1>
+  <p class="lede">
+    Two bodies are in a mean-motion resonance when their orbital periods form a simple ratio. Three views of the same idea:
+    where the repeated conjunctions happen, what those repeated kicks do to an orbit, and what they do to a whole population.
+  </p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true" aria-controls="s1"><span>1</span>Conjunctions</button>
+    <button role="tab" id="tab2" aria-selected="false" aria-controls="s2"><span>2</span>Eccentricity pumping</button>
+    <button role="tab" id="tab3" aria-selected="false" aria-controls="s3"><span>3</span>Gaps</button>
+  </div>
+
+  <!-- ===================== Screen 1 ===================== -->
+  <section id="s1" role="tabpanel">
+    <p class="lede">A planet on a circular orbit and a smaller body on a Keplerian orbit with a chosen period ratio. Every time
+      they line up on the same side of the star, a marker is dropped where the body was. Whether the markers pile up or smear
+      around the orbit is the whole difference between a resonance and no resonance.</p>
+    <canvas id="c1"></canvas>
+    <div class="transport">
+      <button id="play1">Pause</button>
+      <button id="reset1" class="secondary">Restart</button>
+      <div class="seg" id="pre1" role="group" aria-label="Presets">
+        <button data-r="0.5" data-e="0.05" data-c="180">2:1 inside</button>
+        <button data-r="0.6667" data-e="0.15" data-c="180">3:2 inside</button>
+        <button data-r="0.3333" data-e="0.1" data-c="180">3:1 inside</button>
+        <button data-r="1.5" data-e="0.25" data-c="180">3:2 outside (Pluto)</button>
+        <button data-r="2" data-e="0.1" data-c="180">2:1 outside</button>
+        <button data-r="0.7071" data-e="0.1" data-c="180">irrational</button>
+      </div>
+      <span class="grow"></span>
+      <label class="check"><input type="checkbox" id="rot1"> frame rotating with the planet</label>
+    </div>
+    <div class="controls">
+      <label><div class="row"><span>Period ratio, body : planet</span><span class="val" id="r1_v"></span></div>
+        <input type="range" id="r1" min="-2" max="2" step="0.005" value="-1"></label>
+      <label><div class="row"><span>Body's eccentricity</span><span class="val" id="e1_v"></span></div>
+        <input type="range" id="e1" min="0" max="0.6" step="0.01" value="0.05"></label>
+      <label><div class="row"><span>First conjunction, measured from the body's pericentre</span><span class="val" id="c1_v"></span></div>
+        <input type="range" id="c1s" min="0" max="360" step="5" value="180"></label>
+      <label><div class="row"><span>Simulation speed</span><span class="val" id="spd1_v"></span></div>
+        <input type="range" id="spd1" min="0.2" max="4" step="0.1" value="0.8"></label>
+    </div>
+    <div class="notes">
+      <p><b>What to try.</b> With a simple ratio the markers land on the same few spots forever; nudge the slider off the ratio and they
+        creep around the orbit. For the Pluto preset the two orbits cross, yet with conjunctions at the body's apocentre the closest
+        approach stays large. Drag the conjunction slider toward 0° and watch the closest approach collapse: same orbits, same ratio,
+        wrong phase. The rotating frame shows the body's path as the planet sees it, which is how the Pluto and Trojan pictures are usually drawn.</p>
+      <p>This screen is pure Kepler: the planet has no mass here. The other two screens turn gravity on.</p>
+    </div>
+  </section>
+
+  <!-- ===================== Screen 2 ===================== -->
+  <section id="s2" role="tabpanel" hidden>
+    <p class="lede">Now the planet has mass. A small body starts on a nearly circular orbit at exactly the resonant semi-major axis.
+      Watch what the repeated conjunctions do: the semi-major axis stays locked while the eccentricity grows. The magenta outline is
+      the ellipse the body is on right now; the plots track its eccentricity and the resonant angle
+      <span class="math">&phi; = q&lambda; &minus; p&lambda;<sub>p</sub> + (p&minus;q)&varpi;</span>.</p>
+    <canvas id="orbit"></canvas>
+    <div class="transport">
+      <button id="play2">Pause</button>
+      <button id="reset2" class="secondary">Restart</button>
+      <span>Resonance</span>
+      <div class="seg" id="res" role="group" aria-label="Resonance">
+        <button data-p="4" data-q="3">4:3</button><button data-p="3" data-q="2">3:2</button><button data-p="2" data-q="1">2:1</button><button data-p="5" data-q="2">5:2</button><button data-p="3" data-q="1">3:1</button>
+      </div>
+      <span class="grow"></span>
+      <label class="check"><input type="checkbox" id="twin" checked> comparison body 3% outside the resonance</label>
+    </div>
+    <canvas id="plotE" class="stack"></canvas>
+    <canvas id="plotPhi" class="stack"></canvas>
+    <div class="controls">
+      <label><div class="row"><span>Planet mass (Jupiter masses)</span><span class="val" id="m_v"></span></div>
+        <input type="range" id="m" min="0" max="1" step="0.01" value="0"></label>
+      <label><div class="row"><span>Starting eccentricity</span><span class="val" id="e0_v"></span></div>
+        <input type="range" id="e0" min="0" max="0.25" step="0.005" value="0.01"></label>
+      <label><div class="row"><span>Offset in <i>a</i> from exact resonance</span><span class="val" id="off_v"></span></div>
+        <input type="range" id="off" min="-6" max="6" step="0.25" value="0"></label>
+      <label><div class="row"><span>Simulation speed</span><span class="val" id="spd_v"></span></div>
+        <input type="range" id="spd" min="1" max="30" step="1" value="6"></label>
+    </div>
+    <div class="notes">
+      <p><b>What to try.</b> Let the 2:1 case run until the ellipse is obvious, then restart at 3:1 with the same near-circular start
+        at one Jupiter mass: almost nothing happens for a very long time. Add some starting eccentricity and it takes off. First-order
+        resonances (2:1, 3:2, 4:3) pump a circular orbit directly; second-order ones (3:1, 5:2) need a seed, because their forcing
+        scales as <i>e</i><sup>2</sup> rather than <i>e</i>.</p>
+      <p><b>About the mass slider.</b> At one Jupiter mass the pumping is slow, so the counter shows how many planet orbits have elapsed.
+        Raising the mass makes the libration faster and the eccentricity swing larger; it exaggerates the effect rather than changing its
+        character. Push it far enough and close encounters take over and the body can be scattered or ejected.</p>
+      <p>Units: the planet orbits at radius 1 around a star of mass 1, with <i>G</i> = 1. Elements are heliocentric and osculating.</p>
+    </div>
+  </section>
+
+  <!-- ===================== Screen 3 ===================== -->
+  <section id="s3" role="tabpanel" hidden>
+    <p class="lede">A few hundred test bodies spread across semi-major axis inside a massive planet's orbit, each on a nearly circular
+      orbit. Bodies near a resonance have their eccentricities pumped until they cross the planet's orbit (or an inner planet's) and are
+      removed. The histogram beneath shows the gaps carving themselves out where the resonances sit, as in the asteroid belt's Kirkwood gaps.</p>
+    <canvas id="c3"></canvas>
+    <canvas id="h3" class="stack"></canvas>
+    <div class="transport">
+      <button id="play3">Pause</button>
+      <button id="reset3" class="secondary">Restart</button>
+      <span class="grow"></span>
+      <label class="check"><input type="checkbox" id="col3" checked> colour bodies by eccentricity</label>
+    </div>
+    <div class="controls">
+      <label><div class="row"><span>Planet mass (Jupiter masses)</span><span class="val" id="m3_v"></span></div>
+        <input type="range" id="m3" min="0" max="1" step="0.01" value="0.59"></label>
+      <label><div class="row"><span>Number of test bodies</span><span class="val" id="n3_v"></span></div>
+        <input type="range" id="n3" min="100" max="600" step="50" value="300"></label>
+      <label><div class="row"><span>Inner planet's orbit (removal radius)</span><span class="val" id="in3_v"></span></div>
+        <input type="range" id="in3" min="0" max="0.3" step="0.01" value="0.22"></label>
+      <label><div class="row"><span>Simulation speed</span><span class="val" id="spd3_v"></span></div>
+        <input type="range" id="spd3" min="1" max="60" step="1" value="30"></label>
+    </div>
+    <div class="notes">
+      <p><b>Honesty about time.</b> Real Kirkwood gaps take millions of years to open, which at one Jupiter mass would mean an hour or
+        more of watching. The default here uses ten Jupiter masses, which opens the gaps in minutes and exaggerates their width. Set the
+        mass to 1 to see how slowly the real thing happens; the elapsed counter tells you how long it has been in Jupiter-years.</p>
+      <p>Each grey bar in the histogram is the starting population; the blue bars are what is left. The dashed lines mark where each
+        resonance sits. Bodies are removed when their orbit crosses the planet's or the inner planet's, or when they are scattered
+        out of the system.</p>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = Math.PI * 2;
+  const wrap = x => Math.atan2(Math.sin(x), Math.cos(x));
+  const niceStep = raw => { const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p; };
+  function fit(canvas, D) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    const k = r.width / D;
+    ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
+    return { ctx, W: D, H: r.height / k };
+  }
+  function wrapText(ctx, text, x, y, maxW, lh) {
+    const words = text.split(' '); let line = '';
+    words.forEach(w => { const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, y); y += lh; line = w; } else line = test; });
+    if (line) { ctx.fillText(line, x, y); y += lh; }
+    return y;
+  }
+  function seg(id, isOn, onPick) {
+    $(id).querySelectorAll('button').forEach(b => {
+      b.setAttribute('aria-pressed', String(isOn(b)));
+      b.onclick = () => { onPick(b); seg(id, isOn, onPick); };
+    });
+  }
+  // best small fraction for a ratio, or null
+  function asFraction(r, tol) {
+    let best = null;
+    for (let q = 1; q <= 9; q++) { const p = Math.round(r * q); if (p >= 1 && Math.abs(p / q - r) / r < tol) { best = [p, q]; break; } }
+    return best;
+  }
+  const gcd = (a, b) => b ? gcd(b, a % b) : a;
+
+  // Keplerian helpers (mu = 1)
+  function kepler(M, e) { let E = M; for (let i = 0; i < 12; i++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E)); return E; }
+  function nuToM(nu, e) { const E = 2 * Math.atan(Math.sqrt((1 - e) / (1 + e)) * Math.tan(nu / 2)); return E - e * Math.sin(E); }
+
+  // =====================================================================
+  // Screen 1: conjunctions (Keplerian, massless planet)
+  // =====================================================================
+  const S1 = (() => {
+    const st = { r: 0.5, e: 0.05, c: 180, spd: 0.8, rot: false, playing: true };
+    let t = 0, a, nb, M0, th0, marks = [], minD = Infinity, path = [], samples = [];
+    function bodyPos(time) {
+      const M = nb * time + M0, E = kepler(M, st.e);
+      const nu = Math.atan2(Math.sqrt(1 - st.e * st.e) * Math.sin(E), Math.cos(E) - st.e);
+      const r = a * (1 - st.e * Math.cos(E));
+      return { x: r * Math.cos(nu), y: r * Math.sin(nu), nu, r };     // pericentre along +x
+    }
+    function reset() {
+      t = 0; marks = []; minD = Infinity; samples = [];
+      a = Math.pow(st.r, 2 / 3); nb = 1 / st.r;
+      const nu0 = st.c * Math.PI / 180;
+      M0 = nuToM(nu0, st.e); th0 = nu0;                // start at a conjunction, at the chosen angle from pericentre
+      // closed path in the rotating frame
+      const fr = asFraction(st.r, 0.004);
+      const cycles = fr ? Math.min(12, fr[0] / gcd(fr[0], fr[1])) : 12;
+      path = [];
+      const N = 2400;
+      for (let i = 0; i <= N; i++) {
+        const tt = cycles * TAU * i / N, b = bodyPos(tt), th = tt + th0;
+        path.push({ x: b.x * Math.cos(th) + b.y * Math.sin(th), y: -b.x * Math.sin(th) + b.y * Math.cos(th) });
+      }
+      labels();
+    }
+    function labels() {
+      const fr = asFraction(st.r, 0.004);
+      $('r1_v').textContent = fr ? fr[0] + ' : ' + fr[1] + (Math.abs(fr[0] / fr[1] - st.r) > 1e-6 ? '  (≈ ' + st.r.toFixed(3) + ')' : '') : st.r.toFixed(3) + ' (no simple ratio)';
+      $('e1_v').textContent = st.e.toFixed(2);
+      $('c1_v').textContent = st.c + '°' + (st.c === 180 ? ' (apocentre)' : st.c === 0 || st.c === 360 ? ' (pericentre)' : '');
+      $('spd1_v').textContent = st.spd.toFixed(1) + ' planet orbits / s';
+    }
+    let lastD = null;
+    function advance(dt) {
+      const dT = st.spd * dt * TAU;
+      const sub = Math.max(1, Math.ceil(dT / 0.02));
+      for (let k = 0; k < sub; k++) {
+        t += dT / sub;
+        const b = bodyPos(t), th = t + th0;
+        const px = Math.cos(th), py = Math.sin(th);
+        const d = Math.hypot(b.x - px, b.y - py);
+        if (d < minD) minD = d;
+        const D = wrap(Math.atan2(b.y, b.x) - th);
+        // conjunction when the two longitudes cross (either body may be the faster one)
+        if (lastD !== null && Math.sign(D) !== Math.sign(lastD) && Math.abs(D - lastD) < Math.PI) {
+          marks.push({ x: b.x, y: b.y, th });
+          if (marks.length > 60) marks.shift();
+        }
+        lastD = D;
+      }
+    }
+    function draw() {
+      const { ctx, W, H } = fit($('c1'), 900);
+      ctx.clearRect(0, 0, W, H);
+      ctx.font = '13px ' + C('--sans');
+      const cx = 250, cy = H / 2, outer = Math.max(1, a * (1 + st.e));
+      const S = (Math.min(cx, H / 2) - 16) / outer;
+      const th = t + th0;
+      // rotate the view so the planet sits at angle 0 in the rotating frame
+      const rot = st.rot ? -th : 0;
+      const T = (x, y) => { const c = Math.cos(rot), s = Math.sin(rot); return [cx + (x * c - y * s) * S, cy - (x * s + y * c) * S]; };
+
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, S, 0, TAU); ctx.stroke();
+      // body's orbit (inertial ellipse) only in the inertial frame; closed path in the rotating frame
+      if (!st.rot) {
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.ellipse(cx - a * st.e * S, cy, a * S, a * Math.sqrt(1 - st.e * st.e) * S, 0, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        ctx.strokeStyle = C('--body'); ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2;
+        ctx.beginPath(); path.forEach((p, i) => { const q = [cx + p.x * S, cy - p.y * S]; i === 0 ? ctx.moveTo(q[0], q[1]) : ctx.lineTo(q[0], q[1]); }); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      // pericentre marker
+      const [ppx, ppy] = T(a * (1 - st.e), 0);
+      ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ppx, ppy); ctx.stroke();
+      ctx.fillStyle = C('--ghost'); ctx.textAlign = 'center'; ctx.fillText('pericentre', ppx, ppy - 8);
+      // conjunction markers
+      marks.forEach((mk, i) => {
+        let x = mk.x, y = mk.y;
+        if (st.rot) { const c = Math.cos(-mk.th), s = Math.sin(-mk.th); const rx = x * c - y * s, ry = x * s + y * c; x = rx; y = ry; }
+        const [qx, qy] = st.rot ? [cx + x * S, cy - y * S] : T(x, y);
+        ctx.fillStyle = C('--conj'); ctx.globalAlpha = 0.3 + 0.7 * (i + 1) / marks.length;
+        ctx.beginPath(); ctx.arc(qx, qy, 4.5, 0, TAU); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+      // bodies
+      const b = bodyPos(t);
+      const [bx, by] = T(b.x, b.y), [px, py] = T(Math.cos(th), Math.sin(th));
+      ctx.strokeStyle = C('--rule'); ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--star'); ctx.beginPath(); ctx.arc(cx, cy, 9, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('--perturber'); ctx.beginPath(); ctx.arc(px, py, 8, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('--body'); ctx.beginPath(); ctx.arc(bx, by, 5, 0, TAU); ctx.fill();
+
+      // readouts
+      const rx = 540; let ry = 40;
+      const line = (label, val, color) => { ctx.textAlign = 'left'; ctx.fillStyle = C('--muted'); ctx.fillText(label, rx, ry); ctx.fillStyle = color || C('--ink'); ctx.textAlign = 'right'; ctx.fillText(val, W - 30, ry); ry += 22; };
+      const fr = asFraction(st.r, 0.004);
+      ctx.font = '15px ' + C('--serif'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+      ctx.fillText(fr ? 'Period ratio ' + fr[0] + ':' + fr[1] : 'No simple period ratio', rx, ry); ry += 20;
+      ctx.font = '13px ' + C('--sans'); ctx.fillStyle = C('--muted');
+      if (fr) { const g = gcd(fr[0], fr[1]); ctx.fillText('the body makes ' + (fr[1] / g) + (fr[1] / g === 1 ? ' orbit' : ' orbits') + ' for every ' + (fr[0] / g) + ' of the planet\'s', rx, ry); }
+      ry += 22;
+      line('Elapsed', (t / TAU).toFixed(1) + ' planet orbits');
+      line('Conjunctions so far', String(marks.length >= 60 ? '60+' : marks.length));
+      line('Closest approach so far', minD.toFixed(3) + ' planet radii', minD < 0.15 ? C('--hot') : C('--ink'));
+      ry += 6;
+      ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+      let msg;
+      if (fr) {
+        const g = gcd(fr[0], fr[1]), p = fr[0] / g, q = fr[1] / g, spots = Math.abs(p - q);
+        msg = 'Conjunctions repeat at ' + spots + (spots === 1 ? ' fixed longitude' : ' fixed longitudes') + ', ' + st.c + '° from pericentre. The body always meets the planet in the same place, so the same gravitational kick is applied every time.';
+        if (st.e > 0.15 && st.c > 120 && st.c < 240) msg += ' With the meeting at apocentre the orbits can cross without the bodies ever coming close.';
+        if (st.e > 0.15 && (st.c < 60 || st.c > 300)) msg += ' Meeting at pericentre puts the body as close to the planet as it can get.';
+      } else msg = 'Conjunctions drift around the orbit and sample every longitude, so the kicks come from all directions and average out. This is what no resonance looks like.';
+      ry = wrapText(ctx, msg, rx, ry, W - 30 - rx, 17);
+
+      ry = H - 44; let lx = rx; ctx.font = '12px ' + C('--sans');
+      [[C('--star'), 'star'], [C('--perturber'), 'planet'], [C('--body'), 'body'], [C('--conj'), 'conjunctions']].forEach(([c, name]) => {
+        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx + 5, ry - 4, 4.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(name, lx + 14, ry); lx += 14 + ctx.measureText(name).width + 16;
+      });
+    }
+    function bind() {
+      seg('pre1', () => false, b => { st.r = +b.dataset.r; st.e = +b.dataset.e; st.c = +b.dataset.c; $('r1').value = Math.log2(st.r); $('e1').value = st.e; $('c1s').value = st.c; reset(); });
+      $('r1').addEventListener('input', () => { st.r = Math.pow(2, +$('r1').value); const fr = asFraction(st.r, 0.012); if (fr) st.r = fr[0] / fr[1]; reset(); });
+      $('e1').addEventListener('input', () => { st.e = +$('e1').value; reset(); });
+      $('c1s').addEventListener('input', () => { st.c = +$('c1s').value; reset(); });
+      $('spd1').addEventListener('input', () => { st.spd = +$('spd1').value; labels(); });
+      $('rot1').addEventListener('change', () => { st.rot = $('rot1').checked; });
+      $('play1').addEventListener('click', () => { st.playing = !st.playing; $('play1').textContent = st.playing ? 'Pause' : 'Play'; });
+      $('reset1').addEventListener('click', reset);
+      reset();
+    }
+    return { bind, frame(dt) { if (st.playing) advance(dt); draw(); }, st };
+  })();
+
+  // =====================================================================
+  // Shared three-body pieces for screens 2 and 3
+  // =====================================================================
+  const DT = 0.004;
+  function makePerturber(m) {
+    const n = Math.sqrt(1 + m), f = 1 / (1 + m);
+    return time => { const th = n * time + 2.4, c = Math.cos(th), s = Math.sin(th);
+      return { th, n, sx: -m * f * c, sy: -m * f * s, px: f * c, py: f * s, svx: m * f * n * s, svy: -m * f * n * c }; };
+  }
+  function elements(b, P) {
+    const rx = b.x - P.sx, ry = b.y - P.sy, vx = b.vx - P.svx, vy = b.vy - P.svy;
+    const r = Math.hypot(rx, ry), v2 = vx * vx + vy * vy, rv = rx * vx + ry * vy;
+    const a = 1 / (2 / r - v2);
+    const ex = (v2 - 1 / r) * rx - rv * vx, ey = (v2 - 1 / r) * ry - rv * vy;
+    const e = Math.hypot(ex, ey), varpi = Math.atan2(ey, ex), theta = Math.atan2(ry, rx);
+    const nu = theta - varpi;
+    const E = Math.atan2(Math.sqrt(Math.max(0, 1 - e * e)) * Math.sin(nu), e + Math.cos(nu));
+    return { a, e, varpi, theta, lambda: E - e * Math.sin(E) + varpi, r };
+  }
+  function kick(b, P, m, h) {
+    const dx = b.x - P.sx, dy = b.y - P.sy, r3 = Math.pow(dx * dx + dy * dy, 1.5);
+    const ex = b.x - P.px, ey = b.y - P.py, q3 = Math.pow(ex * ex + ey * ey, 1.5);
+    b.vx += h * (-dx / r3 - m * ex / q3); b.vy += h * (-dy / r3 - m * ey / q3);
+  }
+  function launch(a, e, m, P, phase) {   // heliocentric pericentre at longitude `phase`
+    const rp = a * (1 - e), vp = Math.sqrt((1 + e) / (a * (1 - e)));
+    const c = Math.cos(phase), s = Math.sin(phase);
+    return { x: P.sx + rp * c, y: P.sy + rp * s, vx: P.svx - vp * s, vy: P.svy + vp * c, alive: true };
+  }
+
+  // =====================================================================
+  // Screen 2: eccentricity pumping
+  // =====================================================================
+  const S2 = (() => {
+    const st = { p: 2, q: 1, m: 1e-3, e0: 0.01, off: 0, spd: 6, twin: true, playing: true };
+    let pert, t = 0, body, twin, nextSample = 0, sampleEvery = 0.02, trailNext = 0, trailDT = 0.05;
+    const aRes = () => Math.pow(st.q / st.p, 2 / 3) * Math.pow(1 + st.m, -1 / 3);
+    function makeBody(aFactor, color) {
+      const b = launch(aRes() * aFactor, st.e0, st.m, pert(0), 0);
+      Object.assign(b, { color, trail: [], conj: [], lastD: null, samples: [], el: null });
+      return b;
+    }
+    function step(b) {
+      if (!b.alive) return;
+      kick(b, pert(t), st.m, 0.5 * DT);
+      b.x += DT * b.vx; b.y += DT * b.vy;
+      kick(b, pert(t + DT), st.m, 0.5 * DT);
+    }
+    function observe(b, P) {
+      const el = elements(b, P); b.el = el;
+      if (!(el.a > 0) || el.a > 2.5 || el.r > 3.5 || el.e >= 0.999) { b.alive = false; return; }
+      const D = wrap(el.theta - P.th);
+      if (b.lastD !== null && b.lastD < 0 && D >= 0 && D - b.lastD < Math.PI) { b.conj.push({ x: b.x - P.sx, y: b.y - P.sy }); if (b.conj.length > 14) b.conj.shift(); }
+      b.lastD = D;
+    }
+    function sample(b, P, T) {
+      if (!b.alive || !b.el) return;
+      b.samples.push({ T, e: b.el.e, phi: wrap(st.q * b.el.lambda - st.p * P.th + (st.p - st.q) * b.el.varpi), a: b.el.a });
+    }
+    function advance(dtReal) {
+      const P0 = pert(0);
+      let steps = Math.min(2500, Math.round(st.spd * dtReal * TAU / P0.n / DT));
+      for (let k = 0; k < steps; k++) {
+        step(body); if (st.twin) step(twin);
+        t += DT;
+        if (t >= trailNext) { const Pk = pert(t); [body, twin].forEach(b => { if (b.alive) { b.trail.push({ x: b.x - Pk.sx, y: b.y - Pk.sy }); if (b.trail.length > 200) b.trail.shift(); } }); trailNext += trailDT; }
+      }
+      const P = pert(t); observe(body, P); if (st.twin) observe(twin, P);
+      const T = P.n * t / TAU;
+      while (T >= nextSample) { sample(body, P, T); if (st.twin) sample(twin, P, T); nextSample += sampleEvery;
+        if (body.samples.length > 2800) { [body, twin].forEach(b => { b.samples = b.samples.filter((_, i) => i % 2 === 0); }); sampleEvery *= 2; } }
+    }
+    function libration(b) {
+      const s = b.samples; if (s.length < 60) return { text: 'Settling in…', sub: '' };
+      const win = s.slice(-Math.min(s.length, 400));
+      let emin = Infinity, emax = 0, amin = Infinity, amax = 0;
+      win.forEach(p => { emin = Math.min(emin, p.e); emax = Math.max(emax, p.e); amin = Math.min(amin, p.a); amax = Math.max(amax, p.a); });
+      const spread = centre => { let lo = Infinity, hi = -Infinity; win.forEach(p => { const d = wrap(p.phi - centre); lo = Math.min(lo, d); hi = Math.max(hi, d); }); return hi - lo; };
+      const w0 = spread(0), w1 = spread(Math.PI), ar = aRes();
+      const aDev = Math.max(Math.abs(amin / ar - 1), Math.abs(amax / ar - 1)) * 100;
+      if (Math.min(w0, w1) < 1.7 * Math.PI) {
+        const about = w0 < w1 ? 0 : 180, amp = (Math.min(w0, w1) / 2) * 180 / Math.PI;
+        return { text: 'φ librates about ' + about + '° (±' + amp.toFixed(0) + '°): the body is locked in the resonance.', sub: 'a stays within ' + aDev.toFixed(1) + '% of the resonant value; e cycles between ' + emin.toFixed(3) + ' and ' + emax.toFixed(3) + '.' };
+      }
+      if (emin < 0.35 * emax && aDev < 3) return { text: 'φ circulates only because e passes near zero, where the pericentre is undefined.', sub: 'The body is still locked: a stays within ' + aDev.toFixed(1) + '% of resonance while e cycles ' + emin.toFixed(3) + ' to ' + emax.toFixed(3) + '.' };
+      return { text: 'φ circulates: the body is not locked in the resonance.', sub: 'a drifts ' + aDev.toFixed(1) + '% from the resonant value.' };
+    }
+    function drawOrbit() {
+      const { ctx, W, H } = fit($('orbit'), 900);
+      ctx.clearRect(0, 0, W, H); ctx.font = '13px ' + C('--sans');
+      const cx = 250, cy = H / 2, S = Math.min(cx - 12, H / 2 - 12) / 1.05;
+      const P = pert(t);
+      const X = x => cx + (x - P.sx) * S, Y = y => cy - (y - P.sy) * S;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, S, 0, TAU); ctx.stroke();
+      ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.arc(cx, cy, aRes() * S, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      const drawBody = (b, main) => {
+        if (b.trail.length > 1) {
+          ctx.lineWidth = main ? 1.6 : 1.2;
+          for (let i = 1; i < b.trail.length; i++) { ctx.strokeStyle = b.color; ctx.globalAlpha = (i / b.trail.length) * (main ? 0.9 : 0.6);
+            ctx.beginPath(); ctx.moveTo(cx + b.trail[i - 1].x * S, cy - b.trail[i - 1].y * S); ctx.lineTo(cx + b.trail[i].x * S, cy - b.trail[i].y * S); ctx.stroke(); }
+          ctx.globalAlpha = 1;
+        }
+        if (!b.alive) return;
+        const el = b.el;
+        if (main && el) {
+          const bax = el.a * Math.sqrt(Math.max(0, 1 - el.e * el.e)), ccx = -el.a * el.e * Math.cos(el.varpi), ccy = -el.a * el.e * Math.sin(el.varpi);
+          ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+          ctx.beginPath(); ctx.ellipse(cx + ccx * S, cy - ccy * S, el.a * S, bax * S, -el.varpi, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+          if (el.e > 0.02) {
+            const px = el.a * (1 - el.e) * Math.cos(el.varpi), py = el.a * (1 - el.e) * Math.sin(el.varpi);
+            ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + px * S, cy - py * S); ctx.stroke();
+            ctx.fillStyle = C('--ghost'); ctx.beginPath(); ctx.arc(cx + px * S, cy - py * S, 3, 0, TAU); ctx.fill();
+            ctx.textAlign = 'center'; ctx.fillText('pericentre', cx + px * S, cy - py * S - 9);
+          }
+          b.conj.forEach((c, i) => { ctx.fillStyle = C('--conj'); ctx.globalAlpha = 0.25 + 0.75 * (i + 1) / b.conj.length; ctx.beginPath(); ctx.arc(cx + c.x * S, cy - c.y * S, 4, 0, TAU); ctx.fill(); });
+          ctx.globalAlpha = 1;
+        }
+        ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), main ? 5 : 4, 0, TAU); ctx.fill();
+      };
+      if (st.twin) drawBody(twin, false);
+      drawBody(body, true);
+      ctx.fillStyle = C('--star'); ctx.beginPath(); ctx.arc(cx, cy, 9, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('--perturber'); ctx.beginPath(); ctx.arc(X(P.px), Y(P.py), 8, 0, TAU); ctx.fill();
+
+      const T = P.n * t / TAU, rx = 540; let ry = 40;
+      const line = (label, val, color) => { ctx.textAlign = 'left'; ctx.fillStyle = C('--muted'); ctx.fillText(label, rx, ry); ctx.fillStyle = color || C('--ink'); ctx.textAlign = 'right'; ctx.fillText(val, W - 30, ry); ry += 22; };
+      ctx.font = '15px ' + C('--serif'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+      ctx.fillText(st.p + ':' + st.q + ' resonance', rx, ry); ry += 26; ctx.font = '13px ' + C('--sans');
+      line('Elapsed', T.toFixed(0) + ' planet orbits');
+      line('', '(' + (T * 11.86 / 1000).toFixed(1) + ' kyr if the planet were Jupiter)'); ry += 6;
+      const el = body.el;
+      if (body.alive && el) {
+        line('Semi-major axis / resonant value', (el.a / aRes()).toFixed(4), C('--body'));
+        line('Period ratio, planet : body', (Math.pow(el.a, -1.5) / Math.sqrt(1 + st.m)).toFixed(3) + ' : 1', C('--body'));
+        line('Eccentricity', el.e.toFixed(3), C('--body'));
+        line('Resonant angle φ', (wrap(st.q * el.lambda - st.p * P.th + (st.p - st.q) * el.varpi) * 180 / Math.PI).toFixed(0) + '°', C('--body'));
+        ry += 6; const lib = libration(body);
+        ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ry = wrapText(ctx, lib.text, rx, ry, W - 30 - rx, 17);
+        if (lib.sub) { ctx.fillStyle = C('--muted'); ry = wrapText(ctx, lib.sub, rx, ry, W - 30 - rx, 17); }
+      } else line('Body', 'scattered out of the system', C('--body'));
+      if (st.twin) { ry += 6; if (twin.alive && twin.el) line('Comparison body eccentricity', twin.el.e.toFixed(3), C('--twin')); else line('Comparison body', 'scattered', C('--twin')); }
+
+      // resonance plane inset
+      { const pcx = W - 118, pcy = H - 152, R = 74;
+        let emax = 0.05; [body, twin].forEach(b => b.samples.slice(-600).forEach(p => { emax = Math.max(emax, p.e); }));
+        const sc = R / (emax * 1.1);
+        ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(pcx, pcy, R, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(pcx - R, pcy); ctx.lineTo(pcx + R, pcy); ctx.moveTo(pcx, pcy - R); ctx.lineTo(pcx, pcy + R); ctx.stroke();
+        const trace = (b, col, lw) => { const pts = b.samples.slice(-600); if (pts.length < 2) return;
+          ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
+          pts.forEach((p, i) => { const x = pcx + p.e * Math.cos(p.phi) * sc, y = pcy - p.e * Math.sin(p.phi) * sc; i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); ctx.stroke();
+          const l = pts[pts.length - 1]; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(pcx + l.e * Math.cos(l.phi) * sc, pcy - l.e * Math.sin(l.phi) * sc, 3.5, 0, TAU); ctx.fill(); };
+        if (st.twin) trace(twin, C('--twin'), 1);
+        trace(body, C('--body'), 1.4);
+        ctx.fillStyle = C('--muted'); ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'center';
+        ctx.fillText('resonance plane  (e cos φ, e sin φ)', pcx, pcy - R - 10);
+        ctx.fillText('e = ' + (emax * 1.1).toFixed(2) + ' at the rim', pcx, pcy + R + 16); }
+
+      ry = H - 52; let lx = rx; ctx.font = '12px ' + C('--sans');
+      [[C('--star'), 'star'], [C('--perturber'), 'planet'], [C('--body'), 'body'], [C('--twin'), 'comparison'], [C('--conj'), 'conjunctions'], [C('--ghost'), 'current ellipse']].forEach(([c, name], i) => {
+        if (i === 3 && !st.twin) return;
+        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx + 5, ry - 4, 4.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(name, lx + 14, ry); lx += 14 + ctx.measureText(name).width + 16;
+        if (i === 2) { lx = rx; ry += 20; }
+      });
+    }
+    function drawPlot(canvas, key, opts) {
+      const { ctx, W, H } = fit(canvas, 900);
+      ctx.clearRect(0, 0, W, H); ctx.font = '12px ' + C('--sans');
+      const ml = 56, mr = 16, mt = 22, mb = 26, pw = W - ml - mr, ph = H - mt - mb;
+      const Tmax = Math.max(20, pert(0).n * t / TAU);
+      let ylo = opts.lo, yhi = opts.hi;
+      if (opts.auto) { yhi = 0.1; [body, twin].forEach(b => b.samples.forEach(p => { if (p[key] > yhi) yhi = p[key]; })); yhi = Math.min(1, yhi * 1.15); }
+      const X = T => ml + T / Tmax * pw, Y = v => mt + (yhi - v) / (yhi - ylo) * ph;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.fillStyle = C('--muted');
+      opts.ticks(ylo, yhi).forEach(v => { ctx.beginPath(); ctx.moveTo(ml, Y(v) + 0.5); ctx.lineTo(W - mr, Y(v) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(opts.fmt(v), ml - 6, Y(v) + 4); });
+      const ts = niceStep(Tmax / 6); ctx.textAlign = 'center';
+      for (let T = 0; T <= Tmax; T += ts) { ctx.beginPath(); ctx.moveTo(X(T) + 0.5, mt); ctx.lineTo(X(T) + 0.5, mt + ph); ctx.stroke(); ctx.fillText(T.toFixed(0), X(T), H - 8); }
+      ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText(opts.title, ml, 14);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText('time (planet orbits)', W - mr, H - 8);
+      (st.twin ? [[twin, C('--twin')], [body, C('--body')]] : [[body, C('--body')]]).forEach(([b, col]) => {
+        ctx.strokeStyle = ctx.fillStyle = col; ctx.lineWidth = 1.6;
+        if (opts.dots) b.samples.forEach(p => { ctx.beginPath(); ctx.arc(X(p.T), Y(p[key]), 1.3, 0, TAU); ctx.fill(); });
+        else { ctx.beginPath(); b.samples.forEach((p, i) => { const x = X(p.T), y = Y(p[key]); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }); ctx.stroke(); }
+      });
+    }
+    function labels() {
+      const mj = st.m / 1e-3;
+      $('m_v').textContent = mj.toFixed(mj < 10 ? 1 : 0) + ' M\u2C7C  (' + (st.m * 100).toFixed(st.m < 0.01 ? 2 : 1) + '% of star)';
+      $('e0_v').textContent = st.e0.toFixed(3);
+      $('off_v').textContent = (st.off >= 0 ? '+' : '−') + Math.abs(st.off).toFixed(2) + '%';
+      $('spd_v').textContent = st.spd + ' planet orbits / s';
+    }
+    function reset() {
+      pert = makePerturber(st.m);
+      t = 0; nextSample = 0; sampleEvery = 0.02; trailNext = 0;
+      trailDT = TAU * Math.pow(Math.pow(st.q / st.p, 2 / 3), 1.5) / 60;
+      body = makeBody(1 + st.off / 100, C('--body'));
+      twin = makeBody((1 + st.off / 100) * 1.03, C('--twin'));
+      const P = pert(0); observe(body, P); observe(twin, P);
+      labels();
+    }
+    function bind() {
+      seg('res', b => +b.dataset.p === st.p && +b.dataset.q === st.q, b => { st.p = +b.dataset.p; st.q = +b.dataset.q; reset(); });
+      $('m').addEventListener('input', () => { st.m = 1e-3 * Math.pow(50, +$('m').value); reset(); });
+      $('e0').addEventListener('input', () => { st.e0 = +$('e0').value; reset(); });
+      $('off').addEventListener('input', () => { st.off = +$('off').value; reset(); });
+      $('spd').addEventListener('input', () => { st.spd = +$('spd').value; labels(); });
+      $('twin').addEventListener('change', () => { st.twin = $('twin').checked; });
+      $('play2').addEventListener('click', () => { st.playing = !st.playing; $('play2').textContent = st.playing ? 'Pause' : 'Play'; });
+      $('reset2').addEventListener('click', reset);
+      reset();
+    }
+    return { bind, st, frame(dt) { if (st.playing) advance(dt); drawOrbit();
+      drawPlot($('plotE'), 'e', { lo: 0, hi: 1, auto: true, title: 'eccentricity', fmt: v => v.toFixed(2), ticks: (lo, hi) => { const s = niceStep((hi - lo) / 4); const out = []; for (let v = 0; v <= hi; v += s) out.push(v); return out; } });
+      drawPlot($('plotPhi'), 'phi', { lo: -Math.PI, hi: Math.PI, dots: true, title: 'resonant angle φ', fmt: v => (v * 180 / Math.PI).toFixed(0) + '°', ticks: () => [-Math.PI, -Math.PI / 2, 0, Math.PI / 2, Math.PI] }); } };
+  })();
+
+  // =====================================================================
+  // Screen 3: gaps
+  // =====================================================================
+  const S3 = (() => {
+    const st = { m: 1e-2, N: 300, inner: 0.22, spd: 30, colour: true, playing: true };
+    const A_LO = 0.28, A_HI = 0.76, BINS = 48;
+    const RES = [[4, 1], [3, 1], [5, 2], [7, 3], [2, 1]];
+    let pert, t = 0, bodies = [], initHist = [], removed = { planet: 0, inner: 0, ejected: 0 }, checkNext = 0;
+    function reset() {
+      pert = makePerturber(st.m); t = 0; checkNext = 0; removed = { planet: 0, inner: 0, ejected: 0 };
+      const P = pert(0); bodies = [];
+      for (let i = 0; i < st.N; i++) {
+        const a = A_LO + (A_HI - A_LO) * (i + Math.random()) / st.N;      // stratified, so the starting histogram is flat
+        const b = launch(a, 0.01 + 0.03 * Math.random(), st.m, P, Math.random() * TAU);
+        // random mean anomaly: advance along the orbit analytically before starting
+        const M = Math.random() * TAU; const E = kepler(M, 0.02);
+        const nu = Math.atan2(Math.sqrt(1 - 0.0004) * Math.sin(E), Math.cos(E) - 0.02);
+        const ph = Math.random() * TAU, r = a * (1 - 0.02 * Math.cos(E)), v = Math.sqrt(2 / r - 1 / a);
+        // velocity direction from the flight-path angle
+        const gamma = Math.atan2(0.02 * Math.sin(nu), 1 + 0.02 * Math.cos(nu));
+        const ang = ph + nu + Math.PI / 2 - gamma;
+        Object.assign(b, { x: P.sx + r * Math.cos(ph + nu), y: P.sy + r * Math.sin(ph + nu), vx: P.svx + v * Math.cos(ang), vy: P.svy + v * Math.sin(ang), a0: a, e: 0.02, a });
+        bodies.push(b);
+      }
+      initHist = hist(b => b.a0);
+      labels();
+    }
+    function hist(getA) { const h = new Array(BINS).fill(0); bodies.forEach(b => { if (!b.alive) return; const k = Math.floor((getA(b) - A_LO) / (A_HI - A_LO) * BINS); if (k >= 0 && k < BINS) h[k]++; }); return h; }
+    function advance(dtReal) {
+      const P0 = pert(0);
+      const steps = Math.min(900, Math.round(st.spd * dtReal * TAU / P0.n / DT));
+      for (let k = 0; k < steps; k++) {
+        const P1 = pert(t), P2 = pert(t + DT);
+        for (let i = 0; i < bodies.length; i++) { const b = bodies[i]; if (!b.alive) continue;
+          kick(b, P1, st.m, 0.5 * DT); b.x += DT * b.vx; b.y += DT * b.vy; kick(b, P2, st.m, 0.5 * DT); }
+        t += DT;
+      }
+      if (t >= checkNext) {
+        const P = pert(t);
+        bodies.forEach(b => { if (!b.alive) return; const el = elements(b, P); b.a = el.a; b.e = el.e;
+          if (!(el.a > 0) || el.a > 2 || el.e >= 0.99) { b.alive = false; removed.ejected++; }
+          else if (el.a * (1 + el.e) > 0.97) { b.alive = false; removed.planet++; }
+          else if (el.a * (1 - el.e) < st.inner) { b.alive = false; removed.inner++; } });
+        checkNext = t + 0.5;
+      }
+    }
+    function draw() {
+      const { ctx, W, H } = fit($('c3'), 900);
+      ctx.clearRect(0, 0, W, H); ctx.font = '13px ' + C('--sans');
+      const cx = 250, cy = H / 2, S = (Math.min(cx, H / 2) - 14) / 1.02;
+      const P = pert(t);
+      const X = x => cx + (x - P.sx) * S, Y = y => cy - (y - P.sy) * S;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, S, 0, TAU); ctx.stroke();
+      if (st.inner > 0) { ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.arc(cx, cy, st.inner * S, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+      RES.forEach(([p, q]) => { const a = Math.pow(q / p, 2 / 3) * Math.pow(1 + st.m, -1 / 3); ctx.strokeStyle = C('--rule'); ctx.setLineDash([1, 5]); ctx.beginPath(); ctx.arc(cx, cy, a * S, 0, TAU); ctx.stroke(); ctx.setLineDash([]); });
+      bodies.forEach(b => { if (!b.alive) return;
+        ctx.fillStyle = st.colour ? mix(b.e) : C('--body');
+        ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), 2.2, 0, TAU); ctx.fill(); });
+      ctx.fillStyle = C('--star'); ctx.beginPath(); ctx.arc(cx, cy, 9, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('--perturber'); ctx.beginPath(); ctx.arc(X(P.px), Y(P.py), 8, 0, TAU); ctx.fill();
+
+      const T = P.n * t / TAU, rx = 540; let ry = 40;
+      const line = (label, val, color) => { ctx.textAlign = 'left'; ctx.fillStyle = C('--muted'); ctx.fillText(label, rx, ry); ctx.fillStyle = color || C('--ink'); ctx.textAlign = 'right'; ctx.fillText(val, W - 30, ry); ry += 22; };
+      ctx.font = '15px ' + C('--serif'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+      ctx.fillText('Clearing the resonances', rx, ry); ry += 26; ctx.font = '13px ' + C('--sans');
+      line('Elapsed', T.toFixed(0) + ' planet orbits');
+      line('', '(' + (T * 11.86 / 1000).toFixed(1) + ' kyr if the planet were Jupiter)'); ry += 6;
+      const alive = bodies.filter(b => b.alive).length;
+      line('Bodies remaining', alive + ' of ' + bodies.length);
+      line('Removed: crossed the planet\'s orbit', String(removed.planet), C('--hot'));
+      line('Removed: crossed the inner orbit', String(removed.inner), C('--hot'));
+      line('Removed: scattered out', String(removed.ejected), C('--hot'));
+      ry += 6; ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+      ry = wrapText(ctx, 'Bodies near a resonance meet the planet at the same phase every cycle, so their eccentricities are pumped; the rest get kicks from all directions that average out and stay put.', rx, ry, W - 30 - rx, 17);
+      if (st.colour) { ry += 8; ctx.fillStyle = C('--muted'); ctx.fillText('colour: eccentricity 0', rx, ry); const gx = rx + 150;
+        for (let i = 0; i < 80; i++) { ctx.fillStyle = mix(i / 80 * 0.5); ctx.fillRect(gx + i * 1.5, ry - 9, 1.5, 10); }
+        ctx.fillStyle = C('--muted'); ctx.fillText('0.5', gx + 126, ry); }
+    }
+    function mix(e) { const k = Math.min(1, e / 0.5); const r = Math.round(29 + (200 - 29) * k), g = Math.round(79 + (50 - 79) * k), b = Math.round(115 + (30 - 115) * k); return 'rgb(' + r + ',' + g + ',' + b + ')'; }
+    function drawHist() {
+      const { ctx, W, H } = fit($('h3'), 900);
+      ctx.clearRect(0, 0, W, H); ctx.font = '12px ' + C('--sans');
+      const ml = 40, mr = 16, mt = 30, mb = 30, pw = W - ml - mr, ph = H - mt - mb;
+      const cur = hist(b => b.a);
+      const ymax = Math.max(4, ...initHist, ...cur) * 1.15;
+      const X = a => ml + (a - A_LO) / (A_HI - A_LO) * pw, Y = n => mt + (1 - n / ymax) * ph;
+      const bw = pw / BINS;
+      for (let k = 0; k < BINS; k++) {
+        ctx.fillStyle = C('--rule'); ctx.fillRect(ml + k * bw, Y(initHist[k]), bw - 1, mt + ph - Y(initHist[k]));
+        ctx.fillStyle = C('--body'); ctx.fillRect(ml + k * bw, Y(cur[k]), bw - 1, mt + ph - Y(cur[k]));
+      }
+      ctx.strokeStyle = C('--ink'); ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+      RES.forEach(([p, q]) => { const a = Math.pow(q / p, 2 / 3) * Math.pow(1 + st.m, -1 / 3); ctx.beginPath(); ctx.moveTo(X(a) + 0.5, mt - 4); ctx.lineTo(X(a) + 0.5, mt + ph); ctx.stroke();
+        ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText(p + ':' + q, X(a), mt - 8); });
+      ctx.setLineDash([]);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+      for (let a = 0.3; a <= A_HI + 1e-9; a += 0.05) ctx.fillText(a.toFixed(2), X(a), H - 10);
+      ctx.textAlign = 'right'; ctx.fillText('semi-major axis (planet = 1)', W - mr, mt - 8);
+      ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText('grey: start · blue: now', ml, mt - 8);
+    }
+    function labels() {
+      const mj = st.m / 1e-3;
+      $('m3_v').textContent = mj.toFixed(mj < 10 ? 1 : 0) + ' M\u2C7C  (' + (st.m * 100).toFixed(st.m < 0.01 ? 2 : 1) + '% of star)';
+      $('n3_v').textContent = String(st.N);
+      $('in3_v').textContent = st.inner === 0 ? 'none' : st.inner.toFixed(2) + ' planet radii';
+      $('spd3_v').textContent = st.spd + ' planet orbits / s';
+    }
+    function bind() {
+      $('m3').addEventListener('input', () => { st.m = 1e-3 * Math.pow(50, +$('m3').value); reset(); });
+      $('n3').addEventListener('input', () => { st.N = +$('n3').value; reset(); });
+      $('in3').addEventListener('input', () => { st.inner = +$('in3').value; labels(); });
+      $('spd3').addEventListener('input', () => { st.spd = +$('spd3').value; labels(); });
+      $('col3').addEventListener('change', () => { st.colour = $('col3').checked; });
+      $('play3').addEventListener('click', () => { st.playing = !st.playing; $('play3').textContent = st.playing ? 'Pause' : 'Play'; });
+      $('reset3').addEventListener('click', reset);
+      st.m = 1e-3 * Math.pow(50, +$('m3').value);
+      reset();
+    }
+    return { bind, st, frame(dt) { if (st.playing) advance(dt); draw(); drawHist(); } };
+  })();
+
+  // ---------- Tabs and loop ----------
+  const screens = { s1: S1, s2: S2, s3: S3 };
+  let active = 's1';
+  function selectTab(id) {
+    active = id;
+    ['s1', 's2', 's3'].forEach(s => { $(s).hidden = s !== id; $('tab' + s[1]).setAttribute('aria-selected', String(s === id)); });
+    last = null;
+  }
+  ['tab1', 'tab2', 'tab3'].forEach(id => $(id).addEventListener('click', () => selectTab('s' + id[3])));
+  S1.bind(); S2.bind(); S3.bind();
+  // canvas heights via aspect ratios set here so the layout is stable before first draw
+  [['c1', 900 / 520], ['orbit', 900 / 560], ['plotE', 900 / 170], ['plotPhi', 900 / 170], ['c3', 900 / 480], ['h3', 900 / 200]].forEach(([id, r]) => { $(id).style.aspectRatio = String(r); });
+
+  let last = null;
+  function loop(ts) {
+    const dt = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (!document.hidden) screens[active].frame(dt);
+    requestAnimationFrame(loop);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { [S1, S2, S3].forEach(s => { s.st.playing = false; }); ['play1', 'play2', 'play3'].forEach(id => { $(id).textContent = 'Play'; }); }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
