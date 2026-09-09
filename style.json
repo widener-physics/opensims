@@ -1,0 +1,163 @@
+{
+  "$schema_note": "Machine-readable companion to STYLE_GUIDE.md. Hand this file and TEMPLATE.html to an AI model together with a description of the physics you want. The human guide has the reasoning; this has the rules.",
+  "project": {
+    "name": "Open Physics Sims",
+    "license": "GPL-3.0-or-later",
+    "home_link": {
+      "html": "<nav class=\"home\" aria-label=\"Site\"><a href=\"../\">Open Physics Sims</a></nav>",
+      "position": "first child of <main>, before <h1>"
+    },
+    "file_rules": {
+      "single_file": true,
+      "external_requests": "none: no scripts, fonts, stylesheets, images, analytics, or CDN links",
+      "works_offline_from_file_url": true,
+      "file_name": "kebab-case slug matching the sims.js entry, e.g. sims/rolling-race.html",
+      "max_recommended_size_kb": 80
+    }
+  },
+  "tokens": {
+    "colors": {
+      "--paper": "#F2F5F7",
+      "--panel": "#FFFFFF",
+      "--ink": "#172128",
+      "--muted": "#5C6B73",
+      "--rule": "#D3DCE2",
+      "--soft": "#E7EDF1",
+      "--body": "#1D4F73",
+      "--twin": "#9AA7AE",
+      "--ghost": "#B5306D",
+      "--conj": "#D9651B",
+      "--ball": "#D9651B",
+      "--vel": "#2E7D32",
+      "--hot": "#C8321E",
+      "--star": "#E8A317",
+      "--perturber": "#7A4B22",
+      "--track": "#4A5A63",
+      "--water": "#2E6C8C",
+      "--water-light": "#C4DAE6",
+      "--light": "#F2B705"
+    },
+    "color_roles": {
+      "--body": "the primary object under study (a ball, the test body, the boat)",
+      "--twin": "a comparison object drawn in grey",
+      "--ghost": "predicted, theoretical, or osculating paths; drawn dashed",
+      "--conj / --ball": "a secondary moving object or event markers",
+      "--vel": "velocity vectors and 'success' states",
+      "--hot": "warnings, removed bodies, misses",
+      "--star": "the single warm accent; the Sun, a launch point, focus rings on the index page"
+    },
+    "fonts": {
+      "--serif": "\"Iowan Old Style\", \"Palatino Linotype\", Palatino, \"Book Antiqua\", Georgia, serif",
+      "--sans": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+      "usage": {
+        "serif": "h1, lede, notes, readout formulas",
+        "sans": "controls, labels, readout values, all canvas text"
+      },
+      "sizes_px": {
+        "body": 17,
+        "h1": 30,
+        "lede": 17,
+        "controls": 14,
+        "canvas_labels": 13,
+        "canvas_small": 12,
+        "readout_value": 18,
+        "notes": 16
+      }
+    },
+    "layout": {
+      "page_max_width_px": 900,
+      "page_padding": "32px 20px 64px",
+      "panel_border": "1px solid var(--rule)",
+      "panel_radius_px": 4,
+      "canvas_aspect_desktop": "900 / 420 (scene) or 900 / 170 (plot)",
+      "canvas_aspect_phone": "4 / 3 below 640px",
+      "shadows": "none",
+      "gradients": "none",
+      "hover_effects": "none beyond colour change on buttons"
+    },
+    "components": {
+      "button_primary": "background var(--ink); color #fff; border 1px solid var(--ink); radius 4px; padding 6px 14px",
+      "button_secondary": "class 'secondary': transparent background, ink text",
+      "segmented": "div.seg containing buttons with aria-pressed; selected = ink background, white text",
+      "tabs": "div.tabs[role=tablist] > button[role=tab][aria-selected]; underline in --ink for the selected tab",
+      "range": "22px round ink thumb, 4px --rule track, 28px hit height; label on the left, value with units on the right in span.val",
+      "readout": "div.readout > div cards: .k label (muted), .v value (18px), .f formula (serif, muted)",
+      "notes": "div.notes with <b>What to try.</b> paragraph, then assumptions and units",
+      "focus_ring": "3px solid #BFD7E2, offset 2px; never removed"
+    }
+  },
+  "page_structure_in_order": [
+    "nav.home",
+    "h1 (short noun phrase; no 'simulation' in the name)",
+    "p.lede (2-4 sentences: what you see, what will happen, the key physics claim)",
+    "div.tabs (only if there are genuinely different screens)",
+    "canvas (scene), optional stacked plot canvases",
+    "div.transport: Play/Pause button, Reset button, time scrubber (analytic sims), playback speed control (when needed)",
+    "div.readout: numbers with formulas, in HTML not on the canvas",
+    "div.controls: sliders with labels and live values",
+    "div.toggles: checkboxes for views and overlays",
+    "div.notes: 'What to try', then assumptions and units"
+  ],
+  "physics_rules": [
+    "Model functions first in the script, clearly named, equations in comments beside them.",
+    "State units on the page.",
+    "Prefer closed-form solutions where they exist; they make scrubbing exact.",
+    "Use symplectic integration (leapfrog / kick-drift-kick) for orbits and oscillators; fixed small step; remove bodies that leave the domain instead of propagating NaN.",
+    "Any time acceleration, exaggerated parameter, or schematic representation must be stated on screen; exaggerations are sliders that start at the real value.",
+    "Show a limiting-case check in the readout when possible (predicted vs simulated).",
+    "Pause the loop when document.hidden; cap integration steps per frame so slow devices degrade gracefully."
+  ],
+  "interaction_rules": [
+    "Slider changes apply immediately; analytic sims reset t to 0 on parameter change.",
+    "One Play/Pause button whose label changes; Reset returns to t = 0 with current parameters.",
+    "Scrubber works in both directions.",
+    "Playback speed labelled in physical terms ('planet orbits per second', '0.4x slow motion').",
+    "Default the view that makes the main point; default overlays on.",
+    "No autoplaying audio."
+  ],
+  "canvas_rules": [
+    "Draw in CSS pixels: ctx.setTransform(dpr, 0, 0, dpr, 0, 0); compute layout from the canvas's actual CSS size each frame.",
+    "Fit the scene from a bounding box of the whole run so nothing goes off-canvas.",
+    "Predicted paths dashed; trails solid and fading with age.",
+    "Every moving thing keeps one colour across scene, plot, legend, readout.",
+    "Below 560px wide: drop label text on vectors, shorten captions, label every other tick; keep arrows.",
+    "Canvas text 12-13px in screen pixels at all sizes.",
+    "touch-action: pan-y on the canvas."
+  ],
+  "accessibility_rules": [
+    "Respect prefers-reduced-motion: start paused or animate only on user action.",
+    "Real HTML controls with labels; aria-pressed on segmented buttons; role=tab/aria-selected on tabs.",
+    "Never distinguish two things by colour alone; vary line style or shape too.",
+    "Visible focus rings."
+  ],
+  "writing_rules": [
+    "Plain words, short sentences, present tense, written for a student.",
+    "Name things by what they are ('the planet'), not by code names ('the perturber').",
+    "Buttons say what happens; status text reports state.",
+    "No exclamation marks, no emoji, no hype.",
+    "Consistent spelling within a file."
+  ],
+  "header_comment_template": "<!--\n  {TITLE} - part of Open Physics Sims (https://opensims.wu-physics.net)\n  Copyright (C) {YEAR} {AUTHOR}\n  This program is free software: you can redistribute it and/or modify it under the terms of the\n  GNU General Public License as published by the Free Software Foundation, either version 3 of the\n  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see\n  https://www.gnu.org/licenses/gpl-3.0.html for details.\n  Provenance: {e.g. 'Code drafted with an AI model under the author's direction; physics verified by the author.'}\n  Credit: {e.g. 'Independent reimplementation inspired by PhET's Semiconductors (Java) simulation.'}\n-->",
+  "manifest_entry_schema": {
+    "slug": "string, matches file name without .html",
+    "title": "string",
+    "topic": "one of: kinematics, dynamics, rotation, oscillations, thermo, em, optics, modern, astronomy, materials",
+    "tags": "array of 3-6 short strings",
+    "blurb": "1-2 sentences, what it shows and the main thing to notice",
+    "level": "intro | intermediate",
+    "added": "YYYY-MM-DD",
+    "status": "ready | beta",
+    "thumb": "optional path to a 16:9 image"
+  },
+  "submission_checklist": [
+    "Opens from a local file with no network and no console errors",
+    "Physics functions at the top; textbook limiting case reproduced",
+    "Assumptions, units, time acceleration, exaggerations stated on the page",
+    "Usable at 390px wide with readable labels",
+    "Reduced motion respected; loop pauses when hidden",
+    "Home link, GPL header, 'What to try', readouts with formulas present",
+    "sims.js entry added with a real date",
+    "Tried by someone other than the author for two minutes without instructions"
+  ],
+  "prompt_for_ai_generation": "See PROMPT.md in the repository for the full prompt and a worked example. Short form: attach style.json and TEMPLATE.html; describe the physics in one paragraph (what is on screen, what happens, what is adjustable, what the student should notice, what if anything is exaggerated); require the model at the top of the script with equations in comments, units and assumptions on the page, HTML readouts with formulas, a 'What to try' paragraph, offline operation, 390px usability, and the GPL header with provenance; ask for the limiting cases checked and the sims.js entry."
+}
