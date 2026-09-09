@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ballistics cart</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2;
+    --ground: #E3E9EC; --track: #4A5A63; --cart: #1D4F73; --cart-dark: #143A55; --ball: #D9651B; --path: #B5306D;
+    --vel: #2E7D32; --gap: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; min-height: 3.1em; }
+  canvas { display: block; width: 100%; aspect-ratio: 900 / 420; touch-action: pan-y; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 18px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-width: 0; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport input[type=range] { width: 100%; }
+  .transport .time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .hit { color: var(--vel); } .readout .miss { color: var(--gap); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls label[hidden] { display: none; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .toggles { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+  /* touch-friendly range inputs (native look on desktop is fine, but thumbs are too small for fingers) */
+  input[type=range] { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; margin: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  input[type=range]::-moz-range-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -9px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    canvas { aspect-ratio: 4 / 3; }
+    .tabs { flex-wrap: wrap; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; text-align: center; }
+    .tabs button span { display: none; }
+    .transport { grid-template-columns: 1fr 1fr; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .time { grid-column: 1 / -1; text-align: center; margin-top: -4px; }
+    .readout { grid-template-columns: 1fr; }
+    .readout .v { font-size: 17px; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ballistics cart</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Rolling at constant speed</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Accelerating cart</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Rolling down a ramp</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <canvas id="c"></canvas>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
+    <span class="time"><span id="tval">0.00</span> s</span>
+  </div>
+
+  <div class="readout">
+    <div><div class="k">Time in the air</div><div class="v" id="r_T"></div><div class="f" id="f_T"></div></div>
+    <div><div class="k">Where the ball comes down relative to the cart</div><div class="v" id="r_gap"></div><div class="f" id="f_gap"></div></div>
+    <div><div class="k">Horizontal motion during the flight</div><div class="v" id="r_res"></div><div class="f" id="f_res"></div></div>
+  </div>
+
+  <div class="controls">
+    <label><div class="row"><span>Launch speed, relative to the cart</span><span class="val" id="u_v"></span></div>
+      <input type="range" id="u" min="2" max="8" step="0.1" value="5"></label>
+    <label><div class="row"><span>Cart speed at launch</span><span class="val" id="v0_v"></span></div>
+      <input type="range" id="v0" min="0" max="4" step="0.1" value="1.5"></label>
+    <label id="lab_a"><div class="row"><span>Cart acceleration</span><span class="val" id="a_v"></span></div>
+      <input type="range" id="a" min="0" max="4" step="0.1" value="2"></label>
+    <label id="lab_th"><div class="row"><span>Ramp angle</span><span class="val" id="th_v"></span></div>
+      <input type="range" id="th" min="5" max="40" step="1" value="20"></label>
+    <label><div class="row"><span>Playback</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="0.1" max="1" step="0.1" value="0.4"></label>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="follow"> view from the cart</label>
+    <label><input type="checkbox" id="vecs" checked> show velocity components</label>
+    <label id="lab_inertia" hidden><input type="checkbox" id="inertia"> wheels have rotational inertia (cart accelerates at 5&frasl;7 <i>g</i> sin&thinsp;&theta;)</label>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G = 9.8;
+  const CART = { L: 0.6, H: 0.26, wheel: 0.06, tube: 0.22, h0: 0.5 };   // metres; h0 = launch height above the track
+
+  const st = { mode: 1, u: 5, v0: 1.5, a: 2, th: 20, rate: 0.4, follow: false, vecs: true, inertia: false, t: 0, playing: false };
+
+  const TEXT = {
+    1: { lede: 'The cart rolls at constant speed and fires a ball straight up, as seen from the cart. The ball keeps the cart\'s horizontal velocity for the whole flight, so it comes back down into the launcher. The dashed line is the ball\'s path as seen from the ground.',
+         notes: '<p><b>What to try.</b> Tick "view from the cart" and the parabola becomes a straight vertical line: in the cart\'s frame nothing horizontal is happening at all. Change the cart speed and notice that the flight time does not change; only the parabola\'s width does.</p>' },
+    2: { lede: 'Now the cart is being accelerated along the track. At the instant of launch the ball has the cart\'s velocity, but from then on nothing pushes it sideways, while the cart keeps speeding up. The ball lands behind the launcher by the extra distance the cart covered.',
+         notes: '<p><b>What to try.</b> The gap is ½<i>aT</i><sup>2</sup>: double the acceleration and it doubles; double the launch speed and, because <i>T</i> doubles, it quadruples. With a small enough acceleration the gap is less than half the cart\'s length and the ball still lands on the cart. From the cart\'s frame the ball appears to curve backwards, as if a horizontal force were pulling it, which is what a fictitious force in an accelerating frame looks like.</p>' },
+    3: { lede: 'The cart rolls freely down a ramp and fires the ball perpendicular to the ramp surface. Both cart and ball are accelerated down-slope by the same component of gravity, <i>g</i> sin&thinsp;&theta;, so they stay together along the ramp and the ball comes back down into the launcher.',
+         notes: '<p><b>What to try.</b> Split gravity into a component along the ramp and one into it. The along-ramp part acts on the cart and the ball alike; only the into-the-ramp part, <i>g</i> cos&thinsp;&theta;, turns the ball around. Steepen the ramp and the flight lengthens because that component shrinks. Then tick the rotational-inertia box: a real cart with solid wheels accelerates a little less than <i>g</i> sin&thinsp;&theta;, so the ball, which has no wheels, pulls ahead and lands down-slope of it.</p>' }
+  };
+
+  // ---------- Physics in track coordinates (s along the track, n normal to it) ----------
+  function model() {
+    const th = st.mode === 3 ? st.th * Math.PI / 180 : 0;
+    const gs = G * Math.sin(th), gn = G * Math.cos(th);              // gravity components along and into the track
+    const ac = st.mode === 2 ? st.a : st.mode === 3 ? (st.inertia ? 5 / 7 : 1) * gs : 0;
+    const T = 2 * st.u / gn;                                          // back to launch height
+    const gap = 0.5 * (gs - ac) * T * T;                              // ball minus cart, along the track, at time T
+    const onCart = Math.abs(gap) <= CART.L / 2 - 0.04;
+    const Tg = (st.u + Math.sqrt(st.u * st.u + 2 * gn * CART.h0)) / gn;   // reaches the track surface
+    const tEnd = (onCart ? T : Tg) + 0.5;
+    const cart = t => st.v0 * t + 0.5 * ac * t * t;
+    const ball = t => {
+      const tl = onCart ? Math.min(t, T) : Math.min(t, Tg);
+      let s = st.v0 * tl + 0.5 * gs * tl * tl, n = CART.h0 + st.u * tl - 0.5 * gn * tl * tl;
+      if (onCart && t > T) { s = cart(t); n = CART.h0; }
+      if (!onCart && t > Tg) { n = 0.07; }
+      return { s, n };
+    };
+    return { th, gs, gn, ac, T, gap, onCart, Tg, tEnd, cart, ball };
+  }
+  let M = model();
+
+  // track coordinates -> lab metres (track descends to the right by angle th)
+  function lab(s, n) { const c = Math.cos(M.th), si = Math.sin(M.th); return { x: s * c + n * si, y: -s * si + n * c }; }
+
+  // ---------- Drawing ----------
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 3) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * 8, y1 - uy * 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * 10 - uy * 4.5, y1 - uy * 10 + ux * 4.5); ctx.lineTo(x1 - ux * 10 + uy * 4.5, y1 - uy * 10 - ux * 4.5); ctx.closePath(); ctx.fill();
+  }
+
+  function draw() {
+    const { ctx, W, H, compact } = fit($('c'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const t = st.t;
+    const m = compact ? 12 : 20;
+
+    // world bounding box over the whole run
+    let xlo = Infinity, xhi = -Infinity, ylo = Infinity, yhi = -Infinity;
+    const add = p => { xlo = Math.min(xlo, p.x); xhi = Math.max(xhi, p.x); ylo = Math.min(ylo, p.y); yhi = Math.max(yhi, p.y); };
+    for (let k = 0; k <= 60; k++) { const tt = M.tEnd * k / 60; const b = M.ball(tt), c = st.follow ? 0 : M.cart(tt);
+      add(lab(st.follow ? b.s - M.cart(tt) : b.s, b.n)); add(lab(c, 0)); add(lab(c, CART.h0 + 0.2)); }
+    add(lab(-0.9, 0)); add(lab(-0.9, CART.h0 + 0.2));
+    if (M.th > 0 && !st.follow) add(lab(M.cart(M.tEnd) + 0.9, 0));
+    if (st.follow) { add(lab(1.2, 0)); add(lab(-1.2, 0)); }
+    xlo -= 0.3; xhi += 0.3; ylo -= 0.55; yhi += 0.4;
+    const S = Math.min((W - 2 * m) / (xhi - xlo), (H - 30) / (yhi - ylo));
+    let ox = m + ((W - 2 * m) - (xhi - xlo) * S) / 2 - xlo * S;
+    const oy = H - 15 - ((H - 30) - (yhi - ylo) * S) / 2 + ylo * S;
+    // camera follows the cart if requested
+    const cartNow = lab(M.cart(t), 0), cart0 = lab(0, 0);
+    const shift = st.follow ? { x: cartNow.x - cart0.x, y: cartNow.y - cart0.y } : { x: 0, y: 0 };
+    const X = x => ox + (x - shift.x) * S, Y = y => oy - (y - shift.y) * S;
+    const P = (s, n) => { const q = lab(s, n); return [X(q.x), Y(q.y)]; };
+    // in the follow view every point is shown relative to the cart, brought to the cart's current position
+    const rel = (s, n, tt) => { const c = M.cart(tt); return st.follow ? [s - c + M.cart(t), n] : [s, n]; };
+
+    // ground / ramp
+    const sMin = -3, sMax = M.cart(M.tEnd) + 6;
+    const [gx0, gy0] = P(sMin, 0), [gx1, gy1] = P(sMax, 0);
+    ctx.fillStyle = C('--ground');
+    ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx1, gy1); ctx.lineTo(gx1, H + 10); ctx.lineTo(gx0, H + 10); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C('--track'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx1, gy1); ctx.stroke();
+    // metre ticks along the track
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    const every = S < 48 ? 2 : 1;
+    for (let s = Math.ceil(sMin); s <= sMax; s++) {
+      const [tx, ty] = P(s, 0), [tx2, ty2] = P(s, -0.08);
+      ctx.strokeStyle = C('--track'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx2, ty2); ctx.stroke();
+      if (M.th === 0 && s % every === 0) ctx.fillText(s + ' m', tx, ty + 22);
+    }
+    if (M.th > 0) { const [lx, ly] = P(-1.9, -0.3); ctx.save(); ctx.translate(lx, ly); ctx.rotate(M.th); ctx.fillText('ramp, θ = ' + st.th + '°', 0, 0); ctx.restore(); }
+    // launch position marker
+    { const [mx, my] = P(0, 0); ctx.strokeStyle = C('--rule'); ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(...P(0, -0.3)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('launch', ...(M.th === 0 ? [mx, my + 36] : P(0, -0.45))); }
+
+    // predicted path (dashed) and trail (solid)
+    const pathTo = (tmax, dash, color, width) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash);
+      ctx.beginPath();
+      const N = 80;
+      for (let k = 0; k <= N; k++) { const tt = tmax * k / N; const b = M.ball(tt); const [s, n] = rel(b.s, b.n, tt); const [px, py] = P(s, n); k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
+      ctx.stroke(); ctx.setLineDash([]);
+    };
+    pathTo(M.onCart ? M.T : M.Tg, [6, 5], C('--path'), 1.4);
+    if (t > 0) pathTo(Math.min(t, M.onCart ? M.T : M.Tg), [], C('--ball'), 2.2);
+
+    // landing marker on the track when the ball misses
+    if (!M.onCart) {
+      const b = M.ball(M.Tg); const [s, n] = rel(b.s, 0, M.Tg); const [lx, ly] = P(s, 0);
+      ctx.fillStyle = C('--gap'); ctx.beginPath(); ctx.moveTo(lx, ly - 2); ctx.lineTo(lx - 5, ly - 12); ctx.lineTo(lx + 5, ly - 12); ctx.closePath(); ctx.fill();
+    }
+
+    // cart
+    const cs = M.cart(t);
+    const drawCart = (sPos, alpha) => {
+    const [cxp, cyp] = P(sPos, 0);
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.translate(cxp, cyp); ctx.rotate(M.th); ctx.scale(S, -S);
+    ctx.lineWidth = 1 / S;
+    ctx.fillStyle = C('--cart');
+    ctx.fillRect(-CART.L / 2, CART.wheel * 1.6, CART.L, CART.H);
+    ctx.fillStyle = C('--cart-dark');
+    const bodyTop = CART.wheel * 1.6 + CART.H;
+    ctx.fillRect(-0.06, bodyTop - 0.02, 0.12, CART.h0 - bodyTop + 0.02);   // launcher tube up to the launch height
+    [-CART.L / 2 + 0.11, CART.L / 2 - 0.11].forEach(wx => {
+      ctx.fillStyle = C('--track'); ctx.beginPath(); ctx.arc(wx, CART.wheel, CART.wheel, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C('--panel'); ctx.beginPath(); ctx.arc(wx, CART.wheel, CART.wheel * 0.4, 0, Math.PI * 2); ctx.fill();
+      // spoke to show rolling
+      const ang = -sPos / CART.wheel;
+      ctx.strokeStyle = C('--panel'); ctx.lineWidth = 0.012; ctx.beginPath(); ctx.moveTo(wx, CART.wheel); ctx.lineTo(wx + CART.wheel * 0.9 * Math.cos(ang), CART.wheel + CART.wheel * 0.9 * Math.sin(ang)); ctx.stroke();
+    });
+    ctx.restore();
+    };
+    if (!M.onCart && t > M.T && !st.follow) drawCart(M.cart(M.T), 0.25);
+    drawCart(cs, 1);
+
+    // ball
+    const b = M.ball(t);
+    const [bs, bn] = rel(b.s, b.n, t);
+    const [bx, by] = P(bs, bn);
+    ctx.fillStyle = C('--ball'); ctx.beginPath(); ctx.arc(bx, by, Math.max(4, 0.07 * S), 0, Math.PI * 2); ctx.fill();
+
+    // velocity components
+    if (st.vecs) {
+      const inFlight = t > 0 && t < (M.onCart ? M.T : M.Tg);
+      const k = Math.max(0.09 * S, 9);   // px per m/s, with a floor so arrows stay visible on small screens
+      const cv = st.v0 + M.ac * t;                        // cart speed along track
+      const [cvx, cvy] = P(cs + cv * 0.1, 0); const [c0x, c0y] = P(cs, 0);
+      const [ccx, ccy] = P(cs + CART.L / 2 + 0.04, CART.h0 * 0.5);
+      arrow(ctx, ccx, ccy, ccx + (cvx - c0x) * 10 * k / S, ccy + (cvy - c0y) * 10 * k / S, C('--vel'));
+      if (!compact) { ctx.fillStyle = C('--vel'); ctx.textAlign = 'left'; ctx.fillText('cart ' + cv.toFixed(2) + ' m/s', ccx + (cvx - c0x) * 10 * k / S + 6, ccy + 4); }
+      if (inFlight) {
+        const vs = st.v0 + M.gs * t, vn = st.u - M.gn * t;    // ball velocity in track components (lab frame)
+        const vsF = st.follow ? vs - cv : vs;
+        const dir = (ds, dn) => { const q = lab(ds, dn); return [q.x * k, -q.y * k]; };
+        const [ax, ay] = dir(vsF, 0), [nx, ny] = dir(0, vn);
+        arrow(ctx, bx, by, bx + ax, by + ay, C('--vel'));
+        arrow(ctx, bx, by, bx + nx, by + ny, C('--ball'));
+        if (!compact) {
+          ctx.fillStyle = C('--vel'); ctx.textAlign = vsF >= 0 ? 'left' : 'right';
+          if (Math.abs(vsF) > 0.05) ctx.fillText((M.th ? 'along ramp ' : 'horizontal ') + vsF.toFixed(2) + ' m/s', bx + ax + (vsF >= 0 ? 6 : -6), by + ay + 4);
+          ctx.textAlign = 'left';
+          ctx.fillStyle = C('--ball'); ctx.fillText((M.th ? 'normal ' : 'vertical ') + vn.toFixed(2) + ' m/s', bx + nx + 6, by + ny + (vn >= 0 ? -6 : 14));
+        }
+      }
+    }
+
+    // gap annotation at landing
+    if (!M.onCart && t >= M.T) {
+      const cT = M.cart(M.T), bT = M.ball(M.T).s;
+      const [s1] = rel(cT, 0, M.T), [s2] = rel(bT, 0, M.T);
+      const [x1, y1] = P(s1, -0.42), [x2, y2] = P(s2, -0.42);
+      arrow(ctx, x1, y1, x2, y2, C('--gap'), 1.5); arrow(ctx, x2, y2, x1, y1, C('--gap'), 1.5);
+      ctx.fillStyle = C('--gap'); ctx.textAlign = 'center';
+      ctx.fillText(compact ? Math.abs(M.gap).toFixed(2) + ' m ' + (M.gap < 0 ? 'behind' : 'ahead')
+        : Math.abs(M.gap).toFixed(2) + ' m ' + (M.gap < 0 ? 'behind' : 'ahead of') + ' the cart when the ball came back down' + (st.follow ? '' : ' (faded cart)'), (x1 + x2) / 2, (y1 + y2) / 2 + 18);
+    }
+
+    // frame label
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillText(st.follow ? (compact ? 'cart view' : 'view: moving with the cart') : (compact ? 'ground view' : 'view: from the ground'), 12, 18);
+    ctx.textAlign = 'right';
+    ctx.fillText(t < M.T ? 'ball in flight' : M.onCart ? 'ball back on the cart' : t < M.Tg ? 'ball missed the cart' : 'ball on the track', W - 12, 18);
+  }
+
+  // ---------- Readouts ----------
+  function readout() {
+    const m = M;
+    const T = m.T;
+    $('r_T').textContent = T.toFixed(2) + ' s';
+    $('f_T').innerHTML = st.mode === 3 ? '<i>T</i> = 2<i>u</i> / (<i>g</i> cos θ)' : '<i>T</i> = 2<i>u</i> / <i>g</i>';
+    const gapTxt = Math.abs(m.gap) < 0.005 ? 'no offset' : Math.abs(m.gap).toFixed(2) + ' m ' + (m.gap < 0 ? 'behind' : 'ahead');
+    $('r_gap').textContent = gapTxt + (m.onCart ? ' — lands on the cart' : ' — misses the cart');
+    $('r_gap').className = 'v ' + (m.onCart ? 'hit' : 'miss');
+    $('f_gap').innerHTML = st.mode === 1 ? 'both travel <i>v</i><sub>0</sub><i>T</i> = ' + (st.v0 * T).toFixed(2) + ' m' :
+      st.mode === 2 ? 'gap = ½<i>aT</i><sup>2</sup> = ' + (0.5 * st.a * T * T).toFixed(2) + ' m' :
+      'gap = ½(<i>g</i> sin θ − <i>a</i><sub>cart</sub>)<i>T</i><sup>2</sup>';
+    const ballS = st.v0 * T + 0.5 * m.gs * T * T, cartS = m.cart(T);
+    $('r_res').textContent = 'ball ' + ballS.toFixed(2) + ' m, cart ' + cartS.toFixed(2) + ' m';
+    $('f_res').innerHTML = st.mode === 1 ? 'same velocity, no horizontal force on either' :
+      st.mode === 2 ? 'the ball coasts at <i>v</i><sub>0</sub>; the cart keeps accelerating' :
+      'both accelerate down-slope at ' + (m.gs).toFixed(2) + ' m/s² (ball)' + (m.ac === m.gs ? '' : ' vs ' + m.ac.toFixed(2) + ' m/s² (cart)');
+    $('u_v').textContent = st.u.toFixed(1) + ' m/s';
+    $('v0_v').textContent = st.v0.toFixed(1) + ' m/s';
+    $('a_v').textContent = st.a.toFixed(1) + ' m/s²';
+    $('th_v').textContent = st.th + '°';
+    $('rate_v').textContent = st.rate.toFixed(1) + '×' + (st.rate < 1 ? ' (slow motion)' : ' real time');
+    $('tval').textContent = st.t.toFixed(2);
+    scrub.value = String(Math.round(st.t / M.tEnd * 1000));
+  }
+
+  // ---------- Controls ----------
+  const scrub = $('scrub');
+  function setMode(m) {
+    st.mode = m;
+    [1, 2, 3].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === m)));
+    $('lede').innerHTML = TEXT[m].lede; $('notes').innerHTML = TEXT[m].notes;
+    $('lab_a').hidden = m !== 2; $('lab_th').hidden = m !== 3; $('lab_inertia').hidden = m !== 3;
+    rebuild(true);
+  }
+  function rebuild(resetTime) {
+    M = model();
+    if (resetTime) { st.t = 0; st.playing = false; $('play').textContent = 'Play'; }
+    else st.t = Math.min(st.t, M.tEnd);
+    readout(); draw();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setMode(k)));
+  ['u', 'v0', 'a', 'th'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(true); }));
+  $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
+  $('follow').addEventListener('change', () => { st.follow = $('follow').checked; draw(); });
+  $('vecs').addEventListener('change', () => { st.vecs = $('vecs').checked; draw(); });
+  $('inertia').addEventListener('change', () => { st.inertia = $('inertia').checked; rebuild(true); });
+  $('play').addEventListener('click', () => {
+    if (st.playing) { st.playing = false; $('play').textContent = 'Play'; return; }
+    if (st.t >= M.tEnd) st.t = 0;
+    st.playing = true; $('play').textContent = 'Pause'; last = null; requestAnimationFrame(frame);
+  });
+  $('reset').addEventListener('click', () => rebuild(true));
+  scrub.addEventListener('input', () => { st.t = (+scrub.value) / 1000 * M.tEnd; st.playing = false; $('play').textContent = 'Play'; readout(); draw(); });
+  window.addEventListener('resize', draw);
+
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (last !== null) { st.t += (ts - last) / 1000 * st.rate; if (st.t >= M.tEnd) { st.t = M.tEnd; st.playing = false; $('play').textContent = 'Play'; } }
+    last = ts;
+    readout(); draw();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+  setMode(1);
+})();
+</script>
+</body>
+</html>
