@@ -95,14 +95,14 @@
         <input type="range" id="r1" min="-2" max="2" step="0.005" value="-1"></label>
       <label><div class="row"><span>Body's eccentricity</span><span class="val" id="e1_v"></span></div>
         <input type="range" id="e1" min="0" max="0.6" step="0.01" value="0.05"></label>
-      <label><div class="row"><span>First conjunction, measured from the body's pericentre</span><span class="val" id="c1_v"></span></div>
+      <label><div class="row"><span>First conjunction, measured from the body's pericenter</span><span class="val" id="c1_v"></span></div>
         <input type="range" id="c1s" min="0" max="360" step="5" value="180"></label>
       <label><div class="row"><span>Simulation speed</span><span class="val" id="spd1_v"></span></div>
         <input type="range" id="spd1" min="0.2" max="4" step="0.1" value="0.8"></label>
     </div>
     <div class="notes">
       <p><b>What to try.</b> With a simple ratio the markers land on the same few spots forever; nudge the slider off the ratio and they
-        creep around the orbit. For the Pluto preset the two orbits cross, yet with conjunctions at the body's apocentre the closest
+        creep around the orbit. For the Pluto preset the two orbits cross, yet with conjunctions at the body's apocenter the closest
         approach stays large. Drag the conjunction slider toward 0° and watch the closest approach collapse: same orbits, same ratio,
         wrong phase. The rotating frame shows the body's path as the planet sees it, which is how the Pluto and Trojan pictures are usually drawn.</p>
       <p>This screen is pure Kepler: the planet has no mass here. The other two screens turn gravity on.</p>
@@ -161,7 +161,7 @@
       <button id="play3">Pause</button>
       <button id="reset3" class="secondary">Restart</button>
       <span class="grow"></span>
-      <label class="check"><input type="checkbox" id="col3" checked> colour bodies by eccentricity</label>
+      <label class="check"><input type="checkbox" id="col3" checked> color bodies by eccentricity</label>
     </div>
     <div class="controls">
       <label><div class="row"><span>Planet mass (Jupiter masses)</span><span class="val" id="m3_v"></span></div>
@@ -177,7 +177,7 @@
       <p><b>Honesty about time.</b> Real Kirkwood gaps take millions of years to open, which at one Jupiter mass would mean an hour or
         more of watching. The default here uses ten Jupiter masses, which opens the gaps in minutes and exaggerates their width. Set the
         mass to 1 to see how slowly the real thing happens; the elapsed counter tells you how long it has been in Jupiter-years.</p>
-      <p>Each grey bar in the histogram is the starting population; the blue bars are what is left. The dashed lines mark where each
+      <p>Each gray bar in the histogram is the starting population; the blue bars are what is left. The dashed lines mark where each
         resonance sits. Bodies are removed when their orbit crosses the planet's or the inner planet's, or when they are scattered
         out of the system.</p>
     </div>
@@ -238,13 +238,13 @@
       const M = nb * time + M0, E = kepler(M, st.e);
       const nu = Math.atan2(Math.sqrt(1 - st.e * st.e) * Math.sin(E), Math.cos(E) - st.e);
       const r = a * (1 - st.e * Math.cos(E));
-      return { x: r * Math.cos(nu), y: r * Math.sin(nu), nu, r };     // pericentre along +x
+      return { x: r * Math.cos(nu), y: r * Math.sin(nu), nu, r };     // pericenter along +x
     }
     function reset() {
       t = 0; marks = []; minD = Infinity; samples = [];
       a = Math.pow(st.r, 2 / 3); nb = 1 / st.r;
       const nu0 = st.c * Math.PI / 180;
-      M0 = nuToM(nu0, st.e); th0 = nu0;                // start at a conjunction, at the chosen angle from pericentre
+      M0 = nuToM(nu0, st.e); th0 = nu0;                // start at a conjunction, at the chosen angle from pericenter
       // closed path in the rotating frame
       const fr = asFraction(st.r, 0.004);
       const cycles = fr ? Math.min(12, fr[0] / gcd(fr[0], fr[1])) : 12;
@@ -260,7 +260,7 @@
       const fr = asFraction(st.r, 0.004);
       $('r1_v').textContent = fr ? fr[0] + ' : ' + fr[1] + (Math.abs(fr[0] / fr[1] - st.r) > 1e-6 ? '  (≈ ' + st.r.toFixed(3) + ')' : '') : st.r.toFixed(3) + ' (no simple ratio)';
       $('e1_v').textContent = st.e.toFixed(2);
-      $('c1_v').textContent = st.c + '°' + (st.c === 180 ? ' (apocentre)' : st.c === 0 || st.c === 360 ? ' (pericentre)' : '');
+      $('c1_v').textContent = st.c + '°' + (st.c === 180 ? ' (apocenter)' : st.c === 0 || st.c === 360 ? ' (pericenter)' : '');
       $('spd1_v').textContent = st.spd.toFixed(1) + ' planet orbits / s';
     }
     let lastD = null;
@@ -305,11 +305,11 @@
         ctx.beginPath(); path.forEach((p, i) => { const q = [cx + p.x * S, cy - p.y * S]; i === 0 ? ctx.moveTo(q[0], q[1]) : ctx.lineTo(q[0], q[1]); }); ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      // pericentre marker
+      // pericenter marker
       const [ppx, ppy] = T(a * (1 - st.e), 0);
       ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ppx, ppy); ctx.stroke();
-      ctx.fillStyle = C('--ghost'); ctx.textAlign = 'center'; ctx.fillText('pericentre', ppx, ppy - 8);
+      ctx.fillStyle = C('--ghost'); ctx.textAlign = 'center'; ctx.fillText('pericenter', ppx, ppy - 8);
       // conjunction markers
       marks.forEach((mk, i) => {
         let x = mk.x, y = mk.y;
@@ -345,9 +345,9 @@
       let msg;
       if (fr) {
         const g = gcd(fr[0], fr[1]), p = fr[0] / g, q = fr[1] / g, spots = Math.abs(p - q);
-        msg = 'Conjunctions repeat at ' + spots + (spots === 1 ? ' fixed longitude' : ' fixed longitudes') + ', ' + st.c + '° from pericentre. The body always meets the planet in the same place, so the same gravitational kick is applied every time.';
-        if (st.e > 0.15 && st.c > 120 && st.c < 240) msg += ' With the meeting at apocentre the orbits can cross without the bodies ever coming close.';
-        if (st.e > 0.15 && (st.c < 60 || st.c > 300)) msg += ' Meeting at pericentre puts the body as close to the planet as it can get.';
+        msg = 'Conjunctions repeat at ' + spots + (spots === 1 ? ' fixed longitude' : ' fixed longitudes') + ', ' + st.c + '° from pericenter. The body always meets the planet in the same place, so the same gravitational kick is applied every time.';
+        if (st.e > 0.15 && st.c > 120 && st.c < 240) msg += ' With the meeting at apocenter the orbits can cross without the bodies ever coming close.';
+        if (st.e > 0.15 && (st.c < 60 || st.c > 300)) msg += ' Meeting at pericenter puts the body as close to the planet as it can get.';
       } else msg = 'Conjunctions drift around the orbit and sample every longitude, so the kicks come from all directions and average out. This is what no resonance looks like.';
       ry = wrapText(ctx, msg, rx, ry, W - 30 - rx, 17);
 
@@ -395,7 +395,7 @@
     const ex = b.x - P.px, ey = b.y - P.py, q3 = Math.pow(ex * ex + ey * ey, 1.5);
     b.vx += h * (-dx / r3 - m * ex / q3); b.vy += h * (-dy / r3 - m * ey / q3);
   }
-  function launch(a, e, m, P, phase) {   // heliocentric pericentre at longitude `phase`
+  function launch(a, e, m, P, phase) {   // heliocentric pericenter at longitude `phase`
     const rp = a * (1 - e), vp = Math.sqrt((1 + e) / (a * (1 - e)));
     const c = Math.cos(phase), s = Math.sin(phase);
     return { x: P.sx + rp * c, y: P.sy + rp * s, vx: P.svx - vp * s, vy: P.svy + vp * c, alive: true };
@@ -448,14 +448,14 @@
       const win = s.slice(-Math.min(s.length, 400));
       let emin = Infinity, emax = 0, amin = Infinity, amax = 0;
       win.forEach(p => { emin = Math.min(emin, p.e); emax = Math.max(emax, p.e); amin = Math.min(amin, p.a); amax = Math.max(amax, p.a); });
-      const spread = centre => { let lo = Infinity, hi = -Infinity; win.forEach(p => { const d = wrap(p.phi - centre); lo = Math.min(lo, d); hi = Math.max(hi, d); }); return hi - lo; };
+      const spread = center => { let lo = Infinity, hi = -Infinity; win.forEach(p => { const d = wrap(p.phi - center); lo = Math.min(lo, d); hi = Math.max(hi, d); }); return hi - lo; };
       const w0 = spread(0), w1 = spread(Math.PI), ar = aRes();
       const aDev = Math.max(Math.abs(amin / ar - 1), Math.abs(amax / ar - 1)) * 100;
       if (Math.min(w0, w1) < 1.7 * Math.PI) {
         const about = w0 < w1 ? 0 : 180, amp = (Math.min(w0, w1) / 2) * 180 / Math.PI;
         return { text: 'φ librates about ' + about + '° (±' + amp.toFixed(0) + '°): the body is locked in the resonance.', sub: 'a stays within ' + aDev.toFixed(1) + '% of the resonant value; e cycles between ' + emin.toFixed(3) + ' and ' + emax.toFixed(3) + '.' };
       }
-      if (emin < 0.35 * emax && aDev < 3) return { text: 'φ circulates only because e passes near zero, where the pericentre is undefined.', sub: 'The body is still locked: a stays within ' + aDev.toFixed(1) + '% of resonance while e cycles ' + emin.toFixed(3) + ' to ' + emax.toFixed(3) + '.' };
+      if (emin < 0.35 * emax && aDev < 3) return { text: 'φ circulates only because e passes near zero, where the pericenter is undefined.', sub: 'The body is still locked: a stays within ' + aDev.toFixed(1) + '% of resonance while e cycles ' + emin.toFixed(3) + ' to ' + emax.toFixed(3) + '.' };
       return { text: 'φ circulates: the body is not locked in the resonance.', sub: 'a drifts ' + aDev.toFixed(1) + '% from the resonant value.' };
     }
     function drawOrbit() {
@@ -484,7 +484,7 @@
             const px = el.a * (1 - el.e) * Math.cos(el.varpi), py = el.a * (1 - el.e) * Math.sin(el.varpi);
             ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + px * S, cy - py * S); ctx.stroke();
             ctx.fillStyle = C('--ghost'); ctx.beginPath(); ctx.arc(cx + px * S, cy - py * S, 3, 0, TAU); ctx.fill();
-            ctx.textAlign = 'center'; ctx.fillText('pericentre', cx + px * S, cy - py * S - 9);
+            ctx.textAlign = 'center'; ctx.fillText('pericenter', cx + px * S, cy - py * S - 9);
           }
           b.conj.forEach((c, i) => { ctx.fillStyle = C('--conj'); ctx.globalAlpha = 0.25 + 0.75 * (i + 1) / b.conj.length; ctx.beginPath(); ctx.arc(cx + c.x * S, cy - c.y * S, 4, 0, TAU); ctx.fill(); });
           ctx.globalAlpha = 1;
@@ -595,7 +595,7 @@
   // Screen 3: gaps
   // =====================================================================
   const S3 = (() => {
-    const st = { m: 1e-2, N: 300, inner: 0.22, spd: 30, colour: true, playing: true };
+    const st = { m: 1e-2, N: 300, inner: 0.22, spd: 30, color: true, playing: true };
     const A_LO = 0.28, A_HI = 0.76, BINS = 48;
     const RES = [[4, 1], [3, 1], [5, 2], [7, 3], [2, 1]];
     let pert, t = 0, bodies = [], initHist = [], removed = { planet: 0, inner: 0, ejected: 0 }, checkNext = 0;
@@ -648,7 +648,7 @@
       if (st.inner > 0) { ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.arc(cx, cy, st.inner * S, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
       RES.forEach(([p, q]) => { const a = Math.pow(q / p, 2 / 3) * Math.pow(1 + st.m, -1 / 3); ctx.strokeStyle = C('--rule'); ctx.setLineDash([1, 5]); ctx.beginPath(); ctx.arc(cx, cy, a * S, 0, TAU); ctx.stroke(); ctx.setLineDash([]); });
       bodies.forEach(b => { if (!b.alive) return;
-        ctx.fillStyle = st.colour ? mix(b.e) : C('--body');
+        ctx.fillStyle = st.color ? mix(b.e) : C('--body');
         ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), 2.2, 0, TAU); ctx.fill(); });
       ctx.fillStyle = C('--star'); ctx.beginPath(); ctx.arc(cx, cy, 9, 0, TAU); ctx.fill();
       ctx.fillStyle = C('--perturber'); ctx.beginPath(); ctx.arc(X(P.px), Y(P.py), 8, 0, TAU); ctx.fill();
@@ -666,7 +666,7 @@
       line('Removed: scattered out', String(removed.ejected), C('--hot'));
       ry += 6; ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
       ry = wrapText(ctx, 'Bodies near a resonance meet the planet at the same phase every cycle, so their eccentricities are pumped; the rest get kicks from all directions that average out and stay put.', rx, ry, W - 30 - rx, 17);
-      if (st.colour) { ry += 8; ctx.fillStyle = C('--muted'); ctx.fillText('colour: eccentricity 0', rx, ry); const gx = rx + 150;
+      if (st.color) { ry += 8; ctx.fillStyle = C('--muted'); ctx.fillText('color: eccentricity 0', rx, ry); const gx = rx + 150;
         for (let i = 0; i < 80; i++) { ctx.fillStyle = mix(i / 80 * 0.5); ctx.fillRect(gx + i * 1.5, ry - 9, 1.5, 10); }
         ctx.fillStyle = C('--muted'); ctx.fillText('0.5', gx + 126, ry); }
     }
@@ -690,7 +690,7 @@
       ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
       for (let a = 0.3; a <= A_HI + 1e-9; a += 0.05) ctx.fillText(a.toFixed(2), X(a), H - 10);
       ctx.textAlign = 'right'; ctx.fillText('semi-major axis (planet = 1)', W - mr, mt - 8);
-      ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText('grey: start · blue: now', ml, mt - 8);
+      ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText('gray: start · blue: now', ml, mt - 8);
     }
     function labels() {
       const mj = st.m / 1e-3;
@@ -704,7 +704,7 @@
       $('n3').addEventListener('input', () => { st.N = +$('n3').value; reset(); });
       $('in3').addEventListener('input', () => { st.inner = +$('in3').value; labels(); });
       $('spd3').addEventListener('input', () => { st.spd = +$('spd3').value; labels(); });
-      $('col3').addEventListener('change', () => { st.colour = $('col3').checked; });
+      $('col3').addEventListener('change', () => { st.color = $('col3').checked; });
       $('play3').addEventListener('click', () => { st.playing = !st.playing; $('play3').textContent = st.playing ? 'Pause' : 'Play'; });
       $('reset3').addEventListener('click', reset);
       st.m = 1e-3 * Math.pow(50, +$('m3').value);

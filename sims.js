@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'river-crossing',
+    title: 'River crossing',
+    topic: 'kinematics',
+    tags: ['relative velocity', 'vector addition', 'reference frames', 'optimization'],
+    blurb: 'A boat crosses a flowing river. Set its heading and watch the two velocities add: fastest crossing, landing straight across, or least drift when the current wins. A water-frame view straightens the path.',
+    level: 'intro',
+    added: '2026-09-08',
+    status: 'ready'
+  },
+  {
     slug: 'ballistics-cart',
     title: 'Ballistics cart',
     topic: 'kinematics',
@@ -29,8 +39,8 @@ window.SIMS = [
     slug: 'boat-walker',
     title: 'Walking on a boat',
     topic: 'dynamics',
-    tags: ['centre of mass', 'momentum', 'drag', 'impulse'],
-    blurb: 'A person walks the length of a floating boat. Without drag the boat slides back and stays; with linear drag it drifts home while the centre of mass moves. Both cases side by side with x(t) plots.',
+    tags: ['center of mass', 'momentum', 'drag', 'impulse'],
+    blurb: 'A person walks the length of a floating boat. Without drag the boat slides back and stays; with linear drag it drifts home while the center of mass moves. Both cases side by side with x(t) plots.',
     level: 'intro',
     added: '2026-09-02',
     status: 'ready'

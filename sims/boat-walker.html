@@ -128,7 +128,7 @@
     On frictionless water the boat slides back a distance
     <span class="math"><i>m</i><sub>p</sub><i>L</i> / (<i>m</i><sub>p</sub> + <i>m</i><sub>b</sub>)</span>
     and stays there. Add a linear drag force <span class="math"><i>F</i> = &minus;<i>k v</i><sub>b</sub></span>
-    and the boat drifts back to where it started, while the centre of mass of the system moves.
+    and the boat drifts back to where it started, while the center of mass of the system moves.
   </p>
 
   <div class="scene-block">
@@ -176,13 +176,13 @@
       <h2>No drag</h2>
       <p>Predicted boat shift <i>m</i><sub>p</sub><i>L</i>/(<i>m</i><sub>p</sub>+<i>m</i><sub>b</sub>): <span class="num" id="predA"></span></p>
       <p>Simulated boat shift: <span class="num" id="simA"></span></p>
-      <p>Centre of mass shift: <span class="num" id="cmA"></span></p>
+      <p>Center of mass shift: <span class="num" id="cmA"></span></p>
     </div>
     <div>
       <h2>Linear drag</h2>
       <p>Boat shift at the end of the run: <span class="num" id="simB"></span></p>
       <p>Furthest the boat moved: <span class="num" id="maxB"></span></p>
-      <p>Centre of mass shift: <span class="num" id="cmB"></span></p>
+      <p>Center of mass shift: <span class="num" id="cmB"></span></p>
       <p>Net drag impulse &minus;<i>k</i>&int;<i>v</i><sub>b</sub>&thinsp;d<i>t</i> must vanish, so &int;<i>v</i><sub>b</sub>&thinsp;d<i>t</i> = &Delta;<i>x</i><sub>b</sub> &rarr; 0.</p>
     </div>
   </div>
@@ -280,7 +280,7 @@
     T = Math.min(prof.Tw + Math.max(2, Math.min(6 * tau, 40)), 60);
     runA = simulate(P, 0, T, prof);
     runB = simulate(P, P.k, T, prof);
-    // world extent for the scene canvases (metres)
+    // world extent for the scene canvases (meters)
     const halfL = P.L / 2;
     let lo = Infinity, hi = -Infinity;
     [runA, runB].forEach(r => {
@@ -326,7 +326,7 @@
     ctx.clearRect(0, 0, W, H);
     const m = 24;
     const X = x => m + (x - world.lo) / (world.hi - world.lo) * (W - 2 * m);
-    const scale = (W - 2 * m) / (world.hi - world.lo);   // px per metre
+    const scale = (W - 2 * m) / (world.hi - world.lo);   // px per meter
     const waterY = H * 0.66;
 
     // water
@@ -336,7 +336,7 @@
     ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(0, waterY + 0.5); ctx.lineTo(W, waterY + 0.5); ctx.stroke();
 
-    // metre ticks along the bottom
+    // meter ticks along the bottom
     ctx.font = '11px ' + C('--sans');
     ctx.fillStyle = C('--muted');
     ctx.textAlign = 'center';
@@ -346,7 +346,7 @@
       ctx.fillText((Math.abs(x) < 1e-9 ? 0 : x).toFixed(tick < 1 ? 1 : 0), px, H - 3);
     }
 
-    // starting position of the boat's centre
+    // starting position of the boat's center
     ctx.setLineDash([3, 4]);
     ctx.strokeStyle = C('--muted');
     ctx.lineWidth = 1;
@@ -413,7 +413,7 @@
     ctx.beginPath(); ctx.moveTo(px, deckY - 3 - ph * 0.28); ctx.lineTo(px + 5 - spread, deckY - 3); ctx.stroke();
     ctx.lineWidth = 1;
 
-    // centre of mass marker
+    // center of mass marker
     ctx.fillStyle = C('--cm');
     ctx.beginPath();
     ctx.moveTo(X(cm), waterY - 2); ctx.lineTo(X(cm) - 5, waterY - 11); ctx.lineTo(X(cm) + 5, waterY - 11);
@@ -509,7 +509,7 @@
     // legend
     ctx.textAlign = 'left';
     let lx = ml + 4, ly = 14;
-    [['boat', C('--water-deep')], ['person', C('--person')], ['centre of mass', C('--cm')]].forEach(([name, color]) => {
+    [['boat', C('--water-deep')], ['person', C('--person')], ['center of mass', C('--cm')]].forEach(([name, color]) => {
       ctx.fillStyle = color; ctx.fillRect(lx, ly - 5, 14, 3);
       ctx.fillStyle = C('--ink'); ctx.fillText(name, lx + 19, ly);
       lx += 19 + ctx.measureText(name).width + 18;

@@ -141,7 +141,7 @@
     <div>
       <h2>Use it, share it, improve it</h2>
       <p>Use any of these in a lesson, a course site, or a learning management system. Link to a simulation directly, or download the file and host it yourself; it keeps working without this site.</p>
-      <p>To report a problem or contribute a simulation, go to the <a id="repo" href="https://github.com/widener-physics/opensims">repository on GitHub</a>. A new simulation is one file in <code>sims/</code> and one entry in <code>sims.js</code>.</p>
+      <p>To report a problem or contribute a simulation, go to the <a id="repo" href="#">repository on GitHub</a>. A new simulation is one file in <code>sims/</code> and one entry in <code>sims.js</code>.</p>
     </div>
   </section>
 
@@ -170,7 +170,7 @@
   if (hash.get('topic') && (hash.get('topic') === 'all' || TOPICS[hash.get('topic')])) state.topic = hash.get('topic');
   if (hash.get('q')) { state.q = hash.get('q'); $('q').value = state.q; }
 
-  // ---------- Thumbnails: a schematic per topic in the topic colour ----------
+  // ---------- Thumbnails: a schematic per topic in the topic color ----------
   function thumb(sim) {
     const c = TOPICS[sim.topic] ? TOPICS[sim.topic].color : '#5C6B73';
     if (sim.thumb) return '<img src="' + sim.thumb + '" alt="">';

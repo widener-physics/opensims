@@ -51,11 +51,8 @@
   .notes p { margin: 0 0 8px; }
   .notes b { color: var(--ink); font-weight: 600; }
   /* touch-friendly range inputs (native look on desktop is fine, but thumbs are too small for fingers) */
-  input[type=range] { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; margin: 0; }
-  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--rule); border-radius: 2px; }
-  input[type=range]::-moz-range-track { height: 4px; background: var(--rule); border-radius: 2px; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -9px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
-  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
+  /* native range inputs: clearer than a custom track, with a taller hit area for touch */
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
   @media (max-width: 640px) {
     body { padding: 20px 14px 48px; }
     canvas { aspect-ratio: 4 / 3; }
@@ -131,7 +128,7 @@
   const C = n => css.getPropertyValue(n).trim();
   const $ = id => document.getElementById(id);
   const G = 9.8;
-  const CART = { L: 0.6, H: 0.26, wheel: 0.06, tube: 0.22, h0: 0.5 };   // metres; h0 = launch height above the track
+  const CART = { L: 0.6, H: 0.26, wheel: 0.06, tube: 0.22, h0: 0.5 };   // meters; h0 = launch height above the track
 
   const st = { mode: 1, u: 5, v0: 1.5, a: 2, th: 20, rate: 0.4, follow: false, vecs: true, inertia: false, t: 0, playing: false };
 
@@ -166,7 +163,7 @@
   }
   let M = model();
 
-  // track coordinates -> lab metres (track descends to the right by angle th)
+  // track coordinates -> lab meters (track descends to the right by angle th)
   function lab(s, n) { const c = Math.cos(M.th), si = Math.sin(M.th); return { x: s * c + n * si, y: -s * si + n * c }; }
 
   // ---------- Drawing ----------
@@ -221,7 +218,7 @@
     ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx1, gy1); ctx.lineTo(gx1, H + 10); ctx.lineTo(gx0, H + 10); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = C('--track'); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(gx0, gy0); ctx.lineTo(gx1, gy1); ctx.stroke();
-    // metre ticks along the track
+    // meter ticks along the track
     ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
     const every = S < 48 ? 2 : 1;
     for (let s = Math.ceil(sMin); s <= sMax; s++) {

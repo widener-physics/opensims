@@ -43,17 +43,17 @@ If you are using an AI model to draft the code, see `PROMPT.md`: it has the prom
 3. Optionally add `thumb: 'thumbs/rolling-race.png'` for a real screenshot (16:9). Without it the card gets a schematic drawn from the topic.
 4. Run through the checklist at the end of `STYLE_GUIDE.md`, then open a pull request.
 
-To add a topic, add a key to `TOPICS` in `sims.js` with a display name and a colour.
+To add a topic, add a key to `TOPICS` in `sims.js` with a display name and a color.
 
 ## Deploying on Cloudflare Pages
 
 The whole site is static. In the Cloudflare dashboard: Workers & Pages → Create → Pages → connect the GitHub repository. Build command: none. Build output directory: `/`. Every push to `main` redeploys. Add a custom domain from the project's *Custom domains* tab.
 
-## Licence and contributions
+## License and contributions
 
-Everything in this repository is released under the GNU General Public License, version 3 or later; see `LICENSE`. You may use, copy, modify and redistribute it, including commercially, provided derivative work is released under the same licence. Each simulation carries the licence notice in its header so it stays with the file when downloaded.
+Everything in this repository is released under the GNU General Public License, version 3 or later; see `LICENSE`. You may use, copy, modify and redistribute it, including commercially, provided derivative work is released under the same license. Each simulation carries the license notice in its header so it stays with the file when downloaded.
 
-By contributing you agree that your contribution is licensed under the same terms. The project name is not part of the licence: forks are welcome, but please give yours a different name so people can tell them apart.
+By contributing you agree that your contribution is licensed under the same terms. The project name is not part of the license: forks are welcome, but please give yours a different name so people can tell them apart.
 
 ## Credit
 

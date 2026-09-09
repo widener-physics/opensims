@@ -39,7 +39,7 @@
     },
     "color_roles": {
       "--body": "the primary object under study (a ball, the test body, the boat)",
-      "--twin": "a comparison object drawn in grey",
+      "--twin": "a comparison object drawn in gray",
       "--ghost": "predicted, theoretical, or osculating paths; drawn dashed",
       "--conj / --ball": "a secondary moving object or event markers",
       "--vel": "velocity vectors and 'success' states",
@@ -73,14 +73,14 @@
       "canvas_aspect_phone": "4 / 3 below 640px",
       "shadows": "none",
       "gradients": "none",
-      "hover_effects": "none beyond colour change on buttons"
+      "hover_effects": "none beyond color change on buttons"
     },
     "components": {
       "button_primary": "background var(--ink); color #fff; border 1px solid var(--ink); radius 4px; padding 6px 14px",
       "button_secondary": "class 'secondary': transparent background, ink text",
       "segmented": "div.seg containing buttons with aria-pressed; selected = ink background, white text",
       "tabs": "div.tabs[role=tablist] > button[role=tab][aria-selected]; underline in --ink for the selected tab",
-      "range": "22px round ink thumb, 4px --rule track, 28px hit height; label on the left, value with units on the right in span.val",
+      "range": "native <input type=range>, accent-color var(--body), height 28px for touch; label on the left, value with units on the right in span.val; no custom track or thumb",
       "readout": "div.readout > div cards: .k label (muted), .v value (18px), .f formula (serif, muted)",
       "notes": "div.notes with <b>What to try.</b> paragraph, then assumptions and units",
       "focus_ring": "3px solid #BFD7E2, offset 2px; never removed"
@@ -111,7 +111,7 @@
     "Slider changes apply immediately; analytic sims reset t to 0 on parameter change.",
     "One Play/Pause button whose label changes; Reset returns to t = 0 with current parameters.",
     "Scrubber works in both directions.",
-    "Playback speed labelled in physical terms ('planet orbits per second', '0.4x slow motion').",
+    "Playback speed labeled in physical terms ('planet orbits per second', '0.4x slow motion').",
     "Default the view that makes the main point; default overlays on.",
     "No autoplaying audio."
   ],
@@ -119,7 +119,7 @@
     "Draw in CSS pixels: ctx.setTransform(dpr, 0, 0, dpr, 0, 0); compute layout from the canvas's actual CSS size each frame.",
     "Fit the scene from a bounding box of the whole run so nothing goes off-canvas.",
     "Predicted paths dashed; trails solid and fading with age.",
-    "Every moving thing keeps one colour across scene, plot, legend, readout.",
+    "Every moving thing keeps one color across scene, plot, legend, readout.",
     "Below 560px wide: drop label text on vectors, shorten captions, label every other tick; keep arrows.",
     "Canvas text 12-13px in screen pixels at all sizes.",
     "touch-action: pan-y on the canvas."
@@ -127,7 +127,7 @@
   "accessibility_rules": [
     "Respect prefers-reduced-motion: start paused or animate only on user action.",
     "Real HTML controls with labels; aria-pressed on segmented buttons; role=tab/aria-selected on tabs.",
-    "Never distinguish two things by colour alone; vary line style or shape too.",
+    "Never distinguish two things by color alone; vary line style or shape too.",
     "Visible focus rings."
   ],
   "writing_rules": [
@@ -135,7 +135,7 @@
     "Name things by what they are ('the planet'), not by code names ('the perturber').",
     "Buttons say what happens; status text reports state.",
     "No exclamation marks, no emoji, no hype.",
-    "Consistent spelling within a file."
+    "American spelling throughout (meter, center, color, gray)."
   ],
   "header_comment_template": "<!--\n  {TITLE} - part of Open Physics Sims (https://opensims.wu-physics.net)\n  Copyright (C) {YEAR} {AUTHOR}\n  This program is free software: you can redistribute it and/or modify it under the terms of the\n  GNU General Public License as published by the Free Software Foundation, either version 3 of the\n  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see\n  https://www.gnu.org/licenses/gpl-3.0.html for details.\n  Provenance: {e.g. 'Code drafted with an AI model under the author's direction; physics verified by the author.'}\n  Credit: {e.g. 'Independent reimplementation inspired by PhET's Semiconductors (Java) simulation.'}\n-->",
   "manifest_entry_schema": {
