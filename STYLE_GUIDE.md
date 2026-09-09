@@ -64,7 +64,7 @@ Use the CSS custom properties exactly as named in `style.json`; every sim shares
 The canvas is designed for a ~900px-wide desktop column, but must be usable at 390px:
 
 - Draw canvas text in CSS pixels, not scaled design units, so labels stay 12–13px everywhere.
-- Below ~640px switch the canvas to a taller aspect ratio (4:3) and let the scene fit the extra height.
+- Below ~640px give the canvas a taller aspect ratio (4:3 is a good default) and let the scene fit the extra height. If the scene is inherently wide, as in a multi-lane race, keep it wide instead; the point is to use the space, not to hit a particular ratio.
 - Below ~560px drop non-essential canvas labels (keep the arrows, drop their captions); the HTML readouts carry the numbers.
 - Native range inputs (no custom track), with `accent-color: var(--body)` and a 28px hit height; transport controls wrap onto their own rows.
 - `touch-action: pan-y` on the canvas so the page still scrolls.
@@ -77,7 +77,7 @@ The canvas is designed for a ~900px-wide desktop column, but must be usable at 3
 - Name things by what they are, not what they're called in code: "the planet", not "the perturber", in anything a student reads. Physics terms are fine when they're the point ("depletion region", "resonant angle").
 - Button labels say what happens: "Open simulation", "Restart", "Show band diagram". Status text reports state: "ball in flight", "φ is librating".
 - No exclamation marks, no "cool", no emoji.
-- American spelling ("meter", "center", "color", "gray"), so the library reads as one voice.
+- American spelling ("meter", "center", "color", "gray"), so the library reads as one voice. Write "metric ton" rather than "tonne" wherever the unit appears, since a plain "ton" means something else in the United States.
 
 ## 9. License, credit, and AI-generated code
 

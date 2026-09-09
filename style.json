@@ -135,7 +135,7 @@
     "Name things by what they are ('the planet'), not by code names ('the perturber').",
     "Buttons say what happens; status text reports state.",
     "No exclamation marks, no emoji, no hype.",
-    "American spelling throughout (meter, center, color, gray)."
+    "American spelling throughout (meter, center, color, gray); write \"metric ton\", never \"tonne\", and never a bare \"ton\" for 1000 kg."
   ],
   "header_comment_template": "<!--\n  {TITLE} - part of Open Physics Sims (https://opensims.wu-physics.net)\n  Copyright (C) {YEAR} {AUTHOR}\n  This program is free software: you can redistribute it and/or modify it under the terms of the\n  GNU General Public License as published by the Free Software Foundation, either version 3 of the\n  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see\n  https://www.gnu.org/licenses/gpl-3.0.html for details.\n  Provenance: {e.g. 'Code drafted with an AI model under the author's direction; physics verified by the author.'}\n  Credit: {e.g. 'Independent reimplementation inspired by PhET's Semiconductors (Java) simulation.'}\n-->",
   "manifest_entry_schema": {

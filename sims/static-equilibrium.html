@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<!--
+  Static equilibrium - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author
+  against torques taken about two different points, the symmetric-loading case, and the closed form for
+  the ladder's critical angle.
+  Credit: none; beams, ladders and booms are standard textbook problems.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Static equilibrium</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --weight: #D9651B; --normal: #1D4F73; --friction: #8B2E86; --tension: #2E7D32; --hinge: #C8321E;
+    --beam: #7A4B22; --wall: #4A5A63;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; min-height: 3em; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-width: 0; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+  #scene { aspect-ratio: 900 / 420; }
+  #torque { aspect-ratio: 900 / 150; margin-top: 12px; }
+
+  .transport { display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  .transport .poslabel { color: var(--muted); white-space: nowrap; }
+  .transport input[type=range] { width: 100%; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport .pos { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { min-width: 0; padding: 5px 11px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); } .readout .no { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls label[hidden], .toggles label[hidden] { display: none; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .toggles { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; align-items: center; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 4 / 3; }
+    #torque { aspect-ratio: 5 / 2; }
+    .tabs button { padding: 8px 9px; font-size: 13.5px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+    .transport { grid-template-columns: 1fr auto; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .pos { text-align: left; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Static equilibrium</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Beam on two supports</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Ladder against a wall</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Boom and cable</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <canvas id="scene"></canvas>
+
+  <div class="transport">
+    <label class="poslabel" for="pos" id="poslabel">Load position</label>
+    <input type="range" id="pos" min="0" max="1000" step="1" value="500">
+    <span class="pos" id="posv"></span>
+    <button id="reset" class="secondary">Reset</button>
+  </div>
+
+  <canvas id="torque"></canvas>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_L"><div class="row"><span id="Llabel">Beam length</span><span class="val" id="L_v"></span></div>
+      <input type="range" id="L" min="2" max="6" step="0.1" value="4"></label>
+    <label id="lab_mb"><div class="row"><span id="mblabel">Beam mass</span><span class="val" id="mb_v"></span></div>
+      <input type="range" id="mb" min="5" max="60" step="1" value="20"></label>
+    <label id="lab_mL"><div class="row"><span id="mLlabel">Load mass</span><span class="val" id="mL_v"></span></div>
+      <input type="range" id="mL" min="0" max="200" step="5" value="80"></label>
+    <label id="lab_xA"><div class="row"><span>Left support position</span><span class="val" id="xA_v"></span></div>
+      <input type="range" id="xA" min="0" max="0.4" step="0.01" value="0.12"></label>
+    <label id="lab_xB"><div class="row"><span>Right support position</span><span class="val" id="xB_v"></span></div>
+      <input type="range" id="xB" min="0.6" max="1" step="0.01" value="0.88"></label>
+    <label id="lab_th"><div class="row"><span>Ladder angle from the floor</span><span class="val" id="th_v"></span></div>
+      <input type="range" id="th" min="20" max="80" step="1" value="65"></label>
+    <label id="lab_mu"><div class="row"><span>Friction coefficient at the floor</span><span class="val" id="mu_v"></span></div>
+      <input type="range" id="mu" min="0.05" max="0.9" step="0.01" value="0.4"></label>
+    <label id="lab_h"><div class="row"><span>Cable anchor height on the wall</span><span class="val" id="h_v"></span></div>
+      <input type="range" id="h" min="0.4" max="4" step="0.1" value="2.2"></label>
+  </div>
+
+  <div class="toggles">
+    <label id="lab_pivot"><span>Take torques about</span>
+      <span class="seg" id="pivotseg" role="group" aria-label="Pivot point">
+        <button data-p="A">left support</button><button data-p="B">right support</button><button data-p="mid">middle</button><button data-p="load">the load</button>
+      </span></label>
+    <label id="lab_poly"><input type="checkbox" id="poly" checked> show the force polygon</label>
+    <label id="lab_vals"><input type="checkbox" id="vals" checked> label forces with their size</label>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G = 9.8;
+
+  const st = { tab: 1, L: 4, mb: 20, mL: 80, xA: 0.12, xB: 0.88, th: 65, mu: 0.4, h: 2.2,
+    pos: 0.5, pivot: 'A', poly: true, vals: true };
+
+  const TEXT = {
+    1: { lede: 'A plank rests on two supports. Nothing moves, so the forces up must balance the forces down and the turning effects must cancel too. Those two conditions are enough to work out how hard each support pushes. Slide the load along and watch the share move from one support to the other.',
+         notes: '<p><b>What to try.</b> Use the "take torques about" buttons. The two bars below the scene are the clockwise and counter-clockwise torques, and they stay equal whichever point you pick, even a point with no force acting at it. That is the useful trick: choose the pivot that makes an unknown force disappear from the equation. Then slide the load out past the right support until the left reaction goes negative. A support that can only push has run out of options, and the plank tips.</p>' },
+    2: { lede: 'A ladder leans against a smooth wall. The wall can only push straight out, so the only thing stopping the foot from sliding is friction with the floor. As someone climbs, the wall has to push harder, and so does friction, until it reaches its limit and the ladder goes.',
+         notes: '<p><b>What to try.</b> Drag the climber up the ladder. The friction needed grows with height, and the readout turns red at the moment it exceeds what the floor can supply; the ladder in the scene says so too. Now lower the angle: the ladder becomes unsafe much earlier, because a shallower ladder needs more horizontal push at the wall. The critical angle satisfies tan θ = (½<i>W</i> + <i>fW</i><sub>p</sub>)/(μ(<i>W</i> + <i>W</i><sub>p</sub>)), and the readout shows it for the current climber position.</p>' },
+    3: { lede: 'A boom is hinged to a wall and held up by a cable. The cable can only pull along its own length, so the hinge has to supply whatever is left over. The force at the hinge is usually the surprise: it does not point along the boom, and it can be larger than the load being lifted.',
+         notes: '<p><b>What to try.</b> Lower the cable anchor so the cable is nearly parallel to the boom. The tension climbs steeply, because only the small perpendicular part of it does any turning, and the hinge force climbs with it. That is why derricks have their cables anchored high. Watch the force polygon: three or four forces laid tip to tail always close into a loop, which is what ΣF = 0 looks like as a picture.</p>' }
+  };
+
+  // ================================================================
+  // 1. MODEL. Two conditions in every case: sum of forces zero, sum of torques zero.
+  //    Beam:   N_A + N_B = W_b + W_L,   N_B (x_B - x_A) = W_b (L/2 - x_A) + W_L (x_L - x_A)
+  //    Ladder: N_wall = (W_b (L/2) + W_p f L) cos(th) / (L sin(th)) = cot(th)(W_b/2 + W_p f)
+  //            N_floor = W_b + W_p,  friction needed = N_wall,  slips when N_wall > mu N_floor
+  //            critical angle:  tan(th) = (W_b/2 + W_p f) / (mu (W_b + W_p))
+  //    Boom:   T sin(phi) L = W_b (L/2) + W_L d,  H_x = T cos(phi),  H_y = W_b + W_L - T sin(phi)
+  //    Forces are returned as {x, y, fx, fy, label, color} so one routine can draw and check them all.
+  // ================================================================
+  function model() {
+    const L = st.L, Wb = st.mb * G, WL = st.mL * G;
+    const F = [];                                     // every force, for drawing and for the polygon
+    let out = { L, Wb, WL, forces: F };
+
+    if (st.tab === 1) {
+      const xA = st.xA * L, xB = st.xB * L, xL = st.pos * L;
+      const NB = (Wb * (L / 2 - xA) + WL * (xL - xA)) / (xB - xA);
+      const NA = Wb + WL - NB;
+      F.push({ x: L / 2, y: 0, fx: 0, fy: -Wb, label: 'weight of the plank', color: '--weight' });
+      F.push({ x: xL, y: 0, fx: 0, fy: -WL, label: 'load', color: '--star' });
+      F.push({ x: xA, y: 0, fx: 0, fy: NA, label: 'left support', color: '--normal' });
+      F.push({ x: xB, y: 0, fx: 0, fy: NB, label: 'right support', color: '--normal' });
+      const pivotX = st.pivot === 'A' ? xA : st.pivot === 'B' ? xB : st.pivot === 'mid' ? L / 2 : xL;
+      out = { ...out, kind: 'beam', xA, xB, xL, NA, NB, pivotX, pivot: { x: pivotX, y: 0 },
+        tips: NA < 0 || NB < 0, tipAt: NA < 0 ? 'right' : 'left' };
+    }
+
+    if (st.tab === 2) {
+      const th = st.th * Math.PI / 180, frac = 0.06 + 0.88 * st.pos, Wp = st.mL * G;
+      const Nw = Math.cos(th) / Math.sin(th) * (Wb / 2 + Wp * frac);
+      const Nf = Wb + Wp, fMax = st.mu * Nf, muReq = Nw / Nf;
+      const thMin = Math.atan((Wb / 2 + Wp * frac) / (st.mu * Nf)) * 180 / Math.PI;
+      const top = { x: L * Math.cos(th), y: L * Math.sin(th) };
+      F.push({ x: L / 2 * Math.cos(th), y: L / 2 * Math.sin(th), fx: 0, fy: -Wb, label: 'weight of the ladder', color: '--weight' });
+      F.push({ x: frac * L * Math.cos(th), y: frac * L * Math.sin(th), fx: 0, fy: -Wp, label: 'climber', color: '--star' });
+      F.push({ x: top.x, y: top.y, fx: -Nw, fy: 0, label: 'wall pushes out', color: '--normal' });
+      F.push({ x: 0, y: 0, fx: 0, fy: Nf, label: 'floor pushes up', color: '--normal' });
+      F.push({ x: 0, y: 0, fx: Nw, fy: 0, label: 'friction', color: '--friction' });
+      out = { ...out, kind: 'ladder', th, frac, Wp, Nw, Nf, fMax, muReq, thMin, top,
+        slips: Nw > fMax, pivot: { x: 0, y: 0 }, WL: Wp };
+    }
+
+    if (st.tab === 3) {
+      const h = st.h, d = (0.15 + 0.85 * st.pos) * L;
+      const phi = Math.atan2(h, L);
+      const T = (Wb * L / 2 + WL * d) / (L * Math.sin(phi));
+      const Hx = T * Math.cos(phi), Hy = Wb + WL - T * Math.sin(phi);
+      F.push({ x: L / 2, y: 0, fx: 0, fy: -Wb, label: 'weight of the boom', color: '--weight' });
+      F.push({ x: d, y: 0, fx: 0, fy: -WL, label: 'load', color: '--star' });
+      F.push({ x: L, y: 0, fx: -T * Math.cos(phi), fy: T * Math.sin(phi), label: 'cable tension', color: '--tension' });
+      F.push({ x: 0, y: 0, fx: Hx, fy: Hy, label: 'hinge', color: '--hinge' });
+      out = { ...out, kind: 'boom', h, d, phi, T, Hx, Hy,
+        Hmag: Math.hypot(Hx, Hy), Hang: Math.atan2(Hy, Hx) * 180 / Math.PI, pivot: { x: 0, y: 0 } };
+    }
+
+    // residuals, shown on the page so the solution can be checked rather than trusted
+    out.sumFx = F.reduce((s, f) => s + f.fx, 0);
+    out.sumFy = F.reduce((s, f) => s + f.fy, 0);
+    out.Fmax = Math.max(...F.map(f => Math.hypot(f.fx, f.fy)), 1);
+    // Torque of every force about the pivot:  tau = (x - px) fy - (y - py) fx,  positive out of the page.
+    const pv = out.pivot;
+    out.torques = F.map(f => ({ label: f.label, color: f.color, tau: (f.x - pv.x) * f.fy - (f.y - pv.y) * f.fx }));
+    out.cw = out.torques.filter(t => t.tau < 0).reduce((a, t) => a - t.tau, 0);
+    out.ccw = out.torques.filter(t => t.tau > 0).reduce((a, t) => a + t.tau, 0);
+    // A fixed reference so the bar lengths mean something absolute and change with the load:
+    // the largest torque the total weight could produce over the whole length.
+    out.tauRef = (out.Wb + (out.WL || 0)) * out.L * 1.02;
+    return out;
+  }
+  let M = model();
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(10, L * 0.5);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2.4;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.8, y1 - uy * hd * 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.42, y1 - uy * hd + ux * hd * 0.42);
+    ctx.lineTo(x1 - ux * hd + uy * hd * 0.42, y1 - uy * hd - ux * hd * 0.42); ctx.closePath(); ctx.fill();
+  }
+  const N = v => Math.abs(v) >= 1000 ? (v / 1000).toFixed(2) + ' kN' : v.toFixed(0) + ' N';
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const L = M.L, m = compact ? 12 : 26;
+    // world box per case
+    let wx = [-0.3, L + 0.3], wy = [-0.9, 0.9];
+    if (M.kind === 'ladder') { wx = [-0.6, L * Math.cos(M.th) + 0.6]; wy = [-0.5, M.top.y + 0.6]; }
+    if (M.kind === 'boom') { wx = [-0.8, L + 0.5]; wy = [-1.5, Math.max(M.h, 1) + 0.4]; }
+    const S = Math.min((W - 2 * m) / (wx[1] - wx[0]), (H - 2 * m) / (wy[1] - wy[0]));
+    const ox = m + ((W - 2 * m) - (wx[1] - wx[0]) * S) / 2 - wx[0] * S;
+    const oy = H - m - ((H - 2 * m) - (wy[1] - wy[0]) * S) / 2 + wy[0] * S;
+    const X = x => ox + x * S, Y = y => oy - y * S;
+    const fscale = (compact ? 0.13 : 0.19) * Math.min(W, H) / M.Fmax;
+
+    if (M.kind === 'beam') {
+      // plank
+      ctx.fillStyle = C('--beam'); ctx.fillRect(X(0), Y(0) - 7, X(L) - X(0), 14);
+      // supports as triangles
+      [M.xA, M.xB].forEach((xs, i) => {
+        ctx.fillStyle = C('--wall');
+        ctx.beginPath(); ctx.moveTo(X(xs), Y(0) + 8); ctx.lineTo(X(xs) - 13, Y(0) + 32); ctx.lineTo(X(xs) + 13, Y(0) + 32); ctx.closePath(); ctx.fill();
+        ctx.fillRect(X(xs) - 20, Y(0) + 32, 40, 5);
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+        ctx.fillText(i ? 'B' : 'A', X(xs), Y(0) + 50);
+      });
+      // load as a block sitting on the plank
+      ctx.fillStyle = C('--star');
+      const bw = Math.max(16, 0.16 * S);
+      ctx.fillRect(X(M.xL) - bw / 2, Y(0) - 7 - bw * 0.7, bw, bw * 0.7);
+      // metre scale along the plank
+      ctx.strokeStyle = 'rgba(23,33,40,0.3)'; ctx.lineWidth = 1; ctx.fillStyle = C('--muted');
+      for (let x = 0; x <= L + 1e-9; x += 1) { ctx.beginPath(); ctx.moveTo(X(x), Y(0) + 62); ctx.lineTo(X(x), Y(0) + 68); ctx.stroke();
+        ctx.textAlign = 'center'; ctx.fillText(x + ' m', X(x), Y(0) + 82); }
+      // pivot marker
+      ctx.strokeStyle = C('--muted'); ctx.setLineDash([3, 4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X(M.pivotX), Y(0) - 90); ctx.lineTo(X(M.pivotX), Y(0) + 60); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('torques about here', X(M.pivotX), Y(0) - 96);
+      if (M.tips) { ctx.fillStyle = C('--hot'); ctx.textAlign = 'center'; ctx.font = '14px ' + C('--sans');
+        ctx.fillText('the plank tips about the ' + M.tipAt + ' support', W / 2, H - 12); }
+    }
+
+    if (M.kind === 'ladder') {
+      // wall and floor
+      ctx.fillStyle = C('--soft'); ctx.fillRect(0, Y(0), W, H - Y(0));
+      ctx.fillRect(X(M.top.x), 0, W - X(M.top.x), Y(0));
+      ctx.strokeStyle = C('--wall'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(X(wx[0]), Y(0)); ctx.lineTo(X(wx[1]), Y(0)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(X(M.top.x), Y(0)); ctx.lineTo(X(M.top.x), 0); ctx.stroke();
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+      ctx.fillText('smooth wall', X(M.top.x) + 8, Y(M.top.y * 0.55));
+      // ladder with rungs
+      ctx.strokeStyle = C('--beam'); ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(M.top.x), Y(M.top.y)); ctx.stroke();
+      ctx.lineWidth = 1.5;
+      for (let k = 1; k < 8; k++) { const f = k / 8, px = X(f * M.top.x), py = Y(f * M.top.y);
+        const nx = -Math.sin(M.th) * 7, ny = -Math.cos(M.th) * 7;
+        ctx.beginPath(); ctx.moveTo(px - nx, py + ny); ctx.lineTo(px + nx, py - ny); ctx.stroke(); }
+      ctx.lineCap = 'butt';
+      // climber
+      const cx = X(M.frac * M.top.x), cy = Y(M.frac * M.top.y);
+      ctx.fillStyle = C('--star'); ctx.beginPath(); ctx.arc(cx, cy - 9, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = C('--star'); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cx, cy - 4); ctx.lineTo(cx, cy + 8); ctx.stroke();
+      // angle arc
+      ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(X(0), Y(0), 34, -M.th, 0); ctx.stroke();
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+      ctx.fillText(st.th + '°', X(0) + 40, Y(0) - 12);
+      if (M.slips) { ctx.fillStyle = C('--hot'); ctx.textAlign = 'center'; ctx.font = '14px ' + C('--sans');
+        ctx.fillText('the foot slips: friction cannot supply ' + N(M.Nw), W / 2, H - 12); }
+    }
+
+    if (M.kind === 'boom') {
+      // wall
+      ctx.fillStyle = C('--soft'); ctx.fillRect(0, 0, X(0), H);
+      ctx.strokeStyle = C('--wall'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke();
+      // cable
+      ctx.strokeStyle = C('--tension'); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(X(0), Y(M.h)); ctx.lineTo(X(M.L), Y(0)); ctx.stroke();
+      // boom
+      ctx.fillStyle = C('--beam'); ctx.fillRect(X(0), Y(0) - 7, X(M.L) - X(0), 14);
+      // hinge
+      ctx.fillStyle = C('--wall'); ctx.beginPath(); ctx.arc(X(0), Y(0), 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C('--panel'); ctx.beginPath(); ctx.arc(X(0), Y(0), 3, 0, Math.PI * 2); ctx.fill();
+      // load hanging from the boom
+      const bw = Math.max(16, 0.14 * S);
+      ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X(M.d), Y(0) + 7); ctx.lineTo(X(M.d), Y(0) + 7 + bw * 0.5); ctx.stroke();
+      ctx.fillStyle = C('--star'); ctx.fillRect(X(M.d) - bw / 2, Y(0) + 7 + bw * 0.5, bw, bw * 0.7);
+      // cable angle arc
+      ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(X(M.L), Y(0), 30, Math.PI - M.phi, Math.PI); ctx.stroke();
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.font = '12px ' + C('--sans');
+      ctx.fillText((M.phi * 180 / Math.PI).toFixed(0) + '°', X(M.L) - 34, Y(0) - 8);
+    }
+
+    // force arrows, common to all three
+    M.forces.forEach(f => {
+      const mag = Math.hypot(f.fx, f.fy); if (mag < 1) return;
+      const x0 = X(f.x), y0 = Y(f.y);
+      const x1 = x0 + f.fx * fscale, y1 = y0 - f.fy * fscale;
+      arrow(ctx, x0, y0, x1, y1, C(f.color), 2.4);
+      if (st.vals) {
+        ctx.fillStyle = C(f.color); ctx.font = (compact ? '11px ' : '12px ') + C('--sans');
+        const ux = (x1 - x0) / mag / fscale, uy = (y1 - y0) / mag / fscale;
+        ctx.textAlign = Math.abs(ux) > Math.abs(uy) ? (ux > 0 ? 'left' : 'right') : 'center';
+        ctx.fillText((compact ? '' : f.label + '  ') + N(mag), x1 + ux * 8, y1 + uy * 8 + (Math.abs(uy) > Math.abs(ux) ? (uy > 0 ? 14 : -6) : 4));
+      }
+    });
+
+    // force polygon: the same vectors laid tip to tail, closing because the net force is zero
+    if (st.poly && W > 430) {
+      // The same force vectors laid tip to tail. If they close into a loop, the net force is zero.
+      // All-vertical sets are stepped sideways so the individual arrows can be told apart.
+      const pw = compact ? 100 : 152, phh = compact ? 116 : 172;
+      const bx = W - pw - 6, by = 6, pad = 14, top = by + (compact ? 22 : 26);
+      ctx.fillStyle = C('--panel'); ctx.globalAlpha = 0.94; ctx.fillRect(bx, by, pw, phh); ctx.globalAlpha = 1;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(bx, by, pw, phh);
+      ctx.font = '11px ' + C('--sans'); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+      ctx.fillText('forces tip to tail', bx + pw / 2, by + 15);
+
+      const allVert = M.forces.every(f => Math.abs(f.fx) < 1);
+      const stepU = allVert ? 1 : 0;                       // one unit of sideways step per force
+      const pts = [{ u: 0, w: 0 }];
+      M.forces.forEach(f => { const p = pts[pts.length - 1]; pts.push({ u: p.u + f.fx, w: p.w + f.fy, step: stepU }); });
+      let ulo = 0, uhi = 0, wlo = 0, whi = 0;
+      pts.forEach(p => { ulo = Math.min(ulo, p.u); uhi = Math.max(uhi, p.u); wlo = Math.min(wlo, p.w); whi = Math.max(whi, p.w); });
+      const stepsTotal = stepU * M.forces.length;
+      const availW = pw - 2 * pad, availH = phh - (top - by) - (compact ? 20 : 34);
+      const sc = Math.min((availW - stepsTotal * (compact ? 15 : 22)) / Math.max(uhi - ulo, 1e-9) || Infinity,
+                          availH / Math.max(whi - wlo, 1e-9));
+      const stepPx = stepU * (compact ? 15 : 22);
+      const x0 = bx + pad + (allVert ? 0 : (availW - (uhi - ulo) * sc) / 2 - ulo * sc);
+      const y0 = top + (availH - (whi - wlo) * sc) / 2 + whi * sc;
+      let px = x0, py = y0;
+      M.forces.forEach(f => {
+        const nx = px + f.fx * sc + stepPx, ny = py - f.fy * sc;
+        arrow(ctx, px, py, nx, ny, C(f.color), 1.8);
+        px = nx; py = ny;
+      });
+      ctx.fillStyle = C('--vel'); ctx.beginPath(); ctx.arc(x0, y0, 3, 0, Math.PI * 2); ctx.fill();
+      const gap = Math.hypot(px - x0 - stepPx * M.forces.length, py - y0);
+      ctx.fillStyle = gap < 2 ? C('--vel') : C('--hot'); ctx.textAlign = 'center';
+      ctx.fillText(gap < 2 ? (allVert ? 'ends level with the start' : 'closed') : 'not closed', bx + pw / 2, by + phh - 8);
+      if (allVert && !compact) { ctx.fillStyle = C('--muted'); ctx.fillText('stepped sideways to separate', bx + pw / 2, by + phh - 21); }
+    }
+  }
+
+  // Clockwise and counter-clockwise torque bars, split into one segment per force.
+  // Both bars use the same fixed scale, so their length says how big the torques are,
+  // not just that they are equal.
+  function drawTorque() {
+    const { ctx, W, H, compact } = fit($('torque'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const ml = compact ? 78 : 168, mr = compact ? 52 : 120, mt = 28, mb = compact ? 34 : 24;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    const barH = Math.min(26, (ph - 34) / 2);
+    const ref = M.tauRef;
+    const label = M.kind === 'beam' ? 'about the chosen point' : M.kind === 'ladder' ? 'about the foot of the ladder' : 'about the hinge';
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText('turning effects ' + label + ' (N·m)', ml, 15);
+
+    const sides = [
+      { name: 'clockwise', total: M.cw, parts: M.torques.filter(t => t.tau < 0).map(t => ({ ...t, mag: -t.tau })) },
+      { name: 'counter-clockwise', total: M.ccw, parts: M.torques.filter(t => t.tau > 0).map(t => ({ ...t, mag: t.tau })) }
+    ];
+    sides.forEach((side, i) => {
+      const y = mt + i * (barH + 10);
+      ctx.fillStyle = C('--soft'); ctx.fillRect(ml, y, pw, barH);
+      let x = ml;
+      side.parts.forEach(p => {
+        const w = pw * Math.min(1, p.mag / ref);
+        ctx.fillStyle = C(p.color); ctx.fillRect(x, y, w, barH);
+        if (w > 3) { ctx.strokeStyle = C('--panel'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w, y); ctx.lineTo(x + w, y + barH); ctx.stroke(); }
+        x += w;
+      });
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(ml, y, pw, barH);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      ctx.fillText(compact ? (i ? 'ccw' : 'cw') : side.name, ml - 8, y + barH / 2 + 4);
+      ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+      ctx.fillText(side.total.toFixed(0), Math.min(x + 6, W - mr + 4), y + barH / 2 + 4);
+    });
+
+    // the reference the bar width is measured against
+    ctx.strokeStyle = 'rgba(23,33,40,0.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ml + pw, mt - 3); ctx.lineTo(ml + pw, mt + 2 * barH + 10); ctx.stroke();
+    ctx.fillStyle = C('--muted'); ctx.font = '11px ' + C('--sans');
+    if (compact) { ctx.textAlign = 'right'; ctx.fillText('full width = ' + ref.toFixed(0), W - 8, H - 8); }
+    else { ctx.textAlign = 'right'; ctx.fillText('full width = ' + ref.toFixed(0), ml + pw - 4, mt - 8); }
+
+    const diff = Math.abs(M.cw - M.ccw), rel = diff / Math.max(M.cw, 1);
+    ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'left';
+    ctx.fillStyle = rel < 1e-6 ? C('--vel') : C('--hot');
+    ctx.fillText(rel < 1e-6 ? 'equal, so it does not turn' : 'out of balance by ' + diff.toFixed(1) + ' N·m', compact ? 8 : ml, H - 8);
+    if (!compact) {
+      let lx = ml + 210;
+      M.torques.filter(t => Math.abs(t.tau) > 0.5).forEach(t => {
+        ctx.fillStyle = C(t.color); ctx.fillRect(lx, H - 15, 10, 9);
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+        const txt = t.label + ' ' + Math.abs(t.tau).toFixed(0);
+        ctx.fillText(txt, lx + 14, H - 7);
+        lx += 14 + ctx.measureText(txt).width + 16;
+      });
+    }
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  function readout() {
+    let html = '';
+    if (M.kind === 'beam') {
+      html += card('Left support pushes', N(M.NA), '<i>N</i><sub>A</sub> from ΣF = 0 once <i>N</i><sub>B</sub> is known', M.NA < 0 ? 'no' : '');
+      html += card('Right support pushes', N(M.NB), '<i>N</i><sub>B</sub>(<i>x</i><sub>B</sub>−<i>x</i><sub>A</sub>) = <i>W</i><sub>b</sub>(<i>L</i>/2−<i>x</i><sub>A</sub>) + <i>W</i><sub>L</sub>(<i>x</i><sub>L</sub>−<i>x</i><sub>A</sub>)', M.NB < 0 ? 'no' : '');
+      html += card('Total weight carried', N(M.Wb + M.WL), 'and ΣF<sub>y</sub> = ' + M.sumFy.toExponential(1) + ' N, as it must be', 'ok');
+    }
+    if (M.kind === 'ladder') {
+      html += card('Friction needed at the foot', N(M.Nw) + ' of ' + N(M.fMax) + ' available',
+        'needs μ = ' + M.muReq.toFixed(3) + ', floor gives ' + st.mu.toFixed(2), M.slips ? 'no' : 'ok');
+      html += card('Wall pushes out', N(M.Nw), '<i>N</i><sub>wall</sub> = cot θ (<i>W</i><sub>b</sub>/2 + <i>fW</i><sub>p</sub>)');
+      html += card('Shallowest safe angle', M.thMin.toFixed(1) + '° for this climber height',
+        'tan θ = (<i>W</i><sub>b</sub>/2 + <i>fW</i><sub>p</sub>) / μ(<i>W</i><sub>b</sub> + <i>W</i><sub>p</sub>)', st.th >= M.thMin ? 'ok' : 'no');
+    }
+    if (M.kind === 'boom') {
+      html += card('Cable tension', N(M.T), '<i>T</i> = (<i>W</i><sub>b</sub><i>L</i>/2 + <i>W</i><sub>L</sub><i>d</i>) / (<i>L</i> sin φ)');
+      html += card('Force at the hinge', N(M.Hmag) + ' at ' + M.Hang.toFixed(0) + '° above horizontal',
+        'not along the boom: ' + N(M.Hx) + ' out, ' + N(M.Hy) + ' up');
+      html += card('Load being held', N(M.WL), 'tension is ' + (M.T / Math.max(M.WL, 1)).toFixed(1) + '× the load, hinge force ' + (M.Hmag / Math.max(M.WL, 1)).toFixed(1) + '×');
+    }
+    $('readout').innerHTML = html;
+    $('L_v').textContent = st.L.toFixed(1) + ' m';
+    $('mb_v').textContent = st.mb + ' kg (' + N(st.mb * G) + ')';
+    $('mL_v').textContent = st.mL + ' kg (' + N(st.mL * G) + ')';
+    $('xA_v').textContent = (st.xA * st.L).toFixed(2) + ' m from the left end';
+    $('xB_v').textContent = (st.xB * st.L).toFixed(2) + ' m from the left end';
+    $('th_v').textContent = st.th + '°';
+    $('mu_v').textContent = 'μ = ' + st.mu.toFixed(2);
+    $('h_v').textContent = st.h.toFixed(1) + ' m';
+    $('posv').textContent = M.kind === 'beam' ? 'load at ' + M.xL.toFixed(2) + ' m'
+      : M.kind === 'ladder' ? 'climber ' + (M.frac * 100).toFixed(0) + '% up'
+      : 'load at ' + M.d.toFixed(2) + ' m';
+    $('pos').value = String(Math.round(st.pos * 1000));
+    $('pivotseg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.p === st.pivot)));
+  }
+  const SHOW = {
+    1: ['lab_L', 'lab_mb', 'lab_mL', 'lab_xA', 'lab_xB', 'lab_pivot', 'lab_poly', 'lab_vals'],
+    2: ['lab_L', 'lab_mb', 'lab_mL', 'lab_th', 'lab_mu', 'lab_poly', 'lab_vals'],
+    3: ['lab_L', 'lab_mb', 'lab_mL', 'lab_h', 'lab_poly', 'lab_vals']
+  };
+  function setTab(n) {
+    st.tab = n;
+    [1, 2, 3].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
+    ['lab_L', 'lab_mb', 'lab_mL', 'lab_xA', 'lab_xB', 'lab_th', 'lab_mu', 'lab_h', 'lab_pivot', 'lab_poly', 'lab_vals']
+      .forEach(id => { $(id).hidden = SHOW[n].indexOf(id) < 0; });
+    $('Llabel').textContent = n === 1 ? 'Plank length' : n === 2 ? 'Ladder length' : 'Boom length';
+    $('mblabel').textContent = n === 1 ? 'Plank mass' : n === 2 ? 'Ladder mass' : 'Boom mass';
+    $('mLlabel').textContent = n === 2 ? 'Climber mass' : 'Load mass';
+    $('poslabel').textContent = n === 1 ? 'Drag the load along the plank' : n === 2 ? 'Drag the climber up the ladder' : 'Drag the load along the boom';
+    if (n === 1) { st.L = 4; st.mb = 20; st.mL = 80; st.pos = 0.5; }
+    if (n === 2) { st.L = 5; st.mb = 15; st.mL = 70; st.th = 65; st.mu = 0.4; st.pos = 0.15; }
+    if (n === 3) { st.L = 3; st.mb = 25; st.mL = 120; st.h = 2.2; st.pos = 0.8; }
+    ['L', 'mb', 'mL', 'th', 'mu', 'h'].forEach(id => { $(id).value = String(st[id]); });
+    rebuild();
+  }
+  function rebuild() { M = model(); readout(); drawScene(); drawTorque(); }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  ['L', 'mb', 'mL', 'xA', 'xB', 'th', 'mu', 'h'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
+  $('pos').addEventListener('input', () => { st.pos = (+$('pos').value) / 1000; rebuild(); });
+  $('poly').addEventListener('change', () => { st.poly = $('poly').checked; drawScene(); });
+  $('vals').addEventListener('change', () => { st.vals = $('vals').checked; drawScene(); });
+  $('pivotseg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st.pivot = b.dataset.p; rebuild(); }));
+  $('reset').addEventListener('click', () => setTab(st.tab));
+  window.addEventListener('resize', () => { drawScene(); drawTorque(); });
+
+  setTab(1);
+})();
+</script>
+</body>
+</html>

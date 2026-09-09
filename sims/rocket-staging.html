@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<!--
+  Rocket staging - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author
+  against the rocket equation, a hand-checked two-stage case, and a numerical scan for the optimal split.
+  Credit: none; multistage rockets are a standard textbook topic.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rocket staging</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --prop1: #1D4F73; --struct1: #9AA7AE; --prop2: #2E7D32; --struct2: #B7C3CA; --payload: #E8A317;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; }
+
+  .setup { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; font-family: var(--sans); font-size: 14px; }
+  .setup span.lbl { color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { font: inherit; font-family: var(--sans); font-size: 14px; min-width: 0; padding: 6px 14px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; cursor: pointer; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .setup label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .panes { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #stack { aspect-ratio: 300 / 430; }
+  #trace { aspect-ratio: 586 / 430; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); } .readout .no { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls label[hidden] { display: none; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    .panes { grid-template-columns: 1fr; }
+    #stack { aspect-ratio: 3 / 2; }
+    #trace { aspect-ratio: 4 / 3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Rocket staging</h1>
+  <p class="lede">Every rocket spends most of its effort accelerating its own empty tanks. Throwing away a tank once it is empty means the
+    rest of the flight no longer has to carry it, and that is what makes orbit reachable. Build the same 500 metric ton rocket as one stage or two
+    and compare what it can do.</p>
+
+  <div class="setup">
+    <span class="lbl">Build it as</span>
+    <span class="seg" id="stageseg" role="group" aria-label="Number of stages">
+      <button data-s="1">one stage</button><button data-s="2">two stages</button>
+    </span>
+    <label><input type="checkbox" id="grav" checked> include gravity losses</label>
+    <button id="best" class="secondary">best split</button>
+  </div>
+
+  <div class="panes">
+    <canvas id="stack"></canvas>
+    <canvas id="trace"></canvas>
+  </div>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label><div class="row"><span>Payload</span><span class="val" id="pay_v"></span></div>
+      <input type="range" id="pay" min="0.2" max="8" step="0.1" value="1.5"></label>
+    <label id="lab_split"><div class="row"><span>Share of the rocket in the first stage</span><span class="val" id="split_v"></span></div>
+      <input type="range" id="split" min="40" max="95" step="1" value="80"></label>
+    <label><div class="row"><span>Structure as a share of each stage</span><span class="val" id="eps_v"></span></div>
+      <input type="range" id="eps" min="0.03" max="0.25" step="0.005" value="0.07"></label>
+    <label><div class="row"><span>Exhaust speed, first stage</span><span class="val" id="ve1_v"></span></div>
+      <input type="range" id="ve1" min="2000" max="4500" step="50" value="3200"></label>
+    <label id="lab_ve2"><div class="row"><span>Exhaust speed, second stage</span><span class="val" id="ve2_v"></span></div>
+      <input type="range" id="ve2" min="2000" max="4500" step="50" value="3200"></label>
+    <label id="lab_psi"><div class="row"><span>Thrust to weight at each ignition</span><span class="val" id="psi_v"></span></div>
+      <input type="range" id="psi" min="0.6" max="3" step="0.05" value="1.5"></label>
+    <label id="lab_g1"><div class="row"><span>Average climb angle, first stage</span><span class="val" id="g1_v"></span></div>
+      <input type="range" id="g1" min="0" max="90" step="1" value="75"></label>
+    <label id="lab_g2"><div class="row"><span>Average climb angle, second stage</span><span class="val" id="g2_v"></span></div>
+      <input type="range" id="g2" min="0" max="90" step="1" value="10"></label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> Start with two stages, then switch to one and watch the total collapse: the same 500 metric tons of hardware and fuel
+      loses roughly three kilometres per second, because the single stage has to drag its whole empty structure all the way to burnout.
+      Then push the structure slider up towards 0.25, the sort of number a steel water tank would give, and see even the two-stage rocket
+      fall short. Press "best split" to find the division that gets the most out of a given rocket, and notice it is nowhere near half and half.</p>
+    <p><b>About the climb angles.</b> Gravity steals <i>g</i> sin γ for every second the engine burns, where γ is how steeply the rocket is
+      climbing. Set the second stage to 0° and its loss disappears: that is why a launcher pitches over early and spends its upper-stage burn
+      flying almost sideways. Set it to 90° instead and the same rocket cannot reach orbit at all.</p>
+    <p>Model: total liftoff mass fixed at 500 metric tons (500,000 kg); masses on the diagram are labeled in metric tons, written t. Δ<i>v</i> = <i>v</i><sub>e</sub> ln(<i>m</i><sub>initial</sub>/<i>m</i><sub>final</sub>)
+      for each stage in turn, each one carrying everything above it, with the empty stage dropped at separation. Constant mass flow, so the
+      burn time is <i>m</i><sub>propellant</sub><i>v</i><sub>e</sub>/(Ψ<i>m</i><sub>initial</sub><i>g</i>) and the gravity loss is
+      <i>g</i> sin γ times that. No drag, no thrust variation with altitude, no coast between stages. The orbit target is 9.4 km/s in the
+      ideal case, which is the usual allowance for a real launch including its losses, and 8.4 km/s once gravity is modelled explicitly
+      (7.8 km/s of orbital speed plus about 0.6 for drag and steering).</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G0 = 9.80665, MTOT = 500e3;
+
+  const st = { stages: 2, grav: true, pay: 1.5, split: 80, eps: 0.07, ve1: 3200, ve2: 3200, psi: 1.5, g1: 75, g2: 10 };
+
+  // ================================================================
+  // 1. MODEL
+  //    Each stage burns while carrying everything above it, then the empty structure is dropped.
+  //      ideal:        dv = ve ln(m_initial / m_final)
+  //      burn time:    constant mass flow, mdot = thrust / ve, thrust = psi * m_initial * g
+  //                    so t_burn = m_prop ve / (psi m_initial g)
+  //      gravity loss: g sin(gamma) t_burn, for an average climb angle gamma
+  //    Everything below is closed form; the velocity trace uses v(t) = ve ln(m0/(m0 - mdot t)) - g sin(gamma) t.
+  // ================================================================
+  function build(stages, grav, split) {
+    const mPay = st.pay / 100 * MTOT, rest = MTOT - mPay;
+    const m1 = stages === 1 ? rest : (split / 100) * rest;
+    const m2 = stages === 1 ? 0 : rest - m1;
+    const out = [];
+    let below = MTOT;
+    const add = (m, ve, gamma, idx) => {
+      const prop = (1 - st.eps) * m, struct = st.eps * m;
+      const init = below, fin = below - prop;
+      const mr = init / fin, ideal = ve * Math.log(mr);
+      const mdot = st.psi * init * G0 / ve;
+      const tb = prop / mdot;
+      const loss = grav ? G0 * Math.sin(gamma * Math.PI / 180) * tb : 0;
+      below = fin - struct;
+      out.push({ idx, m, prop, struct, init, fin, mr, ideal, tb, mdot, loss, gamma, ve, dv: ideal - loss });
+    };
+    add(m1, st.ve1, st.g1, 1);
+    if (stages === 2) add(m2, st.ve2, st.g2, 2);
+    const total = out.reduce((s, o) => s + o.dv, 0);
+    return { stages, out, total, mPay, m1, m2, tTotal: out.reduce((s, o) => s + o.tb, 0),
+      liftoff: st.psi > 1 || !grav };
+  }
+  function bestSplit(stages, grav) {
+    let best = -1, bs = 80;
+    for (let s = 40; s <= 95; s += 0.25) { const t = build(stages, grav, s).total; if (t > best) { best = t; bs = s; } }
+    return { split: bs, total: best };
+  }
+  const target = () => st.grav ? 8400 : 9400;
+  let M, Malt, Mbest;
+  function recompute() {
+    M = build(st.stages, st.grav, st.split);
+    Malt = build(st.stages === 1 ? 2 : 1, st.grav, st.split);
+    Mbest = bestSplit(2, st.grav);
+  }
+
+  // velocity as a function of time through the whole flight
+  function vAt(m, t) {
+    let acc = 0, t0 = 0;
+    for (const o of m.out) {
+      if (t <= t0 + o.tb) {
+        const dt = t - t0;
+        return acc + o.ve * Math.log(o.init / (o.init - o.mdot * dt)) - (st.grav ? G0 * Math.sin(o.gamma * Math.PI / 180) * dt : 0);
+      }
+      acc += o.dv; t0 += o.tb;
+    }
+    return acc;
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 430 };
+  }
+  const t2 = kg => kg >= 1000 ? (kg / 1000).toFixed(kg >= 100000 ? 0 : 1) + ' t' : kg.toFixed(0) + ' kg';
+
+  // the rocket drawn as a column of masses, to scale
+  function drawStack() {
+    const { ctx, W, H, compact } = fit($('stack'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const top = 46, bot = H - 26, colW = Math.min(96, W * 0.30), cx = compact ? W * 0.26 : W * 0.36;
+    const x0 = cx - colW / 2;
+    const scale = (bot - top) / MTOT;
+    const rows = [];
+    rows.push({ m: M.mPay, name: 'payload', color: '--payload' });
+    if (M.stages === 2) {
+      rows.push({ m: M.out[1].struct, name: 'stage 2 structure', color: '--struct2' });
+      rows.push({ m: M.out[1].prop, name: 'stage 2 propellant', color: '--prop2' });
+    }
+    rows.push({ m: M.out[0].struct, name: 'stage 1 structure', color: '--struct1' });
+    rows.push({ m: M.out[0].prop, name: 'stage 1 propellant', color: '--prop1' });
+
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText('500 metric tons on the pad', 12, 16);
+    // nose cone
+    ctx.fillStyle = C('--payload');
+    ctx.beginPath(); ctx.moveTo(cx, top - 22); ctx.lineTo(x0, top); ctx.lineTo(x0 + colW, top); ctx.closePath(); ctx.fill();
+    let y = top;
+    const labels = [];
+    rows.forEach(r => {
+      const h = r.m * scale;
+      ctx.fillStyle = C(r.color); ctx.fillRect(x0, y, colW, h);
+      ctx.strokeStyle = C('--panel'); ctx.lineWidth = 1; ctx.strokeRect(x0, y, colW, h);
+      labels.push({ text: r.name + '  ' + t2(r.m), at: y + h / 2, want: y + h / 2, color: r.color });
+      y += h;
+    });
+    // push the labels apart so thin bands are still readable, then join each to its band
+    const gap = 16;
+    for (let i = 1; i < labels.length; i++) if (labels[i].want < labels[i - 1].want + gap) labels[i].want = labels[i - 1].want + gap;
+    const overflow = labels[labels.length - 1].want - (bot - 4);
+    if (overflow > 0) labels.forEach(l => { l.want -= overflow; });
+    labels.forEach(l => {
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0 + colW, l.at); ctx.lineTo(x0 + colW + 6, l.want); ctx.stroke();
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+      ctx.fillText(l.text, x0 + colW + 9, l.want + 4);
+    });
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2; ctx.strokeRect(x0, top, colW, bot - top);
+    // separation line
+    if (M.stages === 2) {
+      const ySep = top + (M.mPay + M.out[1].struct + M.out[1].prop) * scale;
+      ctx.strokeStyle = C('--ink'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x0 - 10, ySep); ctx.lineTo(x0 + colW + 4, ySep); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--panel'); ctx.textAlign = 'center'; ctx.font = '11px ' + C('--sans');
+      ctx.fillText('separation', cx, ySep - 6); ctx.font = '12px ' + C('--sans');
+    }
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText('payload fraction ' + (st.pay).toFixed(1) + '%', 12, H - 8);
+  }
+
+  // velocity against time, with the other configuration for comparison
+  function drawTrace() {
+    const { ctx, W, H, compact } = fit($('trace'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const ml = 54, mr = compact ? 14 : 118, mt = 26, mb = 34;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    const tMax = Math.max(M.tTotal, Malt.tTotal) * 1.04;
+    const vMax = Math.max(M.total, Malt.total, target()) * 1.12;
+    const X = t => ml + t / tMax * pw, Y = v => mt + (1 - v / vMax) * ph;
+    // grid
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.fillStyle = C('--muted');
+    for (let v = 0; v <= vMax; v += 2000) { ctx.beginPath(); ctx.moveTo(ml, Y(v) + 0.5); ctx.lineTo(ml + pw, Y(v) + 0.5); ctx.stroke();
+      ctx.textAlign = 'right'; ctx.fillText((v / 1000).toFixed(0), ml - 6, Y(v) + 4); }
+    const ts = tMax > 500 ? 100 : 50;
+    for (let t = 0; t <= tMax; t += ts) { ctx.beginPath(); ctx.moveTo(X(t) + 0.5, mt); ctx.lineTo(X(t) + 0.5, mt + ph); ctx.stroke();
+      ctx.textAlign = 'center'; ctx.fillText(t.toFixed(0), X(t), H - 14); }
+    ctx.textAlign = 'center'; ctx.fillText('time since liftoff (s)', ml + pw / 2, H - 2);
+    ctx.save(); ctx.translate(13, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('speed (km/s)', 0, 0); ctx.restore();
+    // orbit target
+    ctx.strokeStyle = C('--hot'); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ml, Y(target())); ctx.lineTo(ml + pw, Y(target())); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = C('--hot'); ctx.textAlign = 'left'; ctx.font = '11px ' + C('--sans');
+    ctx.fillText('to orbit ' + (target() / 1000).toFixed(1) + ' km/s', ml + 6, Y(target()) - 5);
+    // the other configuration, faint
+    const curve = (m, style, color, width) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(style);
+      ctx.beginPath();
+      for (let k = 0; k <= 240; k++) { const t = m.tTotal * k / 240; const x = X(t), y = Y(vAt(m, t)); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke(); ctx.setLineDash([]);
+    };
+    ctx.globalAlpha = 0.55; curve(Malt, [5, 5], C('--twin'), 1.6); ctx.globalAlpha = 1;
+    curve(M, [], C('--body'), 2.4);
+    // staging marker
+    if (M.stages === 2) {
+      const tsep = M.out[0].tb, vsep = vAt(M, tsep);
+      ctx.strokeStyle = C('--ink'); ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(tsep), Y(vsep)); ctx.lineTo(X(tsep), mt + ph); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(X(tsep), Y(vsep), 4, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = 'center'; ctx.font = '11px ' + C('--sans');
+      ctx.fillText('separation at ' + tsep.toFixed(0) + ' s', X(tsep), Y(vsep) - 9);
+    }
+    // end point
+    const xe = X(M.tTotal), ye = Y(M.total);
+    ctx.fillStyle = C('--body'); ctx.beginPath(); ctx.arc(xe, ye, 4.5, 0, Math.PI * 2); ctx.fill();
+    if (!compact) {
+      ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+      ctx.fillText((M.total / 1000).toFixed(2) + ' km/s', xe + 8, ye + 4);
+      ctx.fillStyle = C('--twin');
+      ctx.fillText((Malt.total / 1000).toFixed(2) + ' km/s', X(Malt.tTotal) + 8, Y(Malt.total) + 4);
+      ctx.fillText(Malt.stages === 1 ? 'one stage' : 'two stages', X(Malt.tTotal) + 8, Y(Malt.total) + 18);
+    }
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillText(M.stages === 2 ? 'two stages' : 'one stage', ml, 16);
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  const km = v => (v / 1000).toFixed(2) + ' km/s';
+  function readout() {
+    const o1 = M.out[0], o2 = M.out[1];
+    let html = '';
+    const grounded = st.grav && st.psi <= 1;
+    html += card('First stage', grounded ? 'never leaves the pad' : km(o1.dv),
+      grounded ? 'thrust is ' + (st.psi * 100).toFixed(0) + '% of its weight, so it cannot lift off'
+        : 'mass ratio ' + o1.mr.toFixed(2) + ', burn ' + o1.tb.toFixed(0) + ' s' + (st.grav ? ', gravity takes ' + km(o1.loss) : ''),
+      grounded ? 'no' : '');
+    html += o2 ? card('Second stage', km(o2.dv),
+      'mass ratio ' + o2.mr.toFixed(2) + ', burn ' + o2.tb.toFixed(0) + ' s' + (st.grav ? ', gravity takes ' + km(o2.loss) : ''))
+      : card('Second stage', 'none', 'everything is carried to burnout, empty tanks included');
+    const short = M.total - target();
+    html += grounded ? card('Total', 'nothing', 'raise the thrust-to-weight ratio above 1 to get off the ground', 'no') : card('Total', km(M.total),
+      (short >= 0 ? km(short) + ' more than it needs for orbit' : km(-short) + ' short of orbit') +
+      '. Payload ' + t2(M.mPay) + (M.stages === 2 ? '. Best split gives ' + km(Mbest.total) : ''),
+      short >= 0 ? 'ok' : 'no');
+    $('readout').innerHTML = html;
+    $('pay_v').textContent = st.pay.toFixed(1) + '% = ' + t2(st.pay / 100 * MTOT);
+    $('split_v').textContent = st.split + '% (' + t2(M.m1) + ' / ' + t2(M.m2) + ')';
+    $('eps_v').textContent = (st.eps * 100).toFixed(1) + '% structure';
+    $('ve1_v').textContent = st.ve1 + ' m/s (Isp ' + (st.ve1 / G0).toFixed(0) + ' s)';
+    $('ve2_v').textContent = st.ve2 + ' m/s (Isp ' + (st.ve2 / G0).toFixed(0) + ' s)';
+    $('psi_v').textContent = st.psi.toFixed(2) + (st.psi <= 1 && st.grav ? ' — will not lift off' : '');
+    $('g1_v').textContent = st.g1 + '°';
+    $('g2_v').textContent = st.g2 + '°';
+    $('lab_split').hidden = st.stages === 1;
+    $('lab_ve2').hidden = st.stages === 1;
+    $('lab_g1').hidden = !st.grav; $('lab_g2').hidden = !st.grav || st.stages === 1;
+    $('lab_psi').hidden = !st.grav;
+    $('best').hidden = st.stages === 1;
+    $('stageseg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.s === st.stages)));
+  }
+  function rebuild() { recompute(); readout(); drawStack(); drawTrace(); }
+  $('stageseg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st.stages = +b.dataset.s; rebuild(); }));
+  $('grav').addEventListener('change', () => { st.grav = $('grav').checked; rebuild(); });
+  $('best').addEventListener('click', () => { st.split = Math.round(Mbest.split); $('split').value = String(st.split); rebuild(); });
+  ['pay', 'split', 'eps', 've1', 've2', 'psi', 'g1', 'g2'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
+  window.addEventListener('resize', () => { drawStack(); drawTrace(); });
+  rebuild();
+})();
+</script>
+</body>
+</html>

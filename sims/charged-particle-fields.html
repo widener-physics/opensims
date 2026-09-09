@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<!--
+  Charged particle in electric and magnetic fields - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author
+  against the closed forms for radius, period, selector speed, semicircle diameter and cyclotron energy.
+  Credit: replaces the idea of PhET's discontinued Java simulations for charged particles in fields.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Charged particle in electric and magnetic fields</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --bfield: #2E6C8C; --efield: #8B2E86; --plate: #4A5A63;
+    --p1: #1D4F73; --p2: #D9651B; --p3: #2E7D32; --p4: #8B2E86; --p5: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; min-height: 3em; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-width: 0; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; aspect-ratio: 900 / 440; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport .time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { min-width: 0; padding: 5px 11px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); } .readout .no { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls label[hidden], .toggles label[hidden] { display: none; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls select { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 8px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); width: 100%; margin-top: 4px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .toggles { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; align-items: center; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    canvas { aspect-ratio: 1 / 1; }
+    .tabs { flex-wrap: wrap; }
+    .tabs button { padding: 8px 9px; font-size: 13.5px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+    .transport { grid-template-columns: 1fr 1fr; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .time { grid-column: 1 / -1; text-align: center; margin-top: -4px; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Charged particle in electric and magnetic fields</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Magnetic force</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Velocity selector</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Mass spectrometer</button>
+    <button role="tab" id="tab4" aria-selected="false"><span>4</span>Cyclotron</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <canvas id="c"></canvas>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
+    <span class="time"><span id="tval">0.00</span> µs</span>
+  </div>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_B"><div class="row"><span>Magnetic field <i>B</i>, out of the page</span><span class="val" id="B_v"></span></div>
+      <input type="range" id="B" min="0.02" max="1" step="0.01" value="0.2"></label>
+    <label id="lab_E"><div class="row"><span>Electric field <i>E</i>, up the page</span><span class="val" id="E_v"></span></div>
+      <input type="range" id="E" min="0" max="60" step="1" value="20"></label>
+    <label id="lab_v"><div class="row"><span>Entry speed</span><span class="val" id="v_v"></span></div>
+      <input type="range" id="v" min="0.2" max="4" step="0.05" value="1"></label>
+    <label id="lab_m"><div class="row"><span>Ion mass</span><span class="val" id="m_v"></span></div>
+      <input type="range" id="m" min="1" max="40" step="1" value="20"></label>
+    <label id="lab_sample"><div class="row"><span>Sample</span></div>
+      <select id="sample">
+        <option value="ne">Neon: 20, 21, 22 u</option>
+        <option value="cl">Chlorine: 35, 37 u</option>
+        <option value="u">Uranium (as UF₆): 349, 352 u</option>
+        <option value="hd">Hydrogen and deuterium: 1, 2 u</option>
+      </select></label>
+    <label id="lab_V"><div class="row"><span>Gap voltage</span><span class="val" id="V_v"></span></div>
+      <input type="range" id="V" min="200" max="4000" step="100" value="2000"></label>
+    <label id="lab_f"><div class="row"><span>Drive frequency, as a multiple of <i>f</i><sub>c</sub></span><span class="val" id="f_v"></span></div>
+      <input type="range" id="f" min="0.7" max="1.3" step="0.01" value="1"></label>
+    <label id="lab_R"><div class="row"><span>Dee radius</span><span class="val" id="R_v"></span></div>
+      <input type="range" id="R" min="0.04" max="0.14" step="0.005" value="0.08"></label>
+    <label id="lab_rate"><div class="row"><span>Playback speed</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="1" max="20" step="1" value="8"></label>
+  </div>
+
+  <div class="toggles">
+    <label id="lab_q"><span>Charge</span>
+      <span class="seg" id="qseg" role="group" aria-label="Charge">
+        <button data-q="-2">−2e</button><button data-q="-1">−1e</button><button data-q="1">+1e</button><button data-q="2">+2e</button>
+      </span></label>
+    <label id="lab_three"><input type="checkbox" id="three"> launch three speeds at once</label>
+    <label id="lab_vecs"><input type="checkbox" id="vecs" checked> show velocity and force</label>
+    <label id="lab_res"><button id="resonate" class="secondary" style="min-width:0;padding:5px 12px">match <i>f</i><sub>c</sub></button></label>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const QE = 1.602176634e-19, U = 1.66053907e-27, KEV = QE * 1e3;
+
+  const st = { tab: 1, B: 0.2, E: 20, v: 1, m: 20, q: 1, sample: 'ne', V: 2000, f: 1, R: 0.08,
+    rate: 8, three: false, vecs: true, t: 0, playing: false };
+
+  const TEXT = {
+    1: { lede: 'A magnetic field out of the page bends a moving charge into a circle. The force <b>F</b> = <i>q</i><b>v</b> × <b>B</b> is always perpendicular to the velocity, so it turns the particle without ever changing its speed. The radius depends on how fast the particle is going; the time for one lap does not.',
+         notes: '<p><b>What to try.</b> Tick "launch three speeds at once". The three circles have very different sizes, yet all three particles come back to the starting line together, because the period 2π<i>m</i>/(<i>qB</i>) has no <i>v</i> in it. Then flip the charge sign and watch the circle go the other way. Watch the force arrow: it stays at right angles to the velocity for the whole lap, which is why the speed readout never moves.</p>' },
+    2: { lede: 'Crossed fields: electric up the page, magnetic out of it. The electric force <i>qE</i> pushes one way and the magnetic force <i>qvB</i> the other, and they cancel only at one speed, <i>v</i> = <i>E</i>/<i>B</i>. Ions of every other speed are deflected into the walls, so only a single speed leaves through the far slit.',
+         notes: '<p><b>What to try.</b> Change the mass slider: nothing at all happens to which ion gets through, because <i>E</i>/<i>B</i> contains neither the mass nor the charge. That is what makes this a speed filter rather than a mass filter. Then change <i>E</i> or <i>B</i> and watch the selected speed follow the ratio.</p>' },
+    3: { lede: 'Ions of the same charge and speed enter a magnetic field and follow semicircles of radius <i>r</i> = <i>mv</i>/(<i>qB</i>). Heavier ions swing wider, so each mass lands at its own spot on the detector, a distance 2<i>r</i> from the entry slit. This is how isotopes are separated and how a mass spectrum is measured.',
+         notes: '<p><b>What to try.</b> Compare neon with uranium hexafluoride: the two uranium isotopes differ by less than one per cent in mass, so their landing spots are almost on top of each other, which is exactly why enriching uranium is hard. Raise <i>B</i> and the whole pattern shrinks toward the slit, while the fractional separation stays the same.</p>' },
+    4: { lede: 'A cyclotron uses the fact that the orbital period does not depend on speed. The particle circles inside two D-shaped electrodes, and the voltage across the gap flips every half turn, so it gets a push each time it crosses. Radius and energy grow, but the timing stays in step, until the particle reaches the edge and leaves.',
+         notes: '<p><b>What to try.</b> At the matched frequency the particle spirals steadily out and leaves with the energy (<i>qBR</i>)²/2<i>m</i>. Detune the drive by even five per cent and it falls out of step: some crossings speed it up and others slow it down, and it never reaches the rim at full energy. That sensitivity is why the cyclotron frequency has to be set so precisely, and why heavier particles need a different frequency.</p>' }
+  };
+
+  const SAMPLES = { ne: [20, 21, 22], cl: [35, 37], u: [349, 352], hd: [1, 2] };
+  const PCOLORS = ['--p1', '--p2', '--p3', '--p4', '--p5'];
+
+  // ================================================================
+  // 1. MODEL
+  //    Boris pusher for  m dv/dt = q(E + v x B),  with B = Bz z-hat and motion in the xy plane.
+  //    Half electric kick, magnetic rotation, half electric kick; it conserves |v| exactly when E = 0.
+  //    Closed forms used for the readouts and for checking:
+  //      radius        r = m v / (|q| B)
+  //      period        T = 2 pi m / (|q| B)          (independent of v)
+  //      selector      v = E / B                     (independent of m and q)
+  //      spectrometer  landing distance = 2r
+  //      cyclotron     f_c = |q| B / (2 pi m),  KE_max = (q B R)^2 / (2 m)
+  // ================================================================
+  function boris(p, field, dt, nmax, stop, keep) {
+    let x = p.x, y = p.y, vx = p.vx, vy = p.vy, t = 0;
+    const X = [x], Y = [y], T = [0], VX = [vx], VY = [vy];
+    const c0 = p.q * dt / (2 * p.m);
+    for (let k = 1; k <= nmax; k++) {
+      const f = field(x, y, t);
+      let vmx = vx + c0 * f.Ex, vmy = vy + c0 * f.Ey;
+      const tz = c0 * f.Bz;
+      const vpx = vmx + vmy * tz, vpy = vmy - vmx * tz;
+      const s = 2 / (1 + tz * tz);
+      vx = vmx + s * (vpy * tz) + c0 * f.Ex;
+      vy = vmy - s * (vpx * tz) + c0 * f.Ey;
+      x += vx * dt; y += vy * dt; t += dt;
+      if (k % keep === 0) { X.push(x); Y.push(y); T.push(t); VX.push(vx); VY.push(vy); }
+      if (stop && stop(x, y, t)) { X.push(x); Y.push(y); T.push(t); VX.push(vx); VY.push(vy); break; }
+    }
+    return { x: X, y: Y, t: T, vx: VX, vy: VY, n: X.length - 1 };
+  }
+  const speedAt = (p, i) => Math.hypot(p.tr.vx[i], p.tr.vy[i]);
+
+  function model() {
+    const q = st.q * QE, B = st.B, E = st.E * 1e3;      // E slider is kV/m
+    const parts = [];
+    let world, deco = {}, tEnd;
+
+    if (st.tab === 1) {
+      const m = st.m * U;
+      const T = 2 * Math.PI * m / (Math.abs(q) * B);
+      const speeds = st.three ? [0.6, 1, 1.5] : [1];
+      speeds.forEach((sf, i) => {
+        const v = st.v * 1e5 * sf;
+        const dt = T / 900, keep = 3;
+        const tr = boris({ x: 0, y: 0, vx: v, vy: 0, q, m }, () => ({ Ex: 0, Ey: 0, Bz: B }), dt, Math.ceil(1.02 * T / dt), null, keep);
+        parts.push({ tr, color: PCOLORS[i], label: (v / 1e5).toFixed(2) + '×10⁵ m/s', r: m * v / (Math.abs(q) * B), v, m, q });
+      });
+      tEnd = T * 1.02;
+      const rMax = Math.max(...parts.map(p => p.r));
+      world = { xlo: -rMax * 1.25, xhi: rMax * 1.25, ylo: -rMax * 2.28, yhi: rMax * 0.42 };
+      if (q < 0) world = { xlo: -rMax * 1.25, xhi: rMax * 1.25, ylo: -rMax * 0.42, yhi: rMax * 2.28 };
+      deco = { period: T, kind: 'circle' };
+    }
+
+    if (st.tab === 2) {
+      // Plates at y = +/- halfH absorb an ion that reaches them; the exit slit only passes |y| < slitHalf.
+      const m = st.m * U, vsel = E / B, L = 0.06, halfH = 0.008, slitHalf = 0.0005, runout = 0.016;
+      const T = 2 * Math.PI * m / (Math.abs(q) * B);
+      const dt = Math.min(T / 900, L / (vsel * 4) / 300), keep = 2;
+      [0.6, 0.8, 1, 1.25, 1.6].forEach((sf, i) => {
+        const v = vsel * sf;
+        const tr = boris({ x: -L / 2, y: 0, vx: v, vy: 0, q, m },
+          (x, y) => (Math.abs(x) < L / 2 ? { Ex: 0, Ey: E, Bz: B } : { Ex: 0, Ey: 0, Bz: 0 }),
+          dt, 60000, (x, y) => Math.abs(y) > halfH || x > L / 2 + runout, keep);
+        // find where it first reaches the exit plane, and whether the slit lets it past
+        let exitI = -1;
+        for (let k = 0; k <= tr.n; k++) if (tr.x[k] >= L / 2) { exitI = k; break; }
+        const hitPlate = exitI < 0;
+        const through = !hitPlate && Math.abs(tr.y[exitI]) < slitHalf;
+        if (!hitPlate && !through) { ['x', 'y', 't', 'vx', 'vy'].forEach(a => { tr[a] = tr[a].slice(0, exitI + 1); }); tr.n = exitI; }
+        parts.push({ tr, color: PCOLORS[i], label: sf.toFixed(2) + ' v', sf, v, through, hitPlate, m, q,
+          fate: through ? 'through the slit' : hitPlate ? 'absorbed by a plate' : 'stopped at the slit' });
+      });
+      tEnd = Math.max(...parts.map(p => p.tr.t[p.tr.n]));
+      world = { xlo: -L / 2 - 0.006, xhi: L / 2 + runout + 0.004, ylo: -halfH * 1.55, yhi: halfH * 1.55 };
+      deco = { kind: 'selector', L, halfH, slitHalf, vsel };
+    }
+
+    if (st.tab === 3) {
+      const masses = SAMPLES[st.sample], v = st.v * 1e5;
+      let rmax = 0;
+      masses.forEach((mu, i) => {
+        const m = mu * U, r = m * v / (Math.abs(q) * B);
+        rmax = Math.max(rmax, r);
+        const T = 2 * Math.PI * m / (Math.abs(q) * B);
+        const dt = T / 1400, keep = 3;
+        const tr = boris({ x: 0, y: 0, vx: 0, vy: v, q, m }, () => ({ Ex: 0, Ey: 0, Bz: B }),
+          dt, Math.ceil(0.62 * T / dt), (x, y) => y < 0 && x > 1e-5, keep);
+        parts.push({ tr, color: PCOLORS[i], label: mu + ' u', mu, r, land: 2 * r, m, q, v });
+      });
+      tEnd = Math.max(...parts.map(p => p.tr.t[p.tr.n]));
+      world = { xlo: -rmax * 0.35, xhi: rmax * 2.45, ylo: -rmax * 0.5, yhi: rmax * 1.3 };
+      deco = { kind: 'spectrometer', rmax };
+    }
+
+    if (st.tab === 4) {
+      const m = st.m * U, R = st.R, gap = Math.max(0.004, R * 0.06), V = st.V;
+      const fc = Math.abs(q) * B / (2 * Math.PI * m), f = fc * st.f;
+      const dt = 1 / fc / 500, keep = 3;
+      const tr = boris({ x: 0, y: 0, vx: 0, vy: 0, q, m },
+        (x, y, t) => ({ Ex: Math.abs(x) < gap / 2 ? (V / gap) * Math.cos(2 * Math.PI * f * t) : 0, Ey: 0, Bz: B }),
+        dt, 26000, (x, y) => Math.hypot(x, y) > R, keep);
+      parts.push({ tr, color: '--p1', label: 'ion', m, q });
+      tEnd = tr.t[tr.n];
+      world = { xlo: -R * 1.22, xhi: R * 1.22, ylo: -R * 1.22, yhi: R * 1.22 };
+      deco = { kind: 'cyclotron', R, gap, fc, f, V, KEmax: Math.pow(Math.abs(q) * B * R, 2) / (2 * m) };
+    }
+
+    return { parts, world, deco, tEnd: Math.max(tEnd, 1e-9), q, B, E };
+  }
+  let M = model();
+  const idxAt = (p, t) => { const tr = p.tr; let lo = 0, hi = tr.n;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (tr.t[mid] < t) lo = mid + 1; else hi = mid; } return lo; };
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(9, L * 0.55);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2.2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.8, y1 - uy * hd * 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45);
+    ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+  }
+
+  function draw() {
+    const { ctx, W, H, compact } = fit($('c'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const t = st.t, w = M.world, m = compact ? 12 : 26;
+    const S = Math.min((W - 2 * m) / (w.xhi - w.xlo), (H - 2 * m) / (w.yhi - w.ylo));
+    const ox = m + ((W - 2 * m) - (w.xhi - w.xlo) * S) / 2 - w.xlo * S;
+    const oy = H - m - ((H - 2 * m) - (w.yhi - w.ylo) * S) / 2 + w.ylo * S;
+    const X = x => ox + x * S, Y = y => oy - y * S;
+    const d = M.deco;
+
+    // B field markers: dots for out of the page, crosses for into it
+    const bOut = M.B > 0;
+    ctx.strokeStyle = ctx.fillStyle = 'rgba(46,108,140,0.42)';
+    const step = Math.max(34, Math.min(56, (W - 2 * m) / 9));
+    for (let px = ox % step; px < W; px += step) for (let py = oy % step; py < H; py += step) {
+      if (d.kind === 'selector' && Math.abs(py - Y(0)) > (d.halfH * S)) continue;
+      if (d.kind === 'cyclotron' && Math.hypot(px - X(0), py - Y(0)) > d.R * S) continue;
+      if (bOut) { ctx.beginPath(); ctx.arc(px, py, 2.6, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(px - 3, py - 3); ctx.lineTo(px + 3, py + 3); ctx.moveTo(px + 3, py - 3); ctx.lineTo(px - 3, py + 3); ctx.stroke(); }
+    }
+
+    // per-tab apparatus
+    if (d.kind === 'selector') {
+      const x0 = X(-d.L / 2), x1 = X(d.L / 2), yt = Y(d.halfH), yb = Y(-d.halfH);
+      // plates: E points up the page, so the lower plate is the positive one
+      ctx.fillStyle = C('--plate'); ctx.fillRect(x0, yt - 8, x1 - x0, 8); ctx.fillRect(x0, yb, x1 - x0, 8);
+      ctx.fillStyle = C('--ink'); ctx.font = '13px ' + C('--sans'); ctx.textAlign = 'center';
+      ctx.fillText('−', (x0 + x1) / 2, yt - 12); ctx.fillText('+', (x0 + x1) / 2, yb + 22);
+      // E arrows between the plates
+      const cols = compact ? 3 : 6;
+      for (let i = 0; i < cols; i++) { const px = x0 + (i + 0.5) * (x1 - x0) / cols;
+        arrow(ctx, px, yb - 3, px, yt + 3, 'rgba(139,46,134,0.5)', 1.6); }
+      ctx.fillStyle = C('--efield'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+      ctx.fillText('E', x1 + 6, (yt + yb) / 2 - 6);
+      // entry and exit slit jaws, with an aperture of the real slit width
+      const sj = Math.max(3, d.slitHalf * S);
+      ctx.fillStyle = C('--plate');
+      [x0, x1].forEach(px => { ctx.fillRect(px - 2, yt, 4, (Y(0) - sj) - yt); ctx.fillRect(px - 2, Y(0) + sj, 4, yb - (Y(0) + sj)); });
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+      ctx.fillText('slit', x0, yb + 34); ctx.fillText('slit', x1, yb + 34);
+    }
+    if (d.kind === 'spectrometer') {
+      // entry slit at the origin, detector strip along the bottom edge to the right
+      ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(X(w.xlo), Y(0)); ctx.lineTo(X(-0.002), Y(0)); ctx.stroke();
+      ctx.fillStyle = C('--plate');
+      ctx.fillRect(X(0.004), Y(0), X(w.xhi) - X(0.004), 7);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+      ctx.fillText('detector', X(0.006), Y(0) + 20);
+      ctx.textAlign = 'center'; ctx.fillText('slit', X(0), Y(0) + 20);
+      // cm scale along the detector
+      for (let cm = 0; cm <= w.xhi * 100; cm++) { const px = X(cm / 100);
+        ctx.strokeStyle = 'rgba(23,33,40,0.35)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(px, Y(0) + 7); ctx.lineTo(px, Y(0) + 11); ctx.stroke();
+        if (cm % 2 === 0 && cm > 0) { ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText(cm, px, Y(0) + 23); }
+      }
+    }
+    if (d.kind === 'cyclotron') {
+      const R = d.R * S, cx = X(0), cy = Y(0), g = Math.max(3, d.gap * S / 2);
+      // the two dees
+      ctx.fillStyle = 'rgba(74,90,99,0.10)'; ctx.strokeStyle = C('--plate'); ctx.lineWidth = 2;
+      [-1, 1].forEach(sgn => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, sgn > 0 ? -Math.PI / 2 : Math.PI / 2, sgn > 0 ? Math.PI / 2 : 3 * Math.PI / 2);
+        ctx.lineTo(cx + sgn * g, cy - sgn * R); ctx.lineTo(cx + sgn * g, cy + sgn * R); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+      });
+      // gap field, sign following the drive
+      const phase = Math.cos(2 * Math.PI * d.f * t);
+      const dir = phase >= 0 ? 1 : -1;
+      ctx.fillStyle = C('--ink'); ctx.font = '13px ' + C('--sans'); ctx.textAlign = 'center';
+      ctx.fillText(dir > 0 ? '−' : '+', cx - g - 14, cy - R - 8);
+      ctx.fillText(dir > 0 ? '+' : '−', cx + g + 14, cy - R - 8);
+      for (let i = -3; i <= 3; i++) { const py = cy + i * R / 4;
+        arrow(ctx, cx - dir * g * 0.9, py, cx + dir * g * 0.9, py, 'rgba(139,46,134,' + (0.25 + 0.45 * Math.abs(phase)).toFixed(2) + ')', 1.5); }
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.font = '12px ' + C('--sans');
+      const capY = cy + R + 26;
+      ctx.fillText('gap voltage ' + (d.V * phase / 1000).toFixed(1) + ' kV', cx, capY < H - 6 ? capY : H - 6);
+      // exit
+      ctx.setLineDash([3, 4]); ctx.strokeStyle = 'rgba(23,33,40,0.3)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // trajectories: dashed for the whole path, solid up to now
+    M.parts.forEach(p => {
+      const col = C(p.color), i = idxAt(p, t), tr = p.tr;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.45; ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      for (let k = 0; k <= tr.n; k += Math.max(1, Math.floor(tr.n / 400))) k === 0 ? ctx.moveTo(X(tr.x[k]), Y(tr.y[k])) : ctx.lineTo(X(tr.x[k]), Y(tr.y[k]));
+      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      if (i > 0) { ctx.lineWidth = 2.2; ctx.beginPath();
+        for (let k = 0; k <= i; k++) k === 0 ? ctx.moveTo(X(tr.x[k]), Y(tr.y[k])) : ctx.lineTo(X(tr.x[k]), Y(tr.y[k]));
+        ctx.stroke(); }
+      // the particle
+      const px = X(tr.x[i]), py = Y(tr.y[i]);
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C('--panel'); ctx.font = 'bold 10px ' + C('--sans'); ctx.textAlign = 'center';
+      ctx.fillText(st.q > 0 ? '+' : '−', px, py + 3.5);
+      // velocity and magnetic force
+      if (st.vecs) {
+        const vx = tr.vx[i], vy = tr.vy[i], sp = Math.hypot(vx, vy) || 1;
+        const vlen = compact ? 30 : 44;
+        arrow(ctx, px, py, px + vx / sp * vlen, py - vy / sp * vlen, C('--vel'), 2.2);
+        const fx = M.q * (vy * M.B), fy = -M.q * (vx * M.B);           // q v x B with B = +z
+        const fmag = Math.hypot(fx, fy);
+        if (fmag > 0) arrow(ctx, px, py, px + fx / fmag * vlen * 0.8, py - fy / fmag * vlen * 0.8, C('--ghost'), 2.2);
+        if (!compact && M.parts.length === 1) {
+          ctx.fillStyle = C('--vel'); ctx.textAlign = 'left';
+          ctx.fillText('v', px + vx / sp * vlen + 5, py - vy / sp * vlen + 4);
+          if (fmag > 0) { ctx.fillStyle = C('--ghost'); ctx.fillText('F', px + fx / fmag * vlen * 0.8 + 5, py - fy / fmag * vlen * 0.8 + 4); }
+        }
+      }
+      // labels
+      if (!compact && (d.kind === 'spectrometer' || (d.kind === 'selector' && M.parts.length > 1))) {
+        const j = M.parts.indexOf(p), endI = tr.n;
+        ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+        const dy = d.kind === 'spectrometer' ? -10 - j * 15 : 4 + (j - (M.parts.length - 1) / 2) * 2;
+        ctx.fillText(p.label, X(tr.x[endI]) + 8, Y(tr.y[endI]) + dy);
+      }
+    });
+
+    // captions
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillText('B = ' + st.B.toFixed(2) + ' T out of the page' + (d.kind === 'circle' && d.period ? ',  one lap ' + (d.period * 1e9).toFixed(0) + ' ns' : ''), 12, 18);
+    ctx.textAlign = 'right';
+    let status = '';
+    if (d.kind === 'selector') { const thr = M.parts.filter(p => p.through).length; status = thr + ' of ' + M.parts.length + ' get through'; }
+    else if (d.kind === 'spectrometer') status = M.parts.length + ' isotopes';
+    else if (d.kind === 'cyclotron') { const p = M.parts[0], i = idxAt(p, t); status = 'turn ' + Math.floor(i / p.tr.n * turns()) + ' of ' + turns(); }
+    else status = st.three ? 'three speeds, one period' : 'one lap';
+    ctx.fillText(status, W - 12, 18);
+  }
+  function turns() { const p = M.parts[0]; if (!p || M.deco.kind !== 'cyclotron') return 0;
+    let n = 0, prev = p.tr.y[0] >= 0; for (let k = 1; k <= p.tr.n; k++) { const s = p.tr.y[k] >= 0; if (s !== prev && p.tr.x[k] > 0) n++; prev = s; } return Math.max(1, n); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  function readout() {
+    const t = st.t, d = M.deco;
+    let html = '';
+    if (d.kind === 'circle') {
+      const multi = M.parts.length > 1;
+      const radii = M.parts.map(p => '<span style="color:' + C(p.color) + '">' + (p.v / 1e5).toFixed(2) + '×10⁵ m/s</span>: ' + (p.r * 100).toFixed(2) + ' cm');
+      html += card('Orbit radius', multi ? M.parts.map(p => (p.r * 100).toFixed(2)).join(' / ') + ' cm' : (M.parts[0].r * 100).toFixed(2) + ' cm',
+        multi ? radii.join('<br>') : '<i>r</i> = <i>mv</i>/(<i>qB</i>)');
+      html += card('Time for one lap', (d.period * 1e9).toFixed(0) + ' ns' + (multi ? ', all three' : ''),
+        '<i>T</i> = 2π<i>m</i>/(<i>qB</i>), no <i>v</i> in it', multi ? 'ok' : '');
+      const sp = M.parts.map(p => speedAt(p, idxAt(p, t)));
+      html += card('Speed now', sp.map(x => (x / 1e5).toFixed(3)).join(' / ') + ' ×10⁵ m/s',
+        'unchanged: <b>F</b> ⊥ <b>v</b>, so the field does no work', 'ok');
+    }
+    if (d.kind === 'selector') {
+      html += card('Speed that gets through', (d.vsel / 1e5).toFixed(3) + ' ×10⁵ m/s', '<i>v</i> = <i>E</i>/<i>B</i>, independent of <i>m</i> and <i>q</i>');
+      const thr = M.parts.filter(p => p.through);
+      html += card('Ions leaving the far slit', thr.length + ' of ' + M.parts.length,
+        M.parts.map(p => '<span style="color:' + C(p.color) + '">' + p.label + '</span>: ' + p.fate).join('<br>'), thr.length ? 'ok' : 'no');
+      html += card('Forces on the matched ion', (Math.abs(M.q) * M.E * 1e15).toFixed(2) + ' fN each way', '<i>qE</i> up, <i>qvB</i> down, net zero');
+    }
+    if (d.kind === 'spectrometer') {
+      const rows = M.parts.map(p => p.label + ': ' + (p.land * 100).toFixed(2) + ' cm').join('<br>');
+      const sep = M.parts.length > 1 ? (M.parts[M.parts.length - 1].land - M.parts[0].land) * 100 : 0;
+      const frac = M.parts.length > 1 ? 100 * (M.parts[M.parts.length - 1].mu - M.parts[0].mu) / M.parts[0].mu : 0;
+      html += card('Landing distance from the slit', rows, 'distance = 2<i>r</i> = 2<i>mv</i>/(<i>qB</i>)');
+      html += card('Spread across the detector', sep.toFixed(2) + ' cm', 'for a ' + frac.toFixed(1) + '% spread in mass');
+      html += card('Radius of the lightest ion', (M.parts[0].r * 100).toFixed(2) + ' cm', '<i>r</i> = <i>mv</i>/(<i>qB</i>)');
+    }
+    if (d.kind === 'cyclotron') {
+      const p = M.parts[0], i = idxAt(p, t), sp = speedAt(p, i);
+      const ke = 0.5 * p.m * sp * sp / KEV;
+      html += card('Cyclotron frequency', (d.fc / 1e6).toFixed(2) + ' MHz', '<i>f</i><sub>c</sub> = <i>qB</i>/(2π<i>m</i>); drive is at ' + (d.f / 1e6).toFixed(2) + ' MHz');
+      html += card('Energy now', ke.toFixed(1) + ' keV', 'gains about <i>qV</i> = ' + (Math.abs(st.q) * st.V / 1000).toFixed(1) + ' keV per gap crossing');
+      const final = 0.5 * p.m * Math.pow(speedAt(p, p.tr.n), 2) / KEV, best = d.KEmax / KEV;
+      html += card('Energy on leaving', final.toFixed(1) + ' keV of a possible ' + best.toFixed(1),
+        '(<i>qBR</i>)²/2<i>m</i> if it stays in step', final > 0.85 * best ? 'ok' : 'no');
+    }
+    $('readout').innerHTML = html;
+    $('B_v').textContent = st.B.toFixed(2) + ' T';
+    $('E_v').textContent = st.E + ' kV/m';
+    $('v_v').textContent = st.v.toFixed(2) + ' ×10⁵ m/s';
+    $('m_v').textContent = st.m + ' u';
+    $('V_v').textContent = (st.V / 1000).toFixed(1) + ' kV';
+    $('f_v').textContent = st.f.toFixed(2) + ' × ' + (Math.abs(st.f - 1) < 0.005 ? 'f_c (matched)' : 'f_c');
+    $('R_v').textContent = (st.R * 100).toFixed(1) + ' cm';
+    const secPerUs = (12 / st.rate) / (M.tEnd * 1e6);
+    $('rate_v').textContent = '1 µs takes ' + (secPerUs >= 1 ? secPerUs.toFixed(1) : secPerUs.toFixed(2)) + ' s';
+    $('tval').textContent = (st.t * 1e6).toFixed(3);
+    $('scrub').value = String(Math.round(st.t / M.tEnd * 1000));
+    $('qseg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.q === st.q)));
+  }
+  const SHOW = {
+    1: ['lab_B', 'lab_v', 'lab_m', 'lab_rate', 'lab_q', 'lab_three', 'lab_vecs'],
+    2: ['lab_B', 'lab_E', 'lab_m', 'lab_rate', 'lab_q', 'lab_vecs'],
+    3: ['lab_B', 'lab_v', 'lab_sample', 'lab_rate', 'lab_q', 'lab_vecs'],
+    4: ['lab_B', 'lab_m', 'lab_V', 'lab_f', 'lab_R', 'lab_rate', 'lab_q', 'lab_res']
+  };
+  function setTab(n) {
+    st.tab = n;
+    [1, 2, 3, 4].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
+    const show = SHOW[n];
+    ['lab_B', 'lab_E', 'lab_v', 'lab_m', 'lab_sample', 'lab_V', 'lab_f', 'lab_R', 'lab_rate', 'lab_q', 'lab_three', 'lab_vecs', 'lab_res']
+      .forEach(id => { $(id).hidden = show.indexOf(id) < 0; });
+    // sensible defaults per tab
+    if (n === 1) { st.B = 0.2; st.v = 1; st.m = 20; }
+    if (n === 2) { st.B = 0.08; st.E = 8; st.m = 20; }
+    if (n === 3) { st.B = 0.5; st.v = 1; }
+    if (n === 4) { st.B = 0.4; st.m = 1; st.V = 2000; st.f = 1; st.R = 0.08; }
+    ['B', 'E', 'v', 'm', 'V', 'f', 'R'].forEach(id => { $(id).value = String(st[id]); });
+    rebuild();
+  }
+  function rebuild() { M = model(); st.t = 0; st.playing = false; $('play').textContent = 'Play'; readout(); draw(); }
+  [1, 2, 3, 4].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  ['B', 'E', 'v', 'm', 'V', 'f', 'R'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
+  $('sample').addEventListener('change', () => { st.sample = $('sample').value; rebuild(); });
+  $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
+  $('three').addEventListener('change', () => { st.three = $('three').checked; rebuild(); });
+  $('vecs').addEventListener('change', () => { st.vecs = $('vecs').checked; draw(); });
+  $('resonate').addEventListener('click', () => { st.f = 1; $('f').value = '1'; rebuild(); });
+  $('qseg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st.q = +b.dataset.q; rebuild(); }));
+  $('reset').addEventListener('click', () => rebuild());
+  $('scrub').addEventListener('input', () => { st.t = (+$('scrub').value) / 1000 * M.tEnd; st.playing = false; $('play').textContent = 'Play'; readout(); draw(); });
+  $('play').addEventListener('click', () => {
+    if (st.playing) { st.playing = false; $('play').textContent = 'Play'; return; }
+    if (st.t >= M.tEnd) st.t = 0;
+    st.playing = true; $('play').textContent = 'Pause'; last = null; requestAnimationFrame(frame);
+  });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP.  Real times here are microseconds, so playback is slowed by a large factor.
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    if (last !== null) { st.t += (ts - last) / 1000 * (M.tEnd / (12 / st.rate)); if (st.t >= M.tEnd) { st.t = M.tEnd; st.playing = false; $('play').textContent = 'Play'; } }
+    last = ts;
+    readout(); draw();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+  setTab(1);
+})();
+</script>
+</body>
+</html>
