@@ -69,10 +69,15 @@
     .readout .v { font-size: 17px; }
     .controls { grid-template-columns: 1fr; padding: 14px 16px; }
   }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
 </style>
 </head>
 <body>
 <main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>Ballistics cart</h1>
 
   <div class="tabs" role="tablist">

@@ -74,10 +74,15 @@
     .regions .group.right { justify-content: flex-start; }
     .lower { grid-template-columns: 1fr; }
   }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
 </style>
 </head>
 <body>
 <main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>p-n junction diode</h1>
   <p class="lede">
     Dope each half of the bar and connect a battery. Electrons and holes drift, diffuse and recombine,

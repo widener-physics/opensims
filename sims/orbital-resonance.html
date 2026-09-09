@@ -49,10 +49,15 @@
   .notes p { margin: 0 0 8px; }
   .notes b { color: var(--ink); font-weight: 600; }
   @media (max-width: 600px) { .tabs button { padding: 8px 10px; font-size: 14px; } .tabs button span { display: none; } }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
 </style>
 </head>
 <body>
 <main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>Orbital resonance</h1>
   <p class="lede">
     Two bodies are in a mean-motion resonance when their orbital periods form a simple ratio. Three views of the same idea:
