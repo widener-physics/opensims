@@ -57,11 +57,8 @@
   .notes p { margin: 0 0 8px; }
   .notes b { color: var(--ink); font-weight: 600; }
 
-  input[type=range] { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; margin: 0; }
-  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--rule); border-radius: 2px; }
-  input[type=range]::-moz-range-track { height: 4px; background: var(--rule); border-radius: 2px; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -9px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
-  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
+  /* native range inputs: clearer than a custom track, with a taller hit area for touch */
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
   @media (max-width: 640px) {
     body { padding: 20px 14px 48px; }
     canvas { aspect-ratio: 4 / 3; }
@@ -111,7 +108,7 @@
 
   <div class="notes">
     <p><b>What to try.</b> Find the launch angle that carries the ball furthest up the slope; it is not 45°. Set the slope to zero and check that the range matches the flat-ground formula.</p>
-    <p>Units: metres and seconds, <i>g</i> = 9.8 m/s², no air resistance. The ball is a point; the slope is a straight line through the launch point.</p>
+    <p>Units: meters and seconds, <i>g</i> = 9.8 m/s², no air resistance. The ball is a point; the slope is a straight line through the launch point.</p>
   </div>
 </main>
 

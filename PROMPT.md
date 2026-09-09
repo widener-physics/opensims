@@ -80,7 +80,7 @@ The model's output is a draft. Before it goes in `sims/`:
 2. Check the physics yourself. Change a parameter to a value where you know the answer and compare with the readout. The model's own list of limiting cases is a starting point, not a substitute.
 3. Read the text on the page as a student would. Cut anything that sounds like marketing.
 4. Try it at phone width (resize the browser to about 390px).
-5. Ask for revisions in the same conversation: "the pericentre label overlaps the ball; move it", "the plot should show both bodies". Small, specific requests work better than restating the whole task.
+5. Ask for revisions in the same conversation: "the pericenter label overlaps the ball; move it", "the plot should show both bodies". Small, specific requests work better than restating the whole task.
 6. Fill in the header (author, year), add the `sims.js` entry, and run the checklist at the end of `STYLE_GUIDE.md`.
 
 The provenance line in the header is not optional. It states that a model drafted the code and that a named person verified the physics. Teachers who download the file deserve to know both.

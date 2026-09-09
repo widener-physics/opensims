@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<!--
+  River crossing - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author.
+  Credit: none; the river-crossing problem is a standard textbook exercise.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River crossing</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --water: #2E6C8C; --water-light: #C4DAE6; --bank: #D9CBA8;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; }
+  canvas { display: block; width: 100%; aspect-ratio: 900 / 460; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+
+  .presets { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; font-family: var(--sans); font-size: 14px; }
+  .presets span { color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { min-width: 0; padding: 5px 11px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; }
+  .seg button:last-child { border-right: 0; }
+  .seg button:disabled { color: var(--muted); cursor: not-allowed; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport .time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .up { color: var(--vel); } .readout .down { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .toggles { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .legend { font-family: var(--sans); font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+  .legend i { display: inline-block; width: 22px; height: 3px; vertical-align: 3px; margin: 0 6px 0 14px; border-radius: 2px; }
+  .legend i:first-child { margin-left: 0; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  /* native range inputs: clearer than a custom track, with a taller hit area for touch */
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    canvas { aspect-ratio: 4 / 3; }
+    .transport { grid-template-columns: 1fr 1fr; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .time { grid-column: 1 / -1; text-align: center; margin-top: -4px; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>River crossing</h1>
+  <p class="lede">A boat crosses a river that is flowing to the right. The boat's speed and heading are set relative to the water; the water carries it
+    downstream at the same time. Where it lands and how long it takes both come from adding two velocities. Aim straight across and you cross fastest;
+    aim upstream and you land closer to the point opposite, but the crossing takes longer.</p>
+
+  <div class="presets"><span>Set the heading for</span>
+    <div class="seg" role="group" aria-label="Presets">
+      <button id="p_fast" title="Aim straight across">fastest crossing</button>
+      <button id="p_zero" title="Aim upstream so the drift is zero">landing straight across</button>
+      <button id="p_min" title="When the current is faster than the boat, the heading that drifts least">least drift</button>
+    </div>
+    <span id="p_note"></span>
+  </div>
+
+  <canvas id="c"></canvas>
+  <p class="legend"><i style="background:var(--ball)"></i>boat relative to water <i style="background:var(--water)"></i>current <i style="background:var(--vel)"></i>boat over ground <i style="background:var(--ghost)"></i>predicted path</p>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
+    <span class="time"><span id="tval">0.0</span> s</span>
+  </div>
+
+  <div class="readout">
+    <div><div class="k">Crossing time</div><div class="v" id="r_T"></div><div class="f"><i>T</i> = <i>W</i> / (<i>v</i><sub>b</sub> cos <i>&theta;</i>)</div></div>
+    <div><div class="k">Landing point, relative to straight across</div><div class="v" id="r_D"></div><div class="f" id="f_D"><i>D</i> = (<i>c</i> &minus; <i>v</i><sub>b</sub> sin <i>&theta;</i>) <i>T</i></div></div>
+    <div><div class="k">Velocity over ground</div><div class="v" id="r_V"></div><div class="f"><b>v</b><sub>ground</sub> = <b>v</b><sub>boat/water</sub> + <b>c</b></div></div>
+  </div>
+
+  <div class="controls">
+    <label><div class="row"><span>Heading, measured from straight across (upstream positive)</span><span class="val" id="th_v"></span></div>
+      <input type="range" id="th" min="-80" max="80" step="1" value="0"></label>
+    <label><div class="row"><span>Boat speed relative to the water</span><span class="val" id="vb_v"></span></div>
+      <input type="range" id="vb" min="0.5" max="5" step="0.1" value="2"></label>
+    <label><div class="row"><span>Current speed</span><span class="val" id="cs_v"></span></div>
+      <input type="range" id="cs" min="0" max="5" step="0.1" value="1.2"></label>
+    <label><div class="row"><span>River width</span><span class="val" id="W_v"></span></div>
+      <input type="range" id="W" min="20" max="200" step="10" value="80"></label>
+    <label><div class="row"><span>Playback</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="1" max="20" step="1" value="8"></label>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="vecs" checked> show the velocity triangle</label>
+    <label><input type="checkbox" id="water"> view from the water (drifting with the current)</label>
+    <label><input type="checkbox" id="prof"> current is fastest mid-river</label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> With the boat faster than the current, press "landing straight across" and check the heading against sin <i>&theta;</i> = <i>c</i>/<i>v</i><sub>b</sub>;
+      then compare its crossing time with the fastest crossing. Set the current faster than the boat: the "straight across" preset grays out because no heading
+      can get there, and "least drift" finds the best you can do, sin <i>&theta;</i> = <i>v</i><sub>b</sub>/<i>c</i>. Tick "view from the water": the boat's path becomes a straight
+      line along its heading, and it is the banks that move.</p>
+    <p>Units: meters and seconds. The current is uniform across the river unless "fastest mid-river" is ticked, which uses a parabolic profile that is zero
+      at the banks and <i>c</i> at the center (mean &frac23;<i>c</i>); in that case the path curves and the water-frame view is not available, since different
+      parts of the river move at different speeds.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+
+  // ================================================================
+  // 1. MODEL. Heading theta is measured from the line straight across; upstream positive.
+  //    Boat velocity relative to water:  (-vb sin(theta), vb cos(theta))   [x downstream, y across]
+  //    Current at height y across:        c(y) = cs               (uniform)
+  //                                       c(y) = cs * 4 y (W - y) / W^2   (parabolic, zero at the banks)
+  //    Ground velocity = boat/water + current.  Crossing time T = W / (vb cos theta), independent of the current.
+  //    Landing offset D = integral of (c(y(t)) - vb sin theta) dt over the crossing.
+  // ================================================================
+  const st = { th: 0, vb: 2, cs: 1.2, W: 80, rate: 8, vecs: true, water: false, prof: false, t: 0, playing: false };
+  function model() {
+    const th = st.th * Math.PI / 180;
+    const ux = -st.vb * Math.sin(th), uy = st.vb * Math.cos(th);            // boat relative to water
+    const T = st.W / uy;
+    const current = y => st.prof ? st.cs * 4 * y * (st.W - y) / (st.W * st.W) : st.cs;
+    const meanC = st.prof ? st.cs * 2 / 3 : st.cs;
+    const pos = t => {
+      const tt = Math.max(0, Math.min(t, T)), y = uy * tt;
+      // x = integral (c(y) + ux) dt with y = uy t; parabolic case integrates to a cubic in t
+      const drift = st.prof ? st.cs * 4 / (st.W * st.W) * (st.W * uy * tt * tt / 2 - uy * uy * tt * tt * tt / 3) : st.cs * tt;
+      return { x: drift + ux * tt, y };
+    };
+    const D = pos(T).x;                                                       // landing offset, downstream positive
+    // Landing offset depends only on the mean current across the crossing, so the two special headings use meanC:
+    //   land straight across:  sin(theta) = meanC / vb   (needs vb > meanC)
+    //   least drift otherwise: sin(theta) = vb / meanC   (from dD/dtheta = 0)
+    const zeroPossible = st.vb > meanC;
+    return { th, ux, uy, T, tEnd: T, pos, current, meanC, D, zeroPossible,
+      thZero: zeroPossible ? Math.asin(meanC / st.vb) : null,
+      thMin: !zeroPossible && meanC > 0 ? Math.asin(st.vb / meanC) : null };
+  }
+  let M = model();
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(10, L * 0.6);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2.2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.8, y1 - uy * hd * 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+  }
+  function draw() {
+    const { ctx, W, H, compact } = fit($('c'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const t = Math.min(st.t, M.T);
+    const water = st.water && !st.prof;
+    // In the water frame, a ground point x at time t' appears at x - cs t'; the boat's own path becomes a straight line.
+    const gx = (x, tOf) => water ? x - st.cs * tOf : x;          // display x of a point that exists at time tOf
+    // bounding box of everything drawn during the run
+    let xlo = Infinity, xhi = -Infinity;
+    const addx = x => { xlo = Math.min(xlo, x); xhi = Math.max(xhi, x); };
+    for (let k = 0; k <= 40; k++) { const tt = M.T * k / 40; const p = M.pos(tt); addx(gx(p.x, tt)); addx(gx(0, tt)); addx(gx(M.D, tt)); }
+    addx(-0.15 * st.W); addx(0.15 * st.W);
+    const m = compact ? 10 : 24, bankH = compact ? 26 : 34;
+    const S = Math.min((W - 2 * m) / (xhi - xlo), (H - 2 * bankH - 8) / st.W);
+    const ox = m + ((W - 2 * m) - (xhi - xlo) * S) / 2 - xlo * S;
+    const oy = H - bankH - ((H - 2 * bankH) - st.W * S) / 2;                 // y = 0 (near bank) at oy, y up
+    const X = x => ox + x * S, Y = y => oy - y * S;
+
+    // river and banks
+    ctx.fillStyle = C('--water-light'); ctx.fillRect(0, Y(st.W), W, st.W * S);
+    ctx.fillStyle = C('--bank'); ctx.fillRect(0, Y(0), W, H - Y(0)); ctx.fillRect(0, 0, W, Y(st.W));
+    // bank ticks every 10 m (they scroll upstream in the water frame)
+    ctx.strokeStyle = 'rgba(23,33,40,0.35)'; ctx.lineWidth = 1;
+    const tick = st.W >= 120 ? 20 : 10;
+    const x0tick = Math.floor((xlo - (water ? 0 : 0)) / tick) * tick - tick * 3;
+    for (let x = x0tick; x <= xhi + tick * 3; x += tick) {
+      const dx = gx(x, t); const px = X(dx); if (px < -5 || px > W + 5) continue;
+      ctx.beginPath(); ctx.moveTo(px, Y(0)); ctx.lineTo(px, Y(0) + 6); ctx.moveTo(px, Y(st.W)); ctx.lineTo(px, Y(st.W) - 6); ctx.stroke();
+    }
+    // current arrows in the water (rows across the river; length shows speed at that row)
+    ctx.strokeStyle = ctx.fillStyle = 'rgba(46,108,140,0.45)';
+    const rows = compact ? 4 : 6, cols = Math.max(4, Math.floor(W / 110));
+    for (let i = 1; i <= rows; i++) {
+      const y = st.W * i / (rows + 1), c = M.current(y), len = 10 + 34 * c / Math.max(st.cs, 0.1);
+      for (let j = 0; j < cols; j++) {
+        const px = (j + 0.5) * W / cols + (water ? 0 : (st.cs * t * S * 0.6) % (W / cols)) - W / cols;
+        if (c < 0.05) continue;
+        arrow(ctx, px, Y(y), px + Math.min(len, W / cols - 8), Y(y), 'rgba(46,108,140,0.45)', 1.5);
+      }
+    }
+    // straight-across reference and start marker
+    ctx.setLineDash([3, 5]); ctx.strokeStyle = 'rgba(23,33,40,0.4)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(gx(0, t)), Y(0)); ctx.lineTo(X(gx(0, t)), Y(st.W)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.font = '12px ' + C('--sans');
+    ctx.fillText('start', X(gx(0, t)), Y(0) + 18);
+    ctx.fillText(compact ? 'opposite' : 'straight across', X(gx(0, t)), Y(st.W) - 10);
+    // predicted path and trail
+    const path = (tmax, dash, color, w) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath();
+      for (let k = 0; k <= 80; k++) { const tt = tmax * k / 80; const p = M.pos(tt); const px = X(gx(p.x, tt)), py = Y(p.y); k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.stroke(); ctx.setLineDash([]); };
+    path(M.T, [6, 5], C('--ghost'), 1.4);
+    if (t > 0) path(t, [], C('--body'), 2.4);
+    // landing marker and drift dimension
+    const lx = X(gx(M.D, t));
+    ctx.fillStyle = C('--ghost'); ctx.beginPath(); ctx.moveTo(lx, Y(st.W) + 1); ctx.lineTo(lx - 5, Y(st.W) - 9); ctx.lineTo(lx + 5, Y(st.W) - 9); ctx.closePath(); ctx.fill();
+    if (Math.abs(M.D) * S > 12) {
+      const yy = Y(st.W) + 22, x0 = X(gx(0, t)), col = M.D > 0 ? C('--hot') : C('--vel');
+      arrow(ctx, x0, yy, lx, yy, col, 1.5); arrow(ctx, lx, yy, x0, yy, col, 1.5);
+      ctx.fillStyle = col; ctx.textAlign = 'center';
+      ctx.fillText(Math.abs(M.D).toFixed(compact ? 0 : 1) + ' m ' + (M.D > 0 ? 'downstream' : 'upstream'), (x0 + lx) / 2, yy + 16);
+    }
+    // boat
+    const p = M.pos(t), bx = X(gx(p.x, t)), by = Y(p.y);
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(-Math.atan2(M.uy, M.ux) + Math.PI / 2);   // bow along the heading
+    const bl = Math.max(14, 0.06 * st.W * S), bw = bl * 0.42;
+    ctx.fillStyle = C('--ball'); ctx.beginPath(); ctx.moveTo(0, -bl / 2); ctx.quadraticCurveTo(bw / 2, -bl / 6, bw / 2, bl / 2); ctx.lineTo(-bw / 2, bl / 2); ctx.quadraticCurveTo(-bw / 2, -bl / 6, 0, -bl / 2); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // velocity triangle at the boat: boat/water (orange) + current (blue) = ground (green)
+    if (st.vecs && t < M.T) {
+      const k = (compact ? 0.2 : 0.24) * H / Math.max(st.vb, st.cs, 0.5);   // px per m/s: the longest vector spans about a quarter of the canvas
+      const cHere = water ? 0 : M.current(p.y);
+      const ax = bx + M.ux * k, ay = by - M.uy * k;
+      arrow(ctx, bx, by, ax, ay, C('--ball'), 2.4);
+      arrow(ctx, ax, ay, ax + cHere * k, ay, C('--water'), 2.4);
+      arrow(ctx, bx, by, ax + cHere * k, ay, C('--vel'), 2.8);
+      if (!compact) {
+        ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'left';
+        ctx.fillStyle = C('--ball'); ctx.textAlign = M.ux <= 0 ? 'right' : 'left';
+        ctx.fillText(st.vb.toFixed(1) + ' m/s', (bx + ax) / 2 + (M.ux <= 0 ? -8 : 8), (by + ay) / 2 + 4);
+        ctx.textAlign = 'center';
+        if (cHere > 0.05) { ctx.fillStyle = C('--water'); ctx.fillText(cHere.toFixed(1) + ' m/s', ax + cHere * k / 2, ay - 8); }
+        ctx.fillStyle = C('--vel'); ctx.textAlign = 'left'; ctx.fillText(Math.hypot(M.ux + cHere, M.uy).toFixed(2) + ' m/s', ax + cHere * k + 8, ay + 14);
+      }
+    }
+    // frame caption
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillText(water ? (compact ? 'water view' : 'view: drifting with the water') : (compact ? 'bank view' : 'view: from the bank'), 12, Y(st.W) - 14 > 20 ? 18 : 18);
+    ctx.textAlign = 'right'; ctx.fillText(t >= M.T ? 'landed' : t > 0 ? 'crossing' : 'ready', W - 12, 18);
+  }
+
+  // ================================================================
+  // 3. READOUTS, PRESETS, CONTROLS
+  // ================================================================
+  const scrub = $('scrub');
+  const deg = r => (r * 180 / Math.PI);
+  function readout() {
+    $('r_T').textContent = M.T.toFixed(1) + ' s' + (Math.abs(st.th) < 0.5 ? ' (the fastest possible)' : ', vs ' + (st.W / st.vb).toFixed(1) + ' s straight across');
+    const D = M.D;
+    $('r_D').textContent = Math.abs(D) < 0.05 ? 'straight across' : Math.abs(D).toFixed(1) + ' m ' + (D > 0 ? 'downstream' : 'upstream');
+    $('r_D').className = 'v ' + (Math.abs(D) < 0.05 ? '' : D > 0 ? 'down' : 'up');
+    $('f_D').innerHTML = st.prof ? '<i>D</i> = (<i>c&#772;</i> &minus; <i>v</i><sub>b</sub> sin <i>&theta;</i>) <i>T</i>, with <i>c&#772;</i> = &frac23;<i>c</i>' : '<i>D</i> = (<i>c</i> &minus; <i>v</i><sub>b</sub> sin <i>&theta;</i>) <i>T</i>';
+    const vgx = M.ux + M.meanC, vgy = M.uy, ang = deg(Math.atan2(vgx, vgy));
+    $('r_V').textContent = Math.hypot(vgx, vgy).toFixed(2) + ' m/s, ' + Math.abs(ang).toFixed(0) + '° ' + (Math.abs(ang) < 0.5 ? 'straight across' : ang > 0 ? 'downstream of straight across' : 'upstream of straight across') + (st.prof ? ' (average)' : '');
+    $('th_v').textContent = (st.th > 0 ? '+' : st.th < 0 ? '−' : '') + Math.abs(st.th) + '°' + (st.th > 0 ? ' upstream' : st.th < 0 ? ' downstream' : '');
+    $('vb_v').textContent = st.vb.toFixed(1) + ' m/s';
+    $('cs_v').textContent = st.cs.toFixed(1) + ' m/s';
+    $('W_v').textContent = st.W + ' m';
+    $('rate_v').textContent = st.rate + '× real time';
+    $('tval').textContent = st.t.toFixed(1);
+    scrub.value = String(Math.round(st.t / M.tEnd * 1000));
+    // presets
+    $('p_zero').disabled = !M.zeroPossible;
+    $('p_min').disabled = M.zeroPossible || M.meanC === 0;
+    $('p_note').textContent = M.zeroPossible ? '' : st.cs === 0 ? 'no current: every heading lands where it points' : 'current faster than the boat: no heading lands straight across';
+    ['p_fast', 'p_zero', 'p_min'].forEach(id => $(id).setAttribute('aria-pressed', 'false'));
+    if (Math.abs(st.th) < 0.5) $('p_fast').setAttribute('aria-pressed', 'true');
+    else if (M.thZero !== null && Math.abs(st.th - deg(M.thZero)) < 0.6) $('p_zero').setAttribute('aria-pressed', 'true');
+    else if (M.thMin !== null && Math.abs(st.th - deg(M.thMin)) < 0.6) $('p_min').setAttribute('aria-pressed', 'true');
+  }
+  function rebuild(keepTime) {
+    M = model();
+    if (!keepTime) { st.t = 0; st.playing = false; $('play').textContent = 'Play'; } else st.t = Math.min(st.t, M.tEnd);
+    readout(); draw();
+  }
+  function setHeading(d) { st.th = Math.round(d * 10) / 10; $('th').value = String(Math.round(d)); rebuild(); }
+  $('p_fast').addEventListener('click', () => setHeading(0));
+  $('p_zero').addEventListener('click', () => { if (M.thZero !== null) setHeading(deg(M.thZero)); });
+  $('p_min').addEventListener('click', () => { if (M.thMin !== null) setHeading(deg(M.thMin)); });
+  ['th', 'vb', 'cs', 'W'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
+  $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
+  $('vecs').addEventListener('change', () => { st.vecs = $('vecs').checked; draw(); });
+  $('water').addEventListener('change', () => { st.water = $('water').checked; draw(); });
+  $('prof').addEventListener('change', () => { st.prof = $('prof').checked; $('water').disabled = st.prof; if (st.prof) { st.water = false; $('water').checked = false; } rebuild(true); });
+  $('reset').addEventListener('click', () => rebuild());
+  scrub.addEventListener('input', () => { st.t = (+scrub.value) / 1000 * M.tEnd; st.playing = false; $('play').textContent = 'Play'; readout(); draw(); });
+  $('play').addEventListener('click', () => {
+    if (st.playing) { st.playing = false; $('play').textContent = 'Play'; return; }
+    if (st.t >= M.tEnd) st.t = 0;
+    st.playing = true; $('play').textContent = 'Pause'; last = null; requestAnimationFrame(frame);
+  });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    if (last !== null) { st.t += (ts - last) / 1000 * st.rate; if (st.t >= M.tEnd) { st.t = M.tEnd; st.playing = false; $('play').textContent = 'Play'; } }
+    last = ts;
+    readout(); draw();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+  rebuild();
+})();
+</script>
+</body>
+</html>
