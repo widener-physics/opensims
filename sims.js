@@ -16,6 +16,46 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'rocket-staging',
+    title: 'Rocket staging',
+    topic: 'dynamics',
+    tags: ['rocket equation', 'variable mass', 'momentum', 'orbital velocity'],
+    blurb: 'Build the same 500 metric ton rocket as one stage or two and see why one cannot reach orbit. Mass diagram, per-stage delta-v, and a speed trace with staging marked, with gravity losses on or off.',
+    level: 'intermediate',
+    added: '2026-09-08',
+    status: 'ready'
+  },
+  {
+    slug: 'static-equilibrium',
+    title: 'Static equilibrium',
+    topic: 'rotation',
+    tags: ['torque', 'free-body diagram', 'ladder problem', 'reaction forces', 'friction'],
+    blurb: 'A plank on two supports, a ladder against a smooth wall, and a boom held by a cable. Forces are solved and drawn, torque bars show the balance about any point you choose, and the force polygon closes.',
+    level: 'intro',
+    added: '2026-09-08',
+    status: 'ready'
+  },
+  {
+    slug: 'charged-particle-fields',
+    title: 'Charged particle in electric and magnetic fields',
+    topic: 'em',
+    tags: ['magnetic force', 'velocity selector', 'mass spectrometer', 'cyclotron', 'Lorentz force'],
+    blurb: 'Four screens on one idea: a magnetic field turns a charge without doing work. Circular orbits whose period ignores speed, a crossed-field speed filter, isotope separation on a detector, and a cyclotron that falls out of step when you detune it.',
+    level: 'intermediate',
+    added: '2026-09-08',
+    status: 'ready'
+  },
+  {
+    slug: 'rolling-race',
+    title: 'Rolling race',
+    topic: 'rotation',
+    tags: ['moment of inertia', 'rotational energy', 'rolling without slipping', 'inclined plane'],
+    blurb: 'A hoop, disc, sphere, hollow sphere and sliding block race down the same ramp. Energy bars show how much each one has to put into spinning, which is exactly the order they finish in. Mass and radius change nothing.',
+    level: 'intro',
+    added: '2026-09-08',
+    status: 'ready'
+  },
+  {
     slug: 'river-crossing',
     title: 'River crossing',
     topic: 'kinematics',

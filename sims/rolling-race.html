@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<!--
+  Rolling race - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author.
+  Credit: none; rolling bodies on an incline is a standard textbook exercise.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rolling race</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --hoop: #1D4F73; --disc: #D9651B; --sphere: #2E7D32; --shell: #8B2E86; --slide: #5C6B73;
+    --track: #4A5A63;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; }
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+  #ramp { aspect-ratio: 900 / 380; }
+  #bars { aspect-ratio: 900 / 210; margin-top: 12px; }
+
+  .entrants { display: flex; gap: 18px 22px; flex-wrap: wrap; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  .entrants label { display: inline-flex; gap: 7px; align-items: center; }
+  .entrants .swatch { width: 12px; height: 12px; border-radius: 50%; background: var(--c); flex: none; }
+  .entrants .swatch.ring { background: transparent; border: 3px solid var(--c); }
+
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport .time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  table.results { width: 100%; border-collapse: collapse; margin-top: 14px; font-family: var(--sans); font-size: 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+  table.results th, table.results td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+  table.results th { color: var(--muted); font-weight: 600; }
+  table.results th:first-child, table.results td:first-child { text-align: left; }
+  table.results tr:last-child td { border-bottom: 0; }
+  table.results td.name { display: flex; align-items: center; gap: 8px; }
+  table.results .swatch { width: 11px; height: 11px; border-radius: 50%; background: var(--c); flex: none; }
+  table.results .swatch.ring { background: transparent; border: 3px solid var(--c); }
+  table.results tr.out td { color: var(--muted); }
+  table.results caption { caption-side: bottom; text-align: left; padding: 8px 2px 0; color: var(--muted); font-size: 13px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .toggles { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    #ramp { aspect-ratio: 3 / 2; }
+    #bars { aspect-ratio: 3 / 4; }
+    .transport { grid-template-columns: 1fr 1fr; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .time { grid-column: 1 / -1; text-align: center; margin-top: -4px; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    table.results th, table.results td { padding: 8px 8px; }
+    table.results .hidesm { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Rolling race</h1>
+  <p class="lede">Release a hoop, a solid disc, a solid sphere, a hollow sphere and a frictionless sliding block from the same height.
+    They all arrive with the same total kinetic energy, but the rollers have to put some of it into spinning, so they arrive slower.
+    Which one wins depends only on how its mass is spread out from the axis, not on how heavy it is or how big.</p>
+
+  <canvas id="ramp"></canvas>
+
+  <div class="entrants" id="entrants"></div>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
+    <span class="time"><span id="tval">0.00</span> s</span>
+  </div>
+
+  <canvas id="bars"></canvas>
+
+  <table class="results" id="results">
+    <caption id="cap"></caption>
+  </table>
+
+  <div class="controls">
+    <label><div class="row"><span>Ramp angle</span><span class="val" id="th_v"></span></div>
+      <input type="range" id="th" min="5" max="35" step="1" value="20"></label>
+    <label><div class="row"><span>Ramp length</span><span class="val" id="L_v"></span></div>
+      <input type="range" id="L" min="1" max="5" step="0.25" value="3"></label>
+    <label><div class="row"><span>Mass of every object</span><span class="val" id="mass_v"></span></div>
+      <input type="range" id="mass" min="0.2" max="5" step="0.1" value="1"></label>
+    <label><div class="row"><span>Radius of every object</span><span class="val" id="rad_v"></span></div>
+      <input type="range" id="rad" min="0.04" max="0.16" step="0.01" value="0.09"></label>
+    <label><div class="row"><span>Playback</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="0.1" max="1" step="0.1" value="0.4"></label>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="spin" checked> mark the rim so you can see the spin</label>
+    <label><input type="checkbox" id="ghost"> keep a marker at each finish position</label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> Change the mass, then the radius: the order never changes, and neither do the finish times. That is the surprise, and it is
+      worth predicting before you drag the slider. Then look at the energy bars: the hoop puts half its energy into rotation, the sphere only two sevenths,
+      and the sliding block none at all, which is exactly the order they finish in. Finally raise the ramp angle past the point where the friction needed
+      exceeds what a real surface can supply; the table flags any object that would start to slip. After the finish line each object carries on along a
+      level runout at the speed it reached, so the gaps you see at the end are the race result.</p>
+    <p>Units: meters and seconds, <i>g</i> = 9.8 m/s². Each object rolls without slipping from rest, with no rolling resistance or air drag; the block
+      slides on a frictionless ramp and along a frictionless runout, so nothing slows down after the finish line. Acceleration is <i>a</i> = <i>g</i> sin θ / (1 + <i>k</i>), where <i>I</i> = <i>kmR</i>² defines the shape factor <i>k</i>:
+      1 for a hoop, ½ for a disc, ⅖ for a solid sphere, ⅔ for a thin hollow sphere, 0 for the sliding block. Mass and radius cancel out of <i>a</i> entirely.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G = 9.8;
+
+  // ================================================================
+  // 1. MODEL
+  //    Rolling without slipping down an incline: mg sin(th) - f = ma, fR = I alpha, a = alpha R.
+  //    With I = k m R^2 this gives  a = g sin(th) / (1 + k)   -- independent of m and R.
+  //    Energy at the bottom: KE_trans / KE_total = 1 / (1 + k),  KE_rot / KE_total = k / (1 + k).
+  //    Friction needed to roll:  f = k m g sin(th) / (1 + k), so the required coefficient is
+  //    mu_min = f / (m g cos(th)) = k tan(th) / (1 + k).
+  // ================================================================
+  const SHAPES = [
+    { id: 'hoop',   name: 'Hoop',           k: 1,       kTex: '1',   color: '--hoop',   ring: true,  on: true },
+    { id: 'shell',  name: 'Hollow sphere',  k: 2 / 3,   kTex: '2/3', color: '--shell',  ring: true,  on: true },
+    { id: 'disc',   name: 'Solid disc',     k: 0.5,     kTex: '1/2', color: '--disc',   ring: false, on: true },
+    { id: 'sphere', name: 'Solid sphere',   k: 0.4,     kTex: '2/5', color: '--sphere', ring: false, on: true },
+    { id: 'block',  name: 'Sliding block',  k: 0,       kTex: '0',   color: '--slide',  ring: false, on: true, block: true }
+  ];
+  const st = { th: 20, L: 3, mass: 1, rad: 0.09, rate: 0.4, spin: true, ghost: false, t: 0, playing: false };
+
+  function model() {
+    const th = st.th * Math.PI / 180;
+    const list = SHAPES.filter(s => s.on).map(s => {
+      const a = G * Math.sin(th) / (1 + s.k);              // along the ramp
+      const T = Math.sqrt(2 * st.L / a);                   // time to cover the ramp from rest
+      const v = a * T;                                     // speed at the bottom
+      const KE = 0.5 * st.mass * v * v * (1 + s.k);         // = m g L sin(th), the same for all of them
+      return { ...s, a, T, v, KE, keTrans: 0.5 * st.mass * v * v, keRot: 0.5 * st.mass * v * v * s.k,
+        muMin: s.block ? 0 : s.k * Math.tan(th) / (1 + s.k),
+        // distance along the ramp while on it, capped at L
+        s: t => 0.5 * a * Math.min(t, T) * Math.min(t, T),
+        // after the ramp each one carries on along a level runout at the speed it reached
+        run: t => Math.max(0, t - T) * v };
+    });
+    const Tmax = Math.max(...list.map(o => o.T), 0.1);
+    const drop = st.L * Math.sin(th);
+    const tEnd = Tmax + Math.min(0.9, 0.32 * Tmax);
+    const runMax = Math.max(...list.map(o => o.run(tEnd)), 0.2);
+    return { th, list, Tmax, tEnd, runMax, drop, PE: st.mass * G * drop };
+  }
+  let M = model();
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+
+  function drawRamp() {
+    const { ctx, W, H, compact } = fit($('ramp'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const t = st.t, n = M.list.length;
+    const m = compact ? 10 : 22;
+    // One ramp per object, identical and stacked, so nothing overlaps: a five-lane race seen from the side.
+    // Lane i's surface runs from (0, -i*gap) down-slope. u is measured along the surface from the start line.
+    const c = Math.cos(M.th), si = Math.sin(M.th);
+    const lane = st.rad * 2 + st.L * si * 0.06 + (compact ? 0.05 : 0.10);                 // vertical spacing between lanes
+    const uMax = st.L + st.rad * 2.5;
+    // A point on lane i: u along the incline (0 at the start, L at the finish), then d along the level runout.
+    const pt = (u, i, lift) => [ u * c + (lift || 0) * si, -u * si - lane * i + (lift || 0) * c ];
+    const ptRun = (d, i, lift) => { const [x, y] = pt(st.L, i, 0); return [x + d, y + (lift || 0)]; };
+    const place = (o, i, lift) => o.run(t) > 0 ? ptRun(o.run(t), i, lift) : pt(o.s(t), i, lift);
+    // bounding box over every lane
+    let xlo = Infinity, xhi = -Infinity, ylo = Infinity, yhi = -Infinity;
+    const add = ([x, y]) => { xlo = Math.min(xlo, x); xhi = Math.max(xhi, x); ylo = Math.min(ylo, y); yhi = Math.max(yhi, y); };
+    for (let i = 0; i < n; i++) {
+      add(pt(-0.15, i, 0)); add(pt(-0.15, i, st.rad * 2.6));
+      add(ptRun(M.runMax + st.rad * 2, i, 0)); add(ptRun(M.runMax + st.rad * 2, i, st.rad * 2.6));
+    }
+    const labelPad = compact ? 0.02 : 0.55 * (xhi - xlo) / 8;
+    xlo -= labelPad + (compact ? 0.03 : 0.1); xhi += compact ? 0.03 : 0.1;
+    ylo -= compact ? 0.04 : 0.12; yhi += compact ? 0.16 : 0.1;      // room for the start/finish captions
+    const S = Math.min((W - 2 * m) / (xhi - xlo), (H - 2 * m) / (yhi - ylo));
+    const ox = m + ((W - 2 * m) - (xhi - xlo) * S) / 2 - xlo * S;
+    const slackY = (H - 2 * m) - (yhi - ylo) * S;
+    const oy = H - m - slackY * (compact ? 0.75 : 0.5) + ylo * S;
+    const D = (u, i, lift) => { const [x, y] = pt(u, i, lift); return [ox + x * S, oy - y * S]; };
+    const DR = (d, i, lift) => { const [x, y] = ptRun(d, i, lift); return [ox + x * S, oy - y * S]; };
+    const DP = (o, i, lift) => { const [x, y] = place(o, i, lift); return [ox + x * S, oy - y * S]; };
+    const R = Math.max(3, st.rad * S);
+
+    M.list.forEach((o, i) => {
+      const col = C(o.color);
+      // the lane: incline, then a level runout after the finish line
+      ctx.strokeStyle = C('--track'); ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(...D(-0.15, i, 0)); ctx.lineTo(...D(st.L, i, 0));
+      ctx.lineTo(...DR(M.runMax + st.rad * 2, i, 0)); ctx.stroke();
+      // start and finish ticks
+      ctx.strokeStyle = 'rgba(23,33,40,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      [0, st.L].forEach(u => { ctx.beginPath(); ctx.moveTo(...D(u, i, 0)); ctx.lineTo(...D(u, i, st.rad * 2.6)); ctx.stroke(); });
+      ctx.setLineDash([]);
+      // marker left at the finish line once it gets there
+      if (st.ghost && t >= o.T) {
+        const [fx, fy] = D(st.L, i, st.rad);
+        ctx.strokeStyle = col; ctx.globalAlpha = 0.3; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(fx, fy, R, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      // the object, centre one radius above the surface
+      const onRun = o.run(t) > 0;
+      const u = o.s(t) + o.run(t), [px, py] = DP(o, i, st.rad);
+      if (o.block) {
+        ctx.save(); ctx.translate(px, py); ctx.rotate(onRun ? 0 : M.th);
+        ctx.fillStyle = col; ctx.fillRect(-R * 1.1, -R * 0.8, R * 2.2, R * 1.6);
+        ctx.restore();
+      } else {
+        ctx.lineWidth = Math.max(2.5, R * 0.26);
+        if (o.ring) { ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(px, py, Math.max(1, R - ctx.lineWidth / 2), 0, Math.PI * 2); ctx.stroke(); }
+        else { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2); ctx.fill(); }
+        if (st.spin) {
+          const ang = u / st.rad + (onRun ? 0 : M.th);                 // rolling without slipping
+          const ex = px + R * 0.78 * Math.cos(ang), ey = py + R * 0.78 * Math.sin(ang);
+          ctx.strokeStyle = o.ring ? col : C('--panel'); ctx.lineWidth = Math.max(1.5, R * 0.13);
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ex, ey); ctx.stroke();
+          ctx.fillStyle = o.ring ? col : C('--panel');
+          ctx.beginPath(); ctx.arc(ex, ey, Math.max(1.6, R * 0.12), 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      // lane label
+      if (!compact) {
+        ctx.fillStyle = col; ctx.textAlign = 'right'; ctx.font = '12px ' + C('--sans');
+        const [nx, ny] = D(-0.2, i, st.rad);
+        ctx.fillText(o.name, nx - 4, ny + 4);
+      }
+    });
+    // shared start / finish captions on the top lane
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.font = '12px ' + C('--sans');
+    const [sx, sy] = D(0, 0, st.rad * 2.6), [fx2, fy2] = D(st.L, 0, st.rad * 2.6);
+    ctx.fillText('start', sx, sy - 5);
+    ctx.fillText('finish', fx2, fy2 - 5);
+    if (!compact) { const [rx2, ry2] = DR(M.runMax * 0.55, n - 1, 0); ctx.textAlign = 'center'; ctx.fillText('level runout', rx2, ry2 + 16); }
+    ctx.textAlign = 'left';
+    ctx.fillText('θ = ' + st.th + '°,  ramp ' + st.L.toFixed(2) + ' m,  drop ' + M.drop.toFixed(2) + ' m', 12, 18);
+    ctx.textAlign = 'right';
+    const done = M.list.filter(o => t >= o.T).length;
+    ctx.fillText(done === 0 ? 'rolling' : done === M.list.length ? 'all finished' : done + ' of ' + M.list.length + ' finished', W - 12, 18);
+  }
+
+  // Energy bars: for each object, translational and rotational share of the same total
+  function drawBars() {
+    const { ctx, W, H, compact } = fit($('bars'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const t = st.t, n = M.list.length;
+    const ml = compact ? 74 : 132, mr = compact ? 12 : 150, mt = 26, mb = 26;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    const rowH = ph / n, barH = Math.min(22, rowH * 0.62);
+    const total = M.PE;                                    // every object converts the same mgh
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText('energy at this instant, out of ' + total.toFixed(1) + ' J released', ml, 14);
+    M.list.forEach((o, i) => {
+      const y = mt + rowH * i + (rowH - barH) / 2;
+      const frac = Math.min(1, o.s(t) / st.L);              // energy converted so far
+      const trans = frac * o.keTrans, rot = frac * o.keRot, pe = total - frac * total;
+      const w = v => pw * v / total;
+      // remaining potential energy, faint
+      ctx.fillStyle = C('--soft'); ctx.fillRect(ml, y, pw, barH);
+      ctx.fillStyle = C(o.color); ctx.fillRect(ml, y, w(trans), barH);
+      // rotational share: same color, hatched, so the split is visible without a second hue
+      const rx = ml + w(trans), rw = w(rot);
+      ctx.save(); ctx.beginPath(); ctx.rect(rx, y, rw, barH); ctx.clip();
+      ctx.fillStyle = C(o.color); ctx.globalAlpha = 0.28; ctx.fillRect(rx, y, rw, barH); ctx.globalAlpha = 1;
+      ctx.strokeStyle = C(o.color); ctx.lineWidth = 1.4;
+      for (let x = rx - barH; x < rx + rw + barH; x += 6) { ctx.beginPath(); ctx.moveTo(x, y + barH); ctx.lineTo(x + barH, y); ctx.stroke(); }
+      ctx.restore();
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(ml, y, pw, barH);
+      // labels
+      ctx.fillStyle = C(o.color); ctx.textAlign = 'right';
+      ctx.fillText(compact ? o.name.split(' ')[0] : o.name, ml - 8, y + barH / 2 + 4);
+      if (!compact) {
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+        ctx.fillText('moving ' + trans.toFixed(1) + ' J, spinning ' + rot.toFixed(1) + ' J', ml + pw + 10, y + barH / 2 + 4);
+      }
+    });
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText('solid: energy of motion   hatched: energy of spin   pale: still stored as height', ml, H - 8);
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  function entrants() {
+    $('entrants').innerHTML = SHAPES.map(s =>
+      '<label style="--c:' + C(s.color) + '"><input type="checkbox" data-id="' + s.id + '"' + (s.on ? ' checked' : '') +
+      '><span class="swatch' + (s.ring ? ' ring' : '') + '"></span>' + s.name + '</label>').join('');
+    $('entrants').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
+      const sh = SHAPES.find(x => x.id === cb.dataset.id);
+      if (!cb.checked && SHAPES.filter(x => x.on).length === 1) { cb.checked = true; return; }   // keep at least one
+      sh.on = cb.checked; rebuild();
+    }));
+  }
+  function results() {
+    const t = st.t;
+    const order = M.list.slice().sort((a, b) => a.T - b.T);
+    const slips = order.filter(o => o.muMin > 0.6);
+    const rows = order.map((o, i) => {
+      const done = t >= o.T;
+      const slip = o.muMin > 0.6;
+      return '<tr class="' + (done ? '' : 'out') + '" style="--c:' + C(o.color) + '">' +
+        '<td class="name"><span class="swatch' + (o.ring ? ' ring' : '') + '"></span>' + o.name + (slip ? ' <span style="color:var(--hot)">would slip</span>' : '') + '</td>' +
+        '<td class="hidesm">' + o.kTex + '</td>' +
+        '<td>' + o.a.toFixed(2) + '</td>' +
+        '<td>' + o.T.toFixed(2) + '</td>' +
+        '<td>' + o.v.toFixed(2) + '</td>' +
+        '<td class="hidesm">' + (100 * o.keRot / o.KE).toFixed(0) + '%</td>' +
+        '<td class="hidesm">' + o.muMin.toFixed(2) + '</td></tr>';
+    }).join('');
+    $('results').innerHTML = '<caption id="cap"></caption><thead><tr><th>Finish order</th><th class="hidesm">k in I = kmR²</th><th>a (m/s²)</th><th>Time (s)</th><th>Speed at bottom (m/s)</th><th class="hidesm">Energy in spin</th><th class="hidesm">Friction needed (μ)</th></tr></thead><tbody>' + rows + '</tbody>';
+    $('cap').textContent = 'Every object releases the same ' + M.PE.toFixed(1) + ' J. Times and speeds do not depend on the mass or the radius.'
+      + (slips.length ? ' A μ above about 0.6 is more than most dry surfaces provide, so ' + (slips.length === 1 ? 'that object' : 'those objects') + ' would slip rather than roll.' : '');
+  }
+  function readout() {
+    $('th_v').textContent = st.th + '°';
+    $('L_v').textContent = st.L.toFixed(2) + ' m';
+    $('mass_v').textContent = st.mass.toFixed(1) + ' kg';
+    $('rad_v').textContent = (st.rad * 100).toFixed(0) + ' cm';
+    $('rate_v').textContent = st.rate.toFixed(1) + '×' + (st.rate < 1 ? ' (slow motion)' : ' real time');
+    $('tval').textContent = st.t.toFixed(2);
+    $('scrub').value = String(Math.round(st.t / M.tEnd * 1000));
+    results();
+  }
+  function rebuild(keepTime) {
+    M = model();
+    if (!keepTime) { st.t = 0; st.playing = false; $('play').textContent = 'Play'; } else st.t = Math.min(st.t, M.tEnd);
+    readout(); drawRamp(); drawBars();
+  }
+  ['th', 'L', 'mass', 'rad'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
+  $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
+  $('spin').addEventListener('change', () => { st.spin = $('spin').checked; drawRamp(); });
+  $('ghost').addEventListener('change', () => { st.ghost = $('ghost').checked; drawRamp(); });
+  $('reset').addEventListener('click', () => rebuild());
+  $('scrub').addEventListener('input', () => { st.t = (+$('scrub').value) / 1000 * M.tEnd; st.playing = false; $('play').textContent = 'Play'; readout(); drawRamp(); drawBars(); });
+  $('play').addEventListener('click', () => {
+    if (st.playing) { st.playing = false; $('play').textContent = 'Play'; return; }
+    if (st.t >= M.tEnd) st.t = 0;
+    st.playing = true; $('play').textContent = 'Pause'; last = null; requestAnimationFrame(frame);
+  });
+  window.addEventListener('resize', () => { drawRamp(); drawBars(); });
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    if (last !== null) { st.t += (ts - last) / 1000 * st.rate; if (st.t >= M.tEnd) { st.t = M.tEnd; st.playing = false; $('play').textContent = 'Play'; } }
+    last = ts;
+    readout(); drawRamp(); drawBars();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+  entrants(); rebuild();
+})();
+</script>
+</body>
+</html>
