@@ -93,8 +93,7 @@
   <div class="presets"><span>Set the heading for</span>
     <div class="seg" role="group" aria-label="Presets">
       <button id="p_fast" title="Aim straight across">fastest crossing</button>
-      <button id="p_zero" title="Aim upstream so the drift is zero">landing straight across</button>
-      <button id="p_min" title="When the current is faster than the boat, the heading that drifts least">least drift</button>
+      <button id="p_min" title="Aim upstream by the angle that drifts least: zero drift if the boat can beat the current">least drift</button>
     </div>
     <span id="p_note"></span>
   </div>
@@ -134,10 +133,10 @@
   </div>
 
   <div class="notes">
-    <p><b>What to try.</b> With the boat faster than the current, press "landing straight across" and check the heading against sin <i>&theta;</i> = <i>c</i>/<i>v</i><sub>b</sub>;
-      then compare its crossing time with the fastest crossing. Set the current faster than the boat: the "straight across" preset grays out because no heading
-      can get there, and "least drift" finds the best you can do, sin <i>&theta;</i> = <i>v</i><sub>b</sub>/<i>c</i>. Tick "view from the water": the boat's path becomes a straight
-      line along its heading, and it is the banks that move.</p>
+    <p><b>What to try.</b> With the boat faster than the current, press "least drift": it lands straight across, at the heading sin <i>&theta;</i> = <i>c</i>/<i>v</i><sub>b</sub>;
+      compare its crossing time with the fastest crossing. Now raise the current above the boat's speed. No heading can land straight across any more, and
+      "least drift" switches to the best you can do, sin <i>&theta;</i> = <i>v</i><sub>b</sub>/<i>c</i>; the note beside the buttons tells you which case you are in. Tick "view from the
+      water": the boat's path becomes a straight line along its heading, and it is the banks that move.</p>
     <p>Units: meters and seconds. The current is uniform across the river unless "fastest mid-river" is ticked, which uses a parabolic profile that is zero
       at the banks and <i>c</i> at the center (mean &frac23;<i>c</i>); in that case the path curves and the water-frame view is not available, since different
       parts of the river move at different speeds.</p>
@@ -312,14 +311,15 @@
     $('rate_v').textContent = st.rate + '× real time';
     $('tval').textContent = st.t.toFixed(1);
     scrub.value = String(Math.round(st.t / M.tEnd * 1000));
-    // presets
-    $('p_zero').disabled = !M.zeroPossible;
-    $('p_min').disabled = M.zeroPossible || M.meanC === 0;
-    $('p_note').textContent = M.zeroPossible ? '' : st.cs === 0 ? 'no current: every heading lands where it points' : 'current faster than the boat: no heading lands straight across';
-    ['p_fast', 'p_zero', 'p_min'].forEach(id => $(id).setAttribute('aria-pressed', 'false'));
+    // presets: "least drift" is the zero-drift heading when the boat can beat the current, otherwise the best it can do
+    const thBest = M.zeroPossible ? M.thZero : M.thMin;
+    $('p_min').disabled = thBest === null;
+    $('p_note').textContent = M.meanC === 0 ? 'no current: every heading lands where it points'
+      : M.zeroPossible ? 'boat faster than the current, so least drift is zero: sin \u03B8 = c/v\u1D66'
+      : 'current faster than the boat: no heading lands straight across; least drift at sin \u03B8 = v\u1D66/c';
+    ['p_fast', 'p_min'].forEach(id => $(id).setAttribute('aria-pressed', 'false'));
     if (Math.abs(st.th) < 0.5) $('p_fast').setAttribute('aria-pressed', 'true');
-    else if (M.thZero !== null && Math.abs(st.th - deg(M.thZero)) < 0.6) $('p_zero').setAttribute('aria-pressed', 'true');
-    else if (M.thMin !== null && Math.abs(st.th - deg(M.thMin)) < 0.6) $('p_min').setAttribute('aria-pressed', 'true');
+    else if (thBest !== null && Math.abs(st.th - deg(thBest)) < 0.6) $('p_min').setAttribute('aria-pressed', 'true');
   }
   function rebuild(keepTime) {
     M = model();
@@ -328,8 +328,7 @@
   }
   function setHeading(d) { st.th = Math.round(d * 10) / 10; $('th').value = String(Math.round(d)); rebuild(); }
   $('p_fast').addEventListener('click', () => setHeading(0));
-  $('p_zero').addEventListener('click', () => { if (M.thZero !== null) setHeading(deg(M.thZero)); });
-  $('p_min').addEventListener('click', () => { if (M.thMin !== null) setHeading(deg(M.thMin)); });
+  $('p_min').addEventListener('click', () => { const th = M.zeroPossible ? M.thZero : M.thMin; if (th !== null) setHeading(deg(th)); });
   ['th', 'vb', 'cs', 'W'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
   $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
   $('vecs').addEventListener('change', () => { st.vecs = $('vecs').checked; draw(); });
