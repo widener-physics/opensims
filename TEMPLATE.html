@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!--
+  Projectile on a slope (TEMPLATE) - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 YOUR NAME
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author.
+  Credit: (none) / Independent reimplementation inspired by ...
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projectile on a slope</title>
+<style>
+  /* ---------- Shared tokens: keep these exactly as they are ---------- */
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; }
+  canvas { display: block; width: 100%; aspect-ratio: 900 / 420; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport .time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .toggles { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  input[type=range] { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; margin: 0; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  input[type=range]::-moz-range-track { height: 4px; background: var(--rule); border-radius: 2px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -9px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
+  input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ink); }
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    canvas { aspect-ratio: 4 / 3; }
+    .transport { grid-template-columns: 1fr 1fr; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .time { grid-column: 1 / -1; text-align: center; margin-top: -4px; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Projectile on a slope</h1>
+  <p class="lede">A ball is launched from the foot of a slope. The dashed line is where it will go; the solid trail is where it has been.
+    Change the launch angle and watch where it lands on the slope. This file is the template: replace the model, the drawing, and this text.</p>
+
+  <canvas id="c"></canvas>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
+    <span class="time"><span id="tval">0.00</span> s</span>
+  </div>
+
+  <div class="readout">
+    <div><div class="k">Time of flight</div><div class="v" id="r_T"></div><div class="f"><i>T</i> = 2<i>v</i><sub>0</sub> sin(<i>&theta;</i> &minus; <i>&alpha;</i>) / (<i>g</i> cos <i>&alpha;</i>)</div></div>
+    <div><div class="k">Distance along the slope</div><div class="v" id="r_R"></div><div class="f"><i>R</i> = <i>v</i><sub>0</sub><i>T</i> cos(<i>&theta;</i> &minus; <i>&alpha;</i>) &minus; &frac12;<i>g</i> sin <i>&alpha;</i> <i>T</i><sup>2</sup></div></div>
+    <div><div class="k">Maximum height above the slope</div><div class="v" id="r_H"></div><div class="f"><i>H</i> = <i>v</i><sub>0</sub><sup>2</sup> sin<sup>2</sup>(<i>&theta;</i> &minus; <i>&alpha;</i>) / (2<i>g</i> cos <i>&alpha;</i>)</div></div>
+  </div>
+
+  <div class="controls">
+    <label><div class="row"><span>Launch speed</span><span class="val" id="v0_v"></span></div>
+      <input type="range" id="v0" min="3" max="15" step="0.5" value="8"></label>
+    <label><div class="row"><span>Launch angle from horizontal</span><span class="val" id="th_v"></span></div>
+      <input type="range" id="th" min="10" max="85" step="1" value="55"></label>
+    <label><div class="row"><span>Slope angle</span><span class="val" id="al_v"></span></div>
+      <input type="range" id="al" min="0" max="40" step="1" value="15"></label>
+    <label><div class="row"><span>Playback</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="0.1" max="1" step="0.1" value="0.5"></label>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="vecs" checked> show velocity components</label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> Find the launch angle that carries the ball furthest up the slope; it is not 45°. Set the slope to zero and check that the range matches the flat-ground formula.</p>
+    <p>Units: metres and seconds, <i>g</i> = 9.8 m/s², no air resistance. The ball is a point; the slope is a straight line through the launch point.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G = 9.8;
+
+  // ================================================================
+  // 1. MODEL. Everything physical lives here. Equations in comments.
+  // ================================================================
+  const st = { v0: 8, th: 55, al: 15, rate: 0.5, vecs: true, t: 0, playing: false };
+  function model() {
+    const th = st.th * Math.PI / 180, al = st.al * Math.PI / 180;
+    const vx = st.v0 * Math.cos(th), vy = st.v0 * Math.sin(th);
+    // Launch from the origin; the slope is y = x tan(alpha). Landing when y(t) = x(t) tan(alpha):
+    //   vy t - g t^2/2 = vx t tan(alpha)  =>  T = 2 (vy - vx tan(alpha)) / g
+    const T = Math.max(0, 2 * (vy - vx * Math.tan(al)) / G);
+    const pos = t => ({ x: vx * t, y: vy * t - 0.5 * G * t * t });
+    const vel = t => ({ vx, vy: vy - G * t });
+    const land = pos(T);
+    const R = Math.hypot(land.x, land.y);                                          // distance along the slope
+    const H = st.v0 * st.v0 * Math.pow(Math.sin(th - al), 2) / (2 * G * Math.cos(al));  // max height above the slope
+    return { T, tEnd: T, pos, vel, land, R, H, al };
+  }
+  let M = model();
+
+  // ================================================================
+  // 2. DRAWING. Works in CSS pixels; fits the whole run in view.
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 3) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * 8, y1 - uy * 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * 10 - uy * 4.5, y1 - uy * 10 + ux * 4.5); ctx.lineTo(x1 - ux * 10 + uy * 4.5, y1 - uy * 10 - ux * 4.5); ctx.closePath(); ctx.fill();
+  }
+  function draw() {
+    const { ctx, W, H, compact } = fit($('c'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const m = compact ? 12 : 24;
+    // bounding box of the whole run
+    let xlo = -0.5, xhi = Math.max(1, M.land.x) + 0.5, ylo = -0.3, yhi = 0.5;
+    for (let k = 0; k <= 40; k++) { const p = M.pos(M.T * k / 40); yhi = Math.max(yhi, p.y + 0.4); }
+    const S = Math.min((W - 2 * m) / (xhi - xlo), (H - 2 * m) / (yhi - ylo));
+    const ox = m + ((W - 2 * m) - (xhi - xlo) * S) / 2 - xlo * S, oy = H - m - ((H - 2 * m) - (yhi - ylo) * S) / 2 + ylo * S;
+    const X = x => ox + x * S, Y = y => oy - y * S;
+    // slope
+    const sx = xhi + 1;
+    ctx.fillStyle = C('--soft'); ctx.beginPath(); ctx.moveTo(X(xlo - 1), Y((xlo - 1) * Math.tan(M.al))); ctx.lineTo(X(sx), Y(sx * Math.tan(M.al))); ctx.lineTo(X(sx), H + 10); ctx.lineTo(X(xlo - 1), H + 10); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(xlo - 1), Y((xlo - 1) * Math.tan(M.al))); ctx.lineTo(X(sx), Y(sx * Math.tan(M.al))); ctx.stroke();
+    // predicted path (dashed) and trail (solid)
+    const path = (tmax, dash, color, w) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.setLineDash(dash); ctx.beginPath();
+      for (let k = 0; k <= 80; k++) { const p = M.pos(tmax * k / 80); k ? ctx.lineTo(X(p.x), Y(p.y)) : ctx.moveTo(X(p.x), Y(p.y)); } ctx.stroke(); ctx.setLineDash([]); };
+    path(M.T, [6, 5], C('--ghost'), 1.4);
+    if (st.t > 0) path(Math.min(st.t, M.T), [], C('--ball'), 2.2);
+    // ball and vectors
+    const p = M.pos(Math.min(st.t, M.T));
+    if (st.vecs && st.t > 0 && st.t < M.T) {
+      const v = M.vel(st.t), k = Math.max(0.06 * S, 6);
+      arrow(ctx, X(p.x), Y(p.y), X(p.x) + v.vx * k, Y(p.y), C('--vel'));
+      arrow(ctx, X(p.x), Y(p.y), X(p.x), Y(p.y) - v.vy * k, C('--ball'));
+      if (!compact) { ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(v.vx.toFixed(1) + ' m/s', X(p.x) + v.vx * k + 6, Y(p.y) + 4); ctx.fillText(v.vy.toFixed(1) + ' m/s', X(p.x) + 6, Y(p.y) - v.vy * k + (v.vy > 0 ? -6 : 14)); }
+    }
+    ctx.fillStyle = C('--ball'); ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), Math.max(4, 0.08 * S), 0, Math.PI * 2); ctx.fill();
+    // landing marker
+    ctx.fillStyle = C('--ghost'); ctx.beginPath(); ctx.arc(X(M.land.x), Y(M.land.y), 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillText(st.t >= M.T ? 'landed' : st.t > 0 ? 'in flight' : 'ready', 12, 18);
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS. Wire the DOM to the model.
+  // ================================================================
+  const scrub = $('scrub');
+  function readout() {
+    $('r_T').textContent = M.T.toFixed(2) + ' s';
+    $('r_R').textContent = M.R.toFixed(2) + ' m';
+    $('r_H').textContent = M.H.toFixed(2) + ' m';
+    $('v0_v').textContent = st.v0.toFixed(1) + ' m/s';
+    $('th_v').textContent = st.th + '°';
+    $('al_v').textContent = st.al + '°';
+    $('rate_v').textContent = st.rate.toFixed(1) + '×' + (st.rate < 1 ? ' (slow motion)' : ' real time');
+    $('tval').textContent = st.t.toFixed(2);
+    scrub.value = String(Math.round(st.t / Math.max(1e-6, M.tEnd) * 1000));
+  }
+  function rebuild() { M = model(); st.t = 0; st.playing = false; $('play').textContent = 'Play'; readout(); draw(); }
+  ['v0', 'th', 'al'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
+  $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
+  $('vecs').addEventListener('change', () => { st.vecs = $('vecs').checked; draw(); });
+  $('reset').addEventListener('click', rebuild);
+  scrub.addEventListener('input', () => { st.t = (+scrub.value) / 1000 * M.tEnd; st.playing = false; $('play').textContent = 'Play'; readout(); draw(); });
+  $('play').addEventListener('click', () => {
+    if (st.playing) { st.playing = false; $('play').textContent = 'Play'; return; }
+    if (st.t >= M.tEnd) st.t = 0;
+    st.playing = true; $('play').textContent = 'Pause'; last = null; requestAnimationFrame(frame);
+  });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP. Pauses when hidden; nothing runs until the user presses Play.
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    if (last !== null) { st.t += (ts - last) / 1000 * st.rate; if (st.t >= M.tEnd) { st.t = M.tEnd; st.playing = false; $('play').textContent = 'Play'; } }
+    last = ts;
+    readout(); draw();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+  rebuild();
+})();
+</script>
+</body>
+</html>
