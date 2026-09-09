@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>p-n junction diode</title>
+<style>
+  :root {
+    --paper: #F2F5F7;
+    --panel: #FFFFFF;
+    --ink: #172128;
+    --muted: #5C6B73;
+    --rule: #D3DCE2;
+    --n-tint: #DCE9F3;
+    --p-tint: #F6E3D6;
+    --i-tint: #ECEFF1;
+    --electron: #1D4F73;
+    --hole: #D9651B;
+    --ion: #8A98A1;
+    --wire: #4A5A63;
+    --light: #F2B705;
+    --depl: rgba(23,33,40,0.06);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 22px; max-width: 64ch; }
+  .math { white-space: nowrap; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #circuit { height: 300px; }
+  #bands { height: 250px; margin-top: 14px; }
+  #iv { height: 210px; }
+
+  .regions {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center;
+    font-family: var(--sans); font-size: 14px; margin: 10px 0 0;
+  }
+  .regions .group { display: flex; align-items: center; gap: 6px; }
+  .regions .group.right { justify-content: flex-end; }
+  .regions .group span { color: var(--muted); margin-right: 4px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button {
+    white-space: nowrap;
+    font: inherit; font-family: var(--sans); font-size: 14px; padding: 5px 12px;
+    background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); cursor: pointer;
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .voltage { text-align: center; min-width: 260px; }
+  .voltage label { display: block; }
+  .voltage .row { display: flex; justify-content: space-between; gap: 12px; }
+  .voltage .val { font-variant-numeric: tabular-nums; }
+  .voltage input[type=range] { width: 100%; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .lower { display: grid; grid-template-columns: 1fr 300px; gap: 20px 28px; margin-top: 18px; align-items: start; }
+  .readout { font-size: 16px; }
+  .readout h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+  .readout p { margin: 0 0 10px; color: var(--muted); max-width: 52ch; }
+  .readout .num { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .readout .legend { font-family: var(--sans); font-size: 13px; color: var(--muted); }
+  .readout .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: -1px; margin: 0 5px 0 12px; }
+  .readout .legend i:first-child { margin-left: 0; }
+  .readout .legend .e { background: var(--electron); }
+  .readout .legend .h { border: 2px solid var(--hole); width: 7px; height: 7px; }
+  .readout .legend .d { background: var(--ion); }
+  @media (max-width: 720px) {
+    .regions { grid-template-columns: 1fr; }
+    .regions .group.right { justify-content: flex-start; }
+    .lower { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>p-n junction diode</h1>
+  <p class="lede">
+    Dope each half of the bar and connect a battery. Electrons and holes drift, diffuse and recombine,
+    while the band diagram below shows what the same carriers are doing in energy. Everything here is
+    schematic: a handful of carriers stand in for 10<sup>17</sup> per cm<sup>3</sup>, and the current
+    follows an ideal diode law with a little series resistance.
+  </p>
+
+  <canvas id="circuit"></canvas>
+
+  <div class="regions">
+    <div class="group"><span>Left region</span>
+      <div class="seg" id="segL" role="group" aria-label="Left region doping">
+        <button data-t="i">intrinsic</button><button data-t="n">n-type</button><button data-t="p">p-type</button>
+      </div>
+    </div>
+    <div class="voltage">
+      <label>
+        <div class="row"><span>Battery voltage (left contact − right)</span><span class="val" id="vval"></span></div>
+        <input type="range" id="V" min="-1.5" max="1.5" step="0.05" value="0">
+      </label>
+    </div>
+    <div class="group right"><span>Right region</span>
+      <div class="seg" id="segR" role="group" aria-label="Right region doping">
+        <button data-t="i">intrinsic</button><button data-t="n">n-type</button><button data-t="p">p-type</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="bands"></canvas>
+
+  <div class="lower">
+    <div class="readout">
+      <h2 id="stateTitle"></h2>
+      <p id="stateText"></p>
+      <p>Current: <span class="num" id="ival"></span></p>
+      <p class="legend"><i class="e"></i>electron <i class="h"></i>hole <i class="d"></i>fixed dopant ion
+        &nbsp; <span style="color:var(--light)">&#9679;</span> light from recombination</p>
+    </div>
+    <canvas id="iv"></canvas>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const circuit = $('circuit'), bands = $('bands'), iv = $('iv');
+
+  // ---------- Model constants (schematic) ----------
+  const VBI = 0.7;          // built-in potential, eV
+  const GAP = 1.0;          // band gap, eV
+  const IS = 1e-10;         // saturation current, A
+  const NVT = 0.04;         // n·kT/q, V
+  const RS = 15;            // series resistance, ohm
+  const R_OHMIC = 30, R_INTR = 3000;
+  const I_REF = 0.005;      // 5 mA saturates the animation
+  const N_MAJ = 14, N_INTR = 3;
+
+  const state = { type: ['p', 'n'], V: 0 };
+
+  // Region helpers. side 0 = left half (u < 0.5), side 1 = right half.
+  const off = { n: 0, i: VBI / 2, p: VBI };              // E_c above reference at zero bias
+  const ef = { n: 0.15, i: GAP / 2, p: GAP - 0.15 };      // E_c - E_F
+  function isJunction() { const [a, b] = state.type; return a !== b && a !== 'i' && b !== 'i'; }
+
+  // ---------- Electrical solution ----------
+  // Returns { I (A), Vj (junction voltage, p relative to n), Vdrop: E_c(left) - E_c(right) }
+  let sol = { I: 0, Vj: 0, w: 0.1, forward: false };
+  function solve() {
+    const V = state.V;
+    if (isJunction()) {
+      const pLeft = state.type[0] === 'p';
+      const Vd = pLeft ? V : -V;           // voltage across diode, p side relative to n side
+      let Vj;
+      if (Vd <= 0) { Vj = Vd; }
+      else {
+        let lo = 0, hi = Vd;               // bisection: IS(e^{Vj/NVT}-1) = (Vd-Vj)/RS
+        for (let k = 0; k < 60; k++) {
+          const mid = (lo + hi) / 2;
+          const f = IS * (Math.exp(mid / NVT) - 1) - (Vd - mid) / RS;
+          if (f > 0) hi = mid; else lo = mid;
+        }
+        Vj = (lo + hi) / 2;
+      }
+      const Id = IS * (Math.exp(Vj / NVT) - 1);
+      const I = pLeft ? Id : -Id;          // sign: positive when conventional current flows left->right through the bar
+      const Vjb = Math.min(Vj, VBI - 0.06);   // junction voltage used for the bands (the rest drops ohmically)
+      const w = 0.10 * Math.sqrt((VBI - Vjb) / VBI);
+      sol = { I, Vj, Vjb, w, forward: Vd > 0.05, pLeft, Vd };
+    } else {
+      const R = (state.type[0] === 'i' || state.type[1] === 'i') ? R_INTR : R_OHMIC;
+      sol = { I: V / R, Vj: 0, w: 0, forward: false };
+    }
+  }
+
+  // Electron energy of the conduction band edge at bar coordinate u in [0,1]
+  function Ec(u) {
+    const V = state.V;
+    const tL = state.type[0], tR = state.type[1];
+    if (isJunction()) {
+      const a = off[tL], b = off[tR];
+      const drop = sol.pLeft ? -sol.Vjb : sol.Vjb;   // applied part that reduces/increases the step
+      const left = a + drop, right = b;
+      const s = smooth((u - (0.5 - sol.w)) / (2 * sol.w));
+      return left + (right - left) * s;
+    }
+    // ohmic: linear drop of the applied voltage, plus a gently smoothed offset if the two halves differ
+    const s = smooth((u - 0.45) / 0.1);
+    return off[tL] + (off[tR] - off[tL]) * s - V * (1 - u);
+  }
+  function Ef(side) {
+    // Fermi level (quasi-Fermi level under bias) on each side
+    const t = state.type[side];
+    const base = -ef[t];
+    if (isJunction()) {
+      const shiftLeft = sol.pLeft ? -sol.Vjb : sol.Vjb;
+      return side === 0 ? off[t] + shiftLeft - ef[t] : off[t] - ef[t];
+    }
+    return side === 0 ? off[t] - state.V - ef[t] : off[t] - ef[t];
+    // (base retained for readability)
+    void base;
+  }
+  const smooth = x => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+
+  // ---------- Carriers ----------
+  let electrons = [], holes = [], flashes = [];
+  function populate() {
+    electrons = []; holes = [];
+    for (let side = 0; side < 2; side++) {
+      const t = state.type[side];
+      const lo = side === 0 ? 0.03 : 0.53, hi = side === 0 ? 0.47 : 0.97;
+      const put = (arr, n) => { for (let k = 0; k < n; k++) arr.push({ u: lo + Math.random() * (hi - lo), y: 0.15 + Math.random() * 0.7, side, cross: false, vu: 0 }); };
+      if (t === 'n') put(electrons, N_MAJ);
+      else if (t === 'p') put(holes, N_MAJ);
+      else { put(electrons, N_INTR); put(holes, N_INTR); }
+    }
+  }
+
+  // Allowed interval for a carrier that belongs to `side` (majority carriers stay out of the depletion region)
+  function bounds(side) {
+    if (isJunction()) return side === 0 ? [0.03, 0.5 - sol.w - 0.01] : [0.5 + sol.w + 0.01, 0.97];
+    return side === 0 ? [0.03, 0.47] : [0.53, 0.97];
+  }
+
+  function stepCarriers(dt) {
+    const Inorm = Math.tanh(Math.abs(sol.I) / I_REF);
+    const jitter = c => { c.u += (Math.random() - 0.5) * 0.012; c.y += (Math.random() - 0.5) * 0.04; c.y = Math.max(0.12, Math.min(0.88, c.y)); };
+
+    if (isJunction()) {
+      const pSide = sol.pLeft ? 0 : 1, nSide = 1 - pSide;
+      const eDir = nSide === 0 ? 1 : -1;      // electrons move from n side toward p side when forward biased
+      const drift = sol.forward ? 0.0025 * Inorm : 0;
+
+      // majority carriers: random walk, drift toward the junction under forward bias, confined otherwise
+      [electrons, holes].forEach((arr, isHole) => {
+        arr.forEach(c => {
+          if (c.cross) return;
+          jitter(c);
+          const dir = isHole ? -eDir : eDir;
+          const [lo, hi] = bounds(c.side);
+          c.u += dir * drift + c.vu + ((lo + hi) / 2 - c.u) * 0.004;
+          c.vu *= 0.94;
+          if (c.u < lo) c.u = lo + (lo - c.u) * 0.5;
+          if (c.u > hi) c.u = hi - (c.u - hi) * 0.5;
+        });
+      });
+
+      // injection: with rate ~ current, the carrier nearest the junction crosses
+      if (sol.forward && Math.random() < 0.22 * Inorm) {
+        const useElectron = Math.random() < 0.5;
+        const arr = useElectron ? electrons : holes;
+        const from = useElectron ? nSide : pSide;
+        let best = null, bd = 1;
+        arr.forEach(c => { if (!c.cross && c.side === from) { const d = Math.abs(c.u - 0.5); if (d < bd) { bd = d; best = c; } } });
+        if (best) best.cross = true;
+      }
+
+      // crossing carriers move across and recombine with the first opposite carrier they meet
+      [electrons, holes].forEach((arr, isHole) => {
+        const other = isHole ? electrons : holes;
+        for (let k = arr.length - 1; k >= 0; k--) {
+          const c = arr[k];
+          if (!c.cross) continue;
+          const dir = isHole ? -eDir : eDir;
+          c.u += dir * 0.007;
+          c.y += (Math.random() - 0.5) * 0.02;
+          const farSide = Math.abs(c.u - 0.5) > sol.w + 0.02 && ((dir > 0) === (c.u > 0.5));
+          if (farSide) {
+            let partner = -1, bd = 0.07;
+            other.forEach((o, j) => { if (!o.cross) { const d = Math.abs(o.u - c.u); if (d < bd) { bd = d; partner = j; } } });
+            if (partner >= 0 || c.u < 0.03 || c.u > 0.97) {
+              if (partner >= 0) {
+                const o = other[partner];
+                flashes.push({ u: (c.u + o.u) / 2, y: (c.y + o.y) / 2, t: 0 });
+                other.splice(partner, 1);
+                spawn(isHole ? electrons : holes, isHole ? nSide : pSide);
+              }
+              arr.splice(k, 1);
+              spawn(arr, isHole ? pSide : nSide);
+            }
+          }
+        }
+      });
+    } else {
+      // ohmic bar: uniform drift in the applied field, carriers re-enter at the opposite contact
+      const v = 0.006 * Inorm * Math.sign(state.V);   // conventional current direction is +u when V > 0
+      electrons.forEach(c => { jitter(c); c.u -= v; if (c.u < 0.02) c.u += 0.96; if (c.u > 0.98) c.u -= 0.96; c.side = c.u < 0.5 ? 0 : 1; });
+      holes.forEach(c => { jitter(c); c.u += v; if (c.u < 0.02) c.u += 0.96; if (c.u > 0.98) c.u -= 0.96; c.side = c.u < 0.5 ? 0 : 1; });
+    }
+    flashes.forEach(f => f.t += dt);
+    flashes = flashes.filter(f => f.t < 0.6);
+    wireOffset += (state.V > 0 ? 1 : -1) * 0.9 * Inorm;
+  }
+  function spawn(arr, side) {
+    arr.push({ u: side === 0 ? 0.035 : 0.965, y: 0.15 + Math.random() * 0.7, side, cross: false, vu: side === 0 ? 0.012 : -0.012 });
+  }
+  // carriers caught mid-crossing when the bias changes go back to their own contact
+  function settleCrossing() {
+    if (!isJunction()) return;
+    const pSide = sol.pLeft ? 0 : 1, nSide = 1 - pSide;
+    [[electrons, nSide], [holes, pSide]].forEach(([arr, home]) => {
+      for (let k = arr.length - 1; k >= 0; k--) if (arr[k].cross) { arr.splice(k, 1); spawn(arr, home); }
+    });
+  }
+
+  // ---------- Geometry (in CSS pixels of a 900-wide layout, scaled to the canvas) ----------
+  const G = { barL: 140, barR: 760, barT: 80, barB: 160, wireY: 258, wireX0: 85, wireX1: 815, batL: 415, batR: 485 };
+  let wireOffset = 0;
+  function wirePath() {
+    return [
+      [G.barL - 8, (G.barT + G.barB) / 2], [G.wireX0, (G.barT + G.barB) / 2], [G.wireX0, G.wireY],
+      [G.batL, G.wireY], [G.batR, G.wireY], [G.wireX1, G.wireY], [G.wireX1, (G.barT + G.barB) / 2], [G.barR + 8, (G.barT + G.barB) / 2]
+    ];
+  }
+
+  function fit(canvas, design) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    const D = design || 900;
+    const k = r.width / D;                   // design units -> CSS px
+    ctx.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
+    return { ctx, W: D, H: r.height / k };
+  }
+
+  // ---------- Circuit view ----------
+  function drawCircuit() {
+    const { ctx, W, H } = fit(circuit);
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const X = u => G.barL + u * (G.barR - G.barL);
+    const Y = y => G.barT + y * (G.barB - G.barT);
+    const mid = (G.barL + G.barR) / 2;
+
+    // regions
+    [[G.barL, mid, state.type[0]], [mid, G.barR, state.type[1]]].forEach(([x0, x1, t]) => {
+      ctx.fillStyle = C(t === 'n' ? '--n-tint' : t === 'p' ? '--p-tint' : '--i-tint');
+      ctx.fillRect(x0, G.barT, x1 - x0, G.barB - G.barT);
+      ctx.fillStyle = C('--muted');
+      ctx.textAlign = 'center';
+      ctx.fillText(t === 'n' ? 'n-type' : t === 'p' ? 'p-type' : 'intrinsic', (x0 + x1) / 2, G.barT - 8);
+    });
+    // fixed ions (faint in the neutral bulk, strong where uncompensated in the depletion region)
+    [0, 1].forEach(side => {
+      const t = state.type[side];
+      if (t === 'i') return;
+      const sym = t === 'n' ? '+' : '−';
+      for (let i = 0; i < 7; i++) for (let j = 0; j < 3; j++) {
+        const u = (side === 0 ? 0.035 : 0.535) + i * 0.0625 + (j % 2) * 0.03;
+        const inDepl = isJunction() && Math.abs(u - 0.5) < sol.w;
+        ctx.strokeStyle = ctx.fillStyle = inDepl ? C('--ink') : C('--ion');
+        ctx.globalAlpha = inDepl ? 0.9 : 0.35;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(X(u), Y(0.22 + j * 0.28), 5, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = '11px ' + C('--sans'); ctx.textAlign = 'center';
+        ctx.fillText(sym, X(u), Y(0.22 + j * 0.28) + 4);
+      }
+      ctx.globalAlpha = 1;
+    });
+    // depletion region
+    if (isJunction()) {
+      ctx.fillStyle = C('--depl');
+      ctx.fillRect(X(0.5 - sol.w), G.barT, X(0.5 + sol.w) - X(0.5 - sol.w), G.barB - G.barT);
+      ctx.fillStyle = C('--ink'); ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'center';
+      ctx.fillText('depletion region', mid, G.barB + 16);
+    }
+    // bar outline and contacts
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2;
+    ctx.strokeRect(G.barL, G.barT, G.barR - G.barL, G.barB - G.barT);
+    ctx.fillStyle = C('--wire');
+    ctx.fillRect(G.barL - 8, G.barT + 6, 8, G.barB - G.barT - 12);
+    ctx.fillRect(G.barR, G.barT + 6, 8, G.barB - G.barT - 12);
+
+    // wires
+    const path = wirePath();
+    ctx.strokeStyle = C('--wire'); ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    path.forEach(([x, y], i) => { if (i === 4) { ctx.moveTo(x, y); return; } i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    ctx.stroke();
+    // battery: long thin plate is +, short thick plate is −
+    const V = state.V;
+    const plusLeft = V > 0;
+    const drawPlate = (x, long) => {
+      ctx.lineWidth = long ? 2 : 6;
+      ctx.beginPath(); ctx.moveTo(x, G.wireY - (long ? 22 : 11)); ctx.lineTo(x, G.wireY + (long ? 22 : 11)); ctx.stroke();
+    };
+    ctx.strokeStyle = C('--ink');
+    if (Math.abs(V) < 0.025) { drawPlate(G.batL + 28, true); drawPlate(G.batL + 42, false); }
+    else { drawPlate(plusLeft ? G.batL + 26 : G.batL + 44, true); drawPlate(plusLeft ? G.batL + 44 : G.batL + 26, false); }
+    ctx.fillStyle = C('--ink'); ctx.font = '13px ' + C('--sans'); ctx.textAlign = 'center';
+    if (Math.abs(V) >= 0.025) {
+      ctx.fillText('+', plusLeft ? G.batL + 12 : G.batR - 12, G.wireY - 26);
+      ctx.fillText('−', plusLeft ? G.batR - 12 : G.batL + 12, G.wireY - 26);
+    }
+    ctx.fillText(Math.abs(V).toFixed(2) + ' V', (G.batL + G.batR) / 2, G.wireY + 40);
+
+    // electrons in the wire, moving from the − terminal toward the bar and back to +
+    const Inorm = Math.tanh(Math.abs(sol.I) / I_REF);
+    if (Inorm > 0.02) {
+      const segs = []; let total = 0;
+      for (let i = 0; i < path.length - 1; i++) { const d = Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]); segs.push(d); total += d; }
+      const n = 34;
+      ctx.fillStyle = C('--electron');
+      for (let k = 0; k < n; k++) {
+        let s = ((k / n) * total + wireOffset) % total; if (s < 0) s += total;
+        let i = 0; while (i < segs.length - 1 && s > segs[i]) { s -= segs[i]; i++; }
+        if (i === 3) continue;   // inside the battery
+        const f = s / segs[i];
+        const x = path[i][0] + (path[i + 1][0] - path[i][0]) * f, y = path[i][1] + (path[i + 1][1] - path[i][1]) * f;
+        ctx.globalAlpha = 0.35 + 0.65 * Inorm;
+        ctx.beginPath(); ctx.arc(x, y, 3.2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // carriers in the bar
+    ctx.fillStyle = C('--electron');
+    electrons.forEach(c => { ctx.beginPath(); ctx.arc(X(c.u), Y(c.y), 4.2, 0, Math.PI * 2); ctx.fill(); });
+    ctx.strokeStyle = C('--hole'); ctx.lineWidth = 2;
+    holes.forEach(c => { ctx.beginPath(); ctx.arc(X(c.u), Y(c.y), 3.8, 0, Math.PI * 2); ctx.stroke(); });
+    // recombination light
+    flashes.forEach(f => {
+      const a = 1 - f.t / 0.6;
+      ctx.strokeStyle = C('--light'); ctx.globalAlpha = a; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(X(f.u), Y(f.y), 4 + 22 * (1 - a), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = C('--light');
+      ctx.beginPath(); ctx.arc(X(f.u), Y(f.y), 4, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+    // current direction arrow
+    if (Inorm > 0.02) {
+      const dir = sol.I > 0 ? 1 : -1;
+      const cx = (G.barL + G.barR) / 2, y = G.barT - 30;
+      const len = 40 + 60 * Inorm;
+      ctx.strokeStyle = ctx.fillStyle = C('--ink'); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(cx - dir * len / 2, y); ctx.lineTo(cx + dir * len / 2, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + dir * len / 2, y); ctx.lineTo(cx + dir * (len / 2 - 8), y - 4); ctx.lineTo(cx + dir * (len / 2 - 8), y + 4); ctx.closePath(); ctx.fill();
+      ctx.textAlign = 'center'; ctx.font = '12px ' + C('--sans');
+      ctx.fillText('conventional current', cx, y - 8);
+    }
+  }
+
+  // ---------- Band diagram ----------
+  function drawBands() {
+    const { ctx, W, H } = fit(bands);
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const X = u => G.barL + u * (G.barR - G.barL);
+    const N = 160;
+    const ec = new Float64Array(N + 1);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i <= N; i++) { ec[i] = Ec(i / N); lo = Math.min(lo, ec[i] - GAP); hi = Math.max(hi, ec[i]); }
+    const pad = 0.35;
+    lo -= pad; hi += pad;
+    const top = 22, bottom = H - 26;
+    const Y = E => top + (hi - E) / (hi - lo) * (bottom - top);
+
+    // region tints and depletion shading
+    const mid = (G.barL + G.barR) / 2;
+    [[G.barL, mid, state.type[0]], [mid, G.barR, state.type[1]]].forEach(([x0, x1, t]) => {
+      ctx.fillStyle = C(t === 'n' ? '--n-tint' : t === 'p' ? '--p-tint' : '--i-tint');
+      ctx.globalAlpha = 0.45; ctx.fillRect(x0, top, x1 - x0, bottom - top); ctx.globalAlpha = 1;
+    });
+    if (isJunction()) {
+      ctx.fillStyle = C('--depl');
+      ctx.fillRect(X(0.5 - sol.w), top, X(0.5 + sol.w) - X(0.5 - sol.w), bottom - top);
+    }
+    // bands (fill the gap lightly so the bands read as edges of allowed regions)
+    const band = (offset, color) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) { const x = X(i / N), y = Y(ec[i] + offset); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+    };
+    ctx.fillStyle = 'rgba(23,33,40,0.05)';
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) ctx.lineTo(X(i / N), Y(ec[i]));
+    for (let i = N; i >= 0; i--) ctx.lineTo(X(i / N), Y(ec[i] - GAP));
+    ctx.closePath(); ctx.fill();
+    band(0, C('--ink'));
+    band(-GAP, C('--ink'));
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'right';
+    ctx.fillText('E\u1D9C', G.barL - 10, Y(ec[0]) + 4);
+    ctx.fillText('E\u1D65', G.barL - 10, Y(ec[0] - GAP) + 4);
+    ctx.textAlign = 'left';
+    ctx.fillText('conduction band', G.barR + 12, Y(ec[N]) + 4);
+    ctx.fillText('valence band', G.barR + 12, Y(ec[N] - GAP) + 4);
+
+    // Fermi level: flat (or split into two quasi-levels) across a junction, tilted with the bands in a resistor
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1.4;
+    ctx.fillStyle = C('--muted'); ctx.font = '12px ' + C('--sans');
+    if (isJunction()) {
+      const fL = Ef(0), fR = Ef(1);
+      ctx.beginPath(); ctx.moveTo(G.barL, Y(fL)); ctx.lineTo(X(0.5 - sol.w), Y(fL)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(X(0.5 + sol.w), Y(fR)); ctx.lineTo(G.barR, Y(fR)); ctx.stroke();
+      ctx.textAlign = 'left';
+      if (Math.abs(fL - fR) < 0.01) ctx.fillText('E\u0493', G.barL + 8, Y(fL) - 5);
+      else {
+        ctx.fillText('E\u0493 (' + state.type[0] + ' side)', G.barL + 8, Y(fL) - 5);
+        ctx.textAlign = 'right';
+        ctx.fillText('E\u0493 (' + state.type[1] + ' side)', G.barR - 8, Y(fR) - 5);
+      }
+    } else {
+      const tL = state.type[0], tR = state.type[1];
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const u = i / N, e = ef[tL] + (ef[tR] - ef[tL]) * smooth((u - 0.45) / 0.1);
+        const x = X(u), y = Y(ec[i] - e);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.fillText('E\u0493', G.barL + 8, Y(ec[0] - ef[tL]) - 5);
+    }
+    ctx.setLineDash([]);
+
+    // barrier annotation
+    if (isJunction()) {
+      const dE = Math.abs(ec[0] - ec[N]);
+      ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+      ctx.fillText('barrier ' + dE.toFixed(2) + ' eV', mid, bottom + 18);
+    }
+
+    // carriers: electrons ride just above E_c, holes just below E_v
+    const Ecu = u => ec[Math.round(Math.max(0, Math.min(1, u)) * N)];
+    ctx.fillStyle = C('--electron');
+    electrons.forEach(c => { ctx.beginPath(); ctx.arc(X(c.u), Y(Ecu(c.u)) - 6 - c.y * 10, 4.2, 0, Math.PI * 2); ctx.fill(); });
+    ctx.strokeStyle = C('--hole'); ctx.lineWidth = 2;
+    holes.forEach(c => { ctx.beginPath(); ctx.arc(X(c.u), Y(Ecu(c.u) - GAP) + 6 + c.y * 10, 3.8, 0, Math.PI * 2); ctx.stroke(); });
+    // recombination: an electron drops across the gap and gives off light
+    flashes.forEach(f => {
+      const a = 1 - f.t / 0.6, x = X(f.u);
+      const y0 = Y(Ecu(f.u)) - 6, y1 = Y(Ecu(f.u) - GAP) + 6;
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = C('--light'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + (y1 - y0) * Math.min(1, f.t / 0.3)); ctx.stroke();
+      ctx.fillStyle = C('--light');
+      ctx.beginPath(); ctx.arc(x, y0 + (y1 - y0) * Math.min(1, f.t / 0.3), 4, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText('electron energy \u2191', G.barL, H - 8);
+  }
+
+  // ---------- I-V curve ----------
+  function currentAt(V) {
+    const saved = state.V; state.V = V; solve(); const I = sol.I; state.V = saved; solve(); return I;
+  }
+  function drawIV() {
+    const { ctx, W, H } = fit(iv, iv.getBoundingClientRect().width);
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+    const ml = 60, mr = 20, mt = 22, mb = 40;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    const Vs = [], Is = [];
+    let imax = 0;
+    for (let k = 0; k <= 120; k++) { const V = -1.5 + 3 * k / 120; const I = currentAt(V) * 1000; Vs.push(V); Is.push(I); imax = Math.max(imax, Math.abs(I)); }
+    imax = Math.max(imax, 0.01) * 1.1;
+    const X = V => ml + (V + 1.5) / 3 * pw;
+    const Y = I => mt + (imax - I) / (2 * imax) * ph;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(W - mr, Y(0)); ctx.moveTo(X(0), mt); ctx.lineTo(X(0), mt + ph); ctx.stroke();
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    [-1.5, -1, -0.5, 0, 0.5, 1, 1.5].forEach(V => ctx.fillText(V.toFixed(1), X(V), H - 22));
+    ctx.fillText('V (volts)', ml + pw / 2, H - 6);
+    ctx.textAlign = 'right';
+    const unit = imax < 1 ? 'µA' : 'mA', scale = imax < 1 ? 1000 : 1;
+    [imax, imax / 2, -imax / 2, -imax].forEach(I => ctx.fillText((I * scale / 1.1).toFixed(imax * scale < 10 ? 1 : 0), ml - 6, Y(I / 1.1) + 4));
+    ctx.save(); ctx.translate(14, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText('I (' + unit + ')', 0, 0); ctx.restore();
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2;
+    ctx.beginPath(); Vs.forEach((V, k) => k === 0 ? ctx.moveTo(X(V), Y(Is[k])) : ctx.lineTo(X(V), Y(Is[k]))); ctx.stroke();
+    ctx.fillStyle = C('--hole');
+    ctx.beginPath(); ctx.arc(X(state.V), Y(sol.I * 1000), 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(isJunction() ? 'I–V of the bar (diode)' : 'I–V of the bar (resistor)', ml, 14);
+  }
+
+  // ---------- Readout ----------
+  function readout() {
+    const I = sol.I;
+    const abs = Math.abs(I);
+    $('ival').textContent = (abs < 1e-6 ? (abs * 1e9).toFixed(1) + ' nA' : abs < 1e-3 ? (abs * 1e6).toFixed(1) + ' µA' : (abs * 1e3).toFixed(2) + ' mA') +
+      (abs < 1e-9 ? '' : I > 0 ? ', flowing left to right through the bar' : ', flowing right to left through the bar');
+    $('vval').textContent = (state.V >= 0 ? '+' : '−') + Math.abs(state.V).toFixed(2) + ' V';
+    let title, text;
+    if (isJunction()) {
+      if (Math.abs(state.V) < 0.025) {
+        title = 'Equilibrium';
+        text = 'Electrons diffuse into the p side and holes into the n side, leaving uncompensated dopant ions behind. The field of those ions balances diffusion, the Fermi level is flat, and no net current flows. The bands step by the built-in potential of ' + VBI.toFixed(1) + ' V.';
+      } else if (sol.forward) {
+        title = 'Forward bias';
+        text = 'The p side is held at the higher potential, so the applied voltage subtracts from the built-in step. The barrier shrinks, the depletion region narrows, and majority carriers flood across the junction where they recombine, releasing energy as light or heat. Current grows exponentially with voltage.';
+      } else {
+        title = 'Reverse bias';
+        text = 'The n side is held at the higher potential, so the applied voltage adds to the built-in step. The barrier grows, the depletion region widens, and the majority carriers are pulled away from the junction. Only a negligible leakage current flows.';
+      }
+    } else if (state.type[0] === 'i' || state.type[1] === 'i') {
+      title = 'Intrinsic material';
+      text = 'With no dopants there are only the few electron–hole pairs that thermal energy creates, so the bar conducts poorly and behaves as a large resistor. Current is linear in voltage.';
+    } else {
+      title = 'No junction';
+      text = 'Both halves are doped the same way, so there is no built-in step and no depletion region. The bar is an ordinary resistor: carriers drift in the applied field and current is linear in voltage.';
+    }
+    $('stateTitle').textContent = title;
+    $('stateText').textContent = text;
+  }
+
+  // ---------- Controls ----------
+  function setSeg(id, side) {
+    const seg = $(id);
+    seg.querySelectorAll('button').forEach(b => {
+      b.setAttribute('aria-pressed', String(b.dataset.t === state.type[side]));
+      b.onclick = () => { state.type[side] = b.dataset.t; setSeg(id, side); rebuild(); };
+    });
+  }
+  $('V').addEventListener('input', () => { state.V = +$('V').value; solve(); if (!sol.forward) settleCrossing(); readout(); drawIV(); });
+
+  function rebuild() { solve(); populate(); flashes = []; readout(); drawIV(); }
+
+  // ---------- Loop ----------
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (!document.hidden) {
+      stepCarriers(dt);
+      drawCircuit();
+      drawBands();
+    }
+    requestAnimationFrame(frame);
+  }
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  setSeg('segL', 0); setSeg('segR', 1);
+  rebuild();
+  window.addEventListener('resize', () => { drawIV(); });
+  if (reduce) { drawCircuit(); drawBands(); } else requestAnimationFrame(frame);
+  if (reduce) {
+    // still animate, but only on user action
+    ['input', 'click'].forEach(ev => document.addEventListener(ev, () => { for (let k = 0; k < 60; k++) stepCarriers(0.016); drawCircuit(); drawBands(); }));
+  }
+})();
+</script>
+</body>
+</html>

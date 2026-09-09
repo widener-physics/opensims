@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking on a boat: with and without drag</title>
+<style>
+  :root {
+    --paper: #F2F5F7;
+    --panel: #FFFFFF;
+    --ink: #172128;
+    --muted: #5C6B73;
+    --rule: #D3DCE2;
+    --water: #2E6C8C;
+    --water-deep: #1E4D66;
+    --water-light: #C4DAE6;
+    --hull: #7A4B22;
+    --deck: #C79A5C;
+    --person: #D9651B;
+    --cm: #8B2E86;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.55;
+    padding: 32px 20px 64px;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 {
+    font-weight: 500;
+    font-size: 30px;
+    line-height: 1.2;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  p.lede { margin: 0 0 24px; max-width: 64ch; color: var(--ink); }
+  p.lede .math { white-space: nowrap; }
+
+  .scene-block { margin-bottom: 14px; }
+  .scene-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--sans); font-size: 14px; margin: 0 0 4px 2px;
+  }
+  .scene-head strong { font-weight: 600; }
+  .scene-head span { color: var(--muted); }
+  canvas.scene {
+    display: block; width: 100%; height: 170px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+
+  .transport {
+    display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center;
+    font-family: var(--sans); font-size: 14px;
+    margin: 6px 0 22px;
+  }
+  button {
+    font: inherit; font-family: var(--sans); font-size: 14px;
+    padding: 6px 14px; border-radius: 4px;
+    border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer;
+    min-width: 72px;
+  }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid var(--water-light); outline-offset: 2px;
+  }
+  .transport input[type=range] { width: 100%; }
+  .transport .time { font-variant-numeric: tabular-nums; min-width: 100px; text-align: right; }
+  .transport select { font: inherit; font-family: var(--sans); font-size: 14px; padding: 4px 6px; }
+
+  canvas.plot {
+    display: block; width: 100%; height: 260px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin-bottom: 22px;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px 28px;
+    font-family: var(--sans); font-size: 14px;
+    padding: 18px 20px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin-bottom: 22px;
+  }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .controls input[type=range] { width: 100%; }
+
+  .readout {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px 32px;
+    font-size: 16px;
+  }
+  .readout h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .readout p { margin: 0 0 8px; color: var(--muted); }
+  .readout .num { color: var(--ink); font-variant-numeric: tabular-nums; }
+  @media (max-width: 600px) {
+    .readout { grid-template-columns: 1fr; }
+    .transport { grid-template-columns: auto auto 1fr; }
+    .transport .time { grid-column: 1 / -1; text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button, input { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Walking on a boat, with and without drag</h1>
+  <p class="lede">
+    A person of mass <span class="math"><i>m</i><sub>p</sub></span> walks from one end of a boat
+    of mass <span class="math"><i>m</i><sub>b</sub></span> and length <span class="math"><i>L</i></span> to the other.
+    On frictionless water the boat slides back a distance
+    <span class="math"><i>m</i><sub>p</sub><i>L</i> / (<i>m</i><sub>p</sub> + <i>m</i><sub>b</sub>)</span>
+    and stays there. Add a linear drag force <span class="math"><i>F</i> = &minus;<i>k v</i><sub>b</sub></span>
+    and the boat drifts back to where it started, while the centre of mass of the system moves.
+  </p>
+
+  <div class="scene-block">
+    <div class="scene-head"><strong>No drag</strong><span>momentum of boat + person stays zero</span></div>
+    <canvas class="scene" id="sceneA"></canvas>
+  </div>
+  <div class="scene-block">
+    <div class="scene-head"><strong>Linear drag</strong><span id="dragLabel"></span></div>
+    <canvas class="scene" id="sceneB"></canvas>
+  </div>
+
+  <div class="transport">
+    <button id="play" aria-label="Play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="Time">
+    <span class="time"><span id="tval">0.00</span> s &nbsp;
+      <select id="speed" aria-label="Playback speed">
+        <option value="0.5">0.5&times;</option>
+        <option value="1" selected>1&times;</option>
+        <option value="2">2&times;</option>
+        <option value="4">4&times;</option>
+      </select>
+    </span>
+  </div>
+
+  <canvas class="plot" id="plot"></canvas>
+
+  <div class="controls">
+    <label><div class="row"><span>Person mass <i>m</i><sub>p</sub></span><span class="val"><span id="mp_v"></span> kg</span></div>
+      <input type="range" id="mp" min="20" max="150" step="5" value="70"></label>
+    <label><div class="row"><span>Boat mass <i>m</i><sub>b</sub></span><span class="val"><span id="mb_v"></span> kg</span></div>
+      <input type="range" id="mb" min="20" max="600" step="10" value="140"></label>
+    <label><div class="row"><span>Boat length <i>L</i></span><span class="val"><span id="L_v"></span> m</span></div>
+      <input type="range" id="L" min="2" max="10" step="0.5" value="5"></label>
+    <label><div class="row"><span>Walking speed (relative to boat)</span><span class="val"><span id="u_v"></span> m/s</span></div>
+      <input type="range" id="u" min="0.3" max="2.5" step="0.1" value="1.0"></label>
+    <label><div class="row"><span>Time to start and stop walking</span><span class="val"><span id="ta_v"></span> s</span></div>
+      <input type="range" id="ta" min="0.1" max="2" step="0.1" value="0.5"></label>
+    <label><div class="row"><span>Drag coefficient <i>k</i></span><span class="val"><span id="k_v"></span> N·s/m</span></div>
+      <input type="range" id="k" min="5" max="300" step="5" value="60"></label>
+  </div>
+
+  <div class="readout">
+    <div>
+      <h2>No drag</h2>
+      <p>Predicted boat shift <i>m</i><sub>p</sub><i>L</i>/(<i>m</i><sub>p</sub>+<i>m</i><sub>b</sub>): <span class="num" id="predA"></span></p>
+      <p>Simulated boat shift: <span class="num" id="simA"></span></p>
+      <p>Centre of mass shift: <span class="num" id="cmA"></span></p>
+    </div>
+    <div>
+      <h2>Linear drag</h2>
+      <p>Boat shift at the end of the run: <span class="num" id="simB"></span></p>
+      <p>Furthest the boat moved: <span class="num" id="maxB"></span></p>
+      <p>Centre of mass shift: <span class="num" id="cmB"></span></p>
+      <p>Net drag impulse &minus;<i>k</i>&int;<i>v</i><sub>b</sub>&thinsp;d<i>t</i> must vanish, so &int;<i>v</i><sub>b</sub>&thinsp;d<i>t</i> = &Delta;<i>x</i><sub>b</sub> &rarr; 0.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- Parameters and DOM ----------
+  const ids = ['mp', 'mb', 'L', 'u', 'ta', 'k'];
+  const el = {};
+  ids.forEach(id => { el[id] = document.getElementById(id); el[id + '_v'] = document.getElementById(id + '_v'); });
+  const sceneA = document.getElementById('sceneA');
+  const sceneB = document.getElementById('sceneB');
+  const plot = document.getElementById('plot');
+  const scrub = document.getElementById('scrub');
+  const playBtn = document.getElementById('play');
+  const resetBtn = document.getElementById('reset');
+  const speedSel = document.getElementById('speed');
+  const tval = document.getElementById('tval');
+  const css = getComputedStyle(document.documentElement);
+  const C = name => css.getPropertyValue(name).trim();
+
+  function params() {
+    return {
+      mp: +el.mp.value, mb: +el.mb.value, L: +el.L.value,
+      u: +el.u.value, ta: +el.ta.value, k: +el.k.value
+    };
+  }
+
+  // ---------- Walking profile: trapezoidal velocity along the deck ----------
+  // s(t) is the person's position along the boat, 0 at the stern, L at the bow.
+  function makeProfile(L, u, ta) {
+    let tc = L / u - ta;            // cruise time
+    if (tc < 0) { u = L / ta; tc = 0; }
+    const Tw = 2 * ta + tc;
+    const a = u / ta;
+    return {
+      Tw,
+      acc(t) {
+        if (t < 0) return 0;
+        if (t < ta) return a;
+        if (t < ta + tc) return 0;
+        if (t < Tw) return -a;
+        return 0;
+      },
+      pos(t) {
+        if (t <= 0) return 0;
+        if (t < ta) return 0.5 * a * t * t;
+        if (t < ta + tc) return 0.5 * u * ta + u * (t - ta);
+        if (t < Tw) { const d = Tw - t; return L - 0.5 * a * d * d; }
+        return L;
+      }
+    };
+  }
+
+  // ---------- Integrate the boat ----------
+  // (mp + mb) a_b = -mp s''(t) - k v_b
+  // The person is rigidly carried by the boat apart from the prescribed walk s(t).
+  function simulate(p, k, T, prof) {
+    const dt = 0.001, every = 5;       // record at 200 Hz
+    const M = p.mp + p.mb;
+    const n = Math.floor(T / (dt * every)) + 1;
+    const t = new Float64Array(n), xb = new Float64Array(n), xp = new Float64Array(n), cm = new Float64Array(n);
+    let x = 0, v = 0, time = 0, idx = 0;
+    for (let step = 0; idx < n; step++) {
+      if (step % every === 0) {
+        t[idx] = time;
+        xb[idx] = x;
+        xp[idx] = x - p.L / 2 + prof.pos(time);
+        cm[idx] = (p.mp * xp[idx] + p.mb * xb[idx]) / M;
+        idx++;
+      }
+      const a = (-p.mp * prof.acc(time) - k * v) / M;
+      v += a * dt;
+      x += v * dt;
+      time += dt;
+    }
+    let maxAbs = 0, maxV = 0;
+    for (let i = 1; i < n; i++) {
+      if (Math.abs(xb[i]) > maxAbs) maxAbs = Math.abs(xb[i]);
+      const vv = Math.abs(xb[i] - xb[i - 1]) / (dt * every);
+      if (vv > maxV) maxV = vv;
+    }
+    return { t, xb, xp, cm, n, dtRec: dt * every, maxAbs, maxV };
+  }
+
+  let P, prof, runA, runB, T, world;
+  function rebuild() {
+    P = params();
+    ids.forEach(id => { el[id + '_v'].textContent = P[id].toFixed(id === 'u' || id === 'ta' || id === 'L' ? 1 : 0); });
+    prof = makeProfile(P.L, P.u, P.ta);
+    const tau = (P.mp + P.mb) / P.k;
+    T = Math.min(prof.Tw + Math.max(2, Math.min(6 * tau, 40)), 60);
+    runA = simulate(P, 0, T, prof);
+    runB = simulate(P, P.k, T, prof);
+    // world extent for the scene canvases (metres)
+    const halfL = P.L / 2;
+    let lo = Infinity, hi = -Infinity;
+    [runA, runB].forEach(r => {
+      for (let i = 0; i < r.n; i++) {
+        lo = Math.min(lo, r.xb[i] - halfL); hi = Math.max(hi, r.xb[i] + halfL);
+      }
+    });
+    const pad = 0.6 + 0.08 * (hi - lo);
+    world = { lo: lo - pad, hi: hi + pad };
+
+    document.getElementById('dragLabel').innerHTML =
+      'time constant (<i>m</i><sub>p</sub>+<i>m</i><sub>b</sub>)/<i>k</i> = ' + tau.toFixed(1) + ' s';
+
+    const pred = -P.mp * P.L / (P.mp + P.mb);
+    const last = runA.n - 1;
+    document.getElementById('predA').textContent = fm(pred);
+    document.getElementById('simA').textContent = fm(runA.xb[last]);
+    document.getElementById('cmA').textContent = fm(runA.cm[last] - runA.cm[0]);
+    document.getElementById('simB').textContent = fm(runB.xb[last]);
+    document.getElementById('maxB').textContent = fm(-runB.maxAbs);
+    document.getElementById('cmB').textContent = fm(runB.cm[last] - runB.cm[0]);
+
+    tNow = 0;
+    scrub.max = String(runA.n - 1);
+    drawAll();
+  }
+  const fm = x => (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(3) + ' m';
+
+  // ---------- Canvas helpers ----------
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height };
+  }
+
+  // ---------- Scene ----------
+  function drawScene(canvas, run, i, withDrag) {
+    const { ctx, W, H } = fit(canvas);
+    ctx.clearRect(0, 0, W, H);
+    const m = 24;
+    const X = x => m + (x - world.lo) / (world.hi - world.lo) * (W - 2 * m);
+    const scale = (W - 2 * m) / (world.hi - world.lo);   // px per metre
+    const waterY = H * 0.66;
+
+    // water
+    ctx.fillStyle = C('--water-light');
+    ctx.fillRect(0, waterY, W, H - waterY);
+    ctx.strokeStyle = C('--water');
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(0, waterY + 0.5); ctx.lineTo(W, waterY + 0.5); ctx.stroke();
+
+    // metre ticks along the bottom
+    ctx.font = '11px ' + C('--sans');
+    ctx.fillStyle = C('--muted');
+    ctx.textAlign = 'center';
+    const tick = niceStep((world.hi - world.lo) / 8);
+    for (let x = Math.ceil(world.lo / tick) * tick; x <= world.hi; x += tick) {
+      const px = X(x);
+      ctx.fillText((Math.abs(x) < 1e-9 ? 0 : x).toFixed(tick < 1 ? 1 : 0), px, H - 3);
+    }
+
+    // starting position of the boat's centre
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = C('--muted');
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(0), 14); ctx.lineTo(X(0), waterY + 26); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C('--muted');
+    ctx.fillText('start', X(0) + 4, 22);
+
+    const xb = run.xb[i], xp = run.xp[i], cm = run.cm[i];
+    const halfL = P.L / 2;
+    const hullH = Math.min(26, Math.max(14, 0.9 * scale));
+    const deckY = waterY - hullH * 0.55;
+
+    // hull
+    const x0 = X(xb - halfL), x1 = X(xb + halfL);
+    const inset = Math.min(18, (x1 - x0) * 0.12);
+    ctx.fillStyle = C('--hull');
+    ctx.beginPath();
+    ctx.moveTo(x0, deckY);
+    ctx.lineTo(x1, deckY);
+    ctx.lineTo(x1 - inset, deckY + hullH);
+    ctx.lineTo(x0 + inset, deckY + hullH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = C('--deck');
+    ctx.fillRect(x0, deckY - 3, x1 - x0, 4);
+
+    // boat displacement arrow
+    if (Math.abs(xb) * scale > 6) {
+      arrow(ctx, X(0), deckY + hullH + 12, X(xb), deckY + hullH + 12, C('--water-deep'));
+      ctx.fillStyle = C('--water-deep');
+      ctx.textAlign = 'center';
+      ctx.fillText('boat shift ' + fm(xb), (X(0) + X(xb)) / 2, deckY + hullH + 26);
+    }
+
+    // drag force arrow (drawn at the waterline, proportional to k v_b)
+    if (withDrag && i > 0) {
+      const vb = (run.xb[i] - run.xb[i - 1]) / run.dtRec;
+      const F = -P.k * vb;
+      const px = run.maxV > 0 ? F / (P.k * run.maxV) * 110 : 0;
+      if (Math.abs(px) > 3) {
+        const y = deckY + hullH * 0.5, sx = px > 0 ? x1 + 3 : x0 - 3;
+        arrow(ctx, sx, y, sx + px, y, C('--cm'));
+        ctx.fillStyle = C('--cm');
+        ctx.textAlign = px > 0 ? 'left' : 'right';
+        ctx.fillText('drag ' + Math.abs(F).toFixed(0) + ' N', sx + px + (px > 0 ? 6 : -6), y + 4);
+      }
+    }
+
+    // person
+    const ph = Math.max(28, Math.min(46, 1.7 * scale));
+    const px = X(xp);
+    ctx.strokeStyle = C('--person');
+    ctx.fillStyle = C('--person');
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(px, deckY - 3); ctx.lineTo(px, deckY - 3 - ph * 0.6); ctx.stroke();   // body
+    ctx.beginPath(); ctx.arc(px, deckY - 3 - ph * 0.6 - ph * 0.18, ph * 0.16, 0, Math.PI * 2); ctx.fill(); // head
+    // legs, spread while walking
+    const walking = prof.acc(run.t[i]) !== 0 || (run.t[i] > 0 && run.t[i] < prof.Tw);
+    const spread = walking ? 6 * Math.sin(run.t[i] * 9) : 0;
+    ctx.beginPath(); ctx.moveTo(px, deckY - 3 - ph * 0.28); ctx.lineTo(px - 5 + spread, deckY - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px, deckY - 3 - ph * 0.28); ctx.lineTo(px + 5 - spread, deckY - 3); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    // centre of mass marker
+    ctx.fillStyle = C('--cm');
+    ctx.beginPath();
+    ctx.moveTo(X(cm), waterY - 2); ctx.lineTo(X(cm) - 5, waterY - 11); ctx.lineTo(X(cm) + 5, waterY - 11);
+    ctx.closePath(); ctx.fill();
+    ctx.textAlign = 'center';
+    ctx.fillText('CM', X(cm), waterY - 14);
+  }
+
+  function arrow(ctx, x0, y0, x1, y1, color) {
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    const d = Math.sign(x1 - x0) || 1;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 7 * d, y1 - 3.5); ctx.lineTo(x1 - 7 * d, y1 + 3.5); ctx.closePath(); ctx.fill();
+  }
+
+  function niceStep(raw) {
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / p;
+    return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p;
+  }
+
+  // ---------- x(t) plot ----------
+  function drawPlot(i) {
+    const { ctx, W, H } = fit(plot);
+    ctx.clearRect(0, 0, W, H);
+    const ml = 48, mr = 16, mt = 30, mb = 30;
+    const pw = W - ml - mr, ph = H - mt - mb;
+
+    let ylo = Infinity, yhi = -Infinity;
+    [runA, runB].forEach(r => [r.xb, r.xp, r.cm].forEach(arr => {
+      for (let j = 0; j < r.n; j++) { if (arr[j] < ylo) ylo = arr[j]; if (arr[j] > yhi) yhi = arr[j]; }
+    }));
+    const ypad = 0.08 * (yhi - ylo) + 0.05;
+    ylo -= ypad; yhi += ypad;
+    const X = t => ml + t / T * pw;
+    const Y = x => mt + (yhi - x) / (yhi - ylo) * ph;
+
+    // axes and grid
+    ctx.font = '11px ' + C('--sans');
+    ctx.fillStyle = C('--muted');
+    ctx.strokeStyle = C('--rule');
+    ctx.lineWidth = 1;
+    const ys = niceStep((yhi - ylo) / 5);
+    ctx.textAlign = 'right';
+    for (let y = Math.ceil(ylo / ys) * ys; y <= yhi; y += ys) {
+      ctx.beginPath(); ctx.moveTo(ml, Y(y) + 0.5); ctx.lineTo(W - mr, Y(y) + 0.5); ctx.stroke();
+      ctx.fillText((Math.abs(y) < 1e-9 ? 0 : y).toFixed(ys < 1 ? 1 : 0), ml - 6, Y(y) + 4);
+    }
+    const ts = niceStep(T / 8);
+    ctx.textAlign = 'center';
+    for (let t = 0; t <= T + 1e-9; t += ts) {
+      ctx.beginPath(); ctx.moveTo(X(t) + 0.5, mt); ctx.lineTo(X(t) + 0.5, mt + ph); ctx.stroke();
+      ctx.fillText(t.toFixed(ts < 1 ? 1 : 0), X(t), H - 12);
+    }
+    ctx.fillText('time (s)', ml + pw / 2, H - 1);
+    ctx.save(); ctx.translate(12, mt + ph / 2); ctx.rotate(-Math.PI / 2);
+    ctx.fillText('position (m)', 0, 0); ctx.restore();
+
+    // shaded walking interval
+    ctx.fillStyle = 'rgba(46,108,140,0.07)';
+    ctx.fillRect(X(0), mt, X(Math.min(prof.Tw, T)) - X(0), ph);
+    ctx.fillStyle = C('--muted');
+    ctx.textAlign = 'left';
+    ctx.fillText('walking', X(0) + 4, mt + 12);
+
+    // series
+    const series = [
+      [runA.xb, C('--water-deep'), []], [runA.xp, C('--person'), []], [runA.cm, C('--cm'), []],
+      [runB.xb, C('--water-deep'), [6, 4]], [runB.xp, C('--person'), [6, 4]], [runB.cm, C('--cm'), [6, 4]]
+    ];
+    const stride = Math.max(1, Math.floor(runA.n / 1200));
+    series.forEach(([arr, color, dash]) => {
+      ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.setLineDash(dash);
+      ctx.beginPath();
+      for (let j = 0; j < runA.n; j += stride) {
+        const x = X(runA.t[j]), y = Y(arr[j]);
+        j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    // time cursor
+    const tc = runA.t[i];
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(tc) + 0.5, mt); ctx.lineTo(X(tc) + 0.5, mt + ph); ctx.stroke();
+    [[runA, []], [runB, [6, 4]]].forEach(([r]) => {
+      [[r.xb, C('--water-deep')], [r.xp, C('--person')], [r.cm, C('--cm')]].forEach(([arr, color]) => {
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(X(tc), Y(arr[i]), 3.5, 0, Math.PI * 2); ctx.fill();
+      });
+    });
+
+    // legend
+    ctx.textAlign = 'left';
+    let lx = ml + 4, ly = 14;
+    [['boat', C('--water-deep')], ['person', C('--person')], ['centre of mass', C('--cm')]].forEach(([name, color]) => {
+      ctx.fillStyle = color; ctx.fillRect(lx, ly - 5, 14, 3);
+      ctx.fillStyle = C('--ink'); ctx.fillText(name, lx + 19, ly);
+      lx += 19 + ctx.measureText(name).width + 18;
+    });
+    ctx.fillStyle = C('--muted');
+    ctx.fillText('solid: no drag    dashed: linear drag', lx + 6, ly);
+  }
+
+  // ---------- Playback ----------
+  let tNow = 0, playing = false, lastFrame = null;
+  function index() { return Math.min(runA.n - 1, Math.max(0, Math.round(tNow / runA.dtRec))); }
+  function drawAll() {
+    const i = index();
+    drawScene(sceneA, runA, i, false);
+    drawScene(sceneB, runB, i, true);
+    drawPlot(i);
+    scrub.value = String(i);
+    tval.textContent = runA.t[i].toFixed(2);
+  }
+  function frame(ts) {
+    if (!playing) return;
+    if (lastFrame !== null) {
+      tNow += (ts - lastFrame) / 1000 * (+speedSel.value);
+      if (tNow >= T) { tNow = T; playing = false; playBtn.textContent = 'Play'; }
+    }
+    lastFrame = ts;
+    drawAll();
+    if (playing) requestAnimationFrame(frame);
+  }
+  playBtn.addEventListener('click', () => {
+    if (playing) { playing = false; playBtn.textContent = 'Play'; return; }
+    if (tNow >= T) tNow = 0;
+    playing = true; playBtn.textContent = 'Pause'; lastFrame = null;
+    requestAnimationFrame(frame);
+  });
+  resetBtn.addEventListener('click', () => { playing = false; playBtn.textContent = 'Play'; tNow = 0; drawAll(); });
+  scrub.addEventListener('input', () => { tNow = (+scrub.value) * runA.dtRec; drawAll(); });
+  ids.forEach(id => el[id].addEventListener('input', () => { playing = false; playBtn.textContent = 'Play'; rebuild(); }));
+  window.addEventListener('resize', drawAll);
+
+  rebuild();
+})();
+</script>
+</body>
+</html>
