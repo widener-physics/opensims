@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Physics Sims</title>
+<meta name="description" content="Free, open, single-file physics simulations for teaching. No accounts, no tracking, nothing loaded from anyone else's server.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --blue: #1D4F73; --marigold: #E8A317; --grid: rgba(29,79,115,0.10);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --measure: 62ch;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.6; }
+  a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--marigold); outline-offset: 2px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- Hero: graph paper with a live strobe photograph ---------- */
+  .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--rule);
+    background-color: var(--panel);
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px; }
+  .hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  .hero .wrap { position: relative; padding-top: 64px; padding-bottom: 56px; }
+  .nameplate { font-family: var(--sans); font-size: 14px; color: var(--muted); margin: 0 0 22px; }
+  .nameplate b { color: var(--ink); font-weight: 600; }
+  h1 { font-weight: 500; font-size: clamp(38px, 6vw, 64px); line-height: 1.02; letter-spacing: -0.02em; margin: 0 0 18px; max-width: 14ch; }
+  .deck { font-size: clamp(18px, 2vw, 21px); line-height: 1.5; margin: 0 0 30px; max-width: 46ch; color: var(--ink); }
+  .search { display: flex; max-width: 560px; border: 1.5px solid var(--ink); background: var(--panel); border-radius: 3px; }
+  .search input { flex: 1; min-width: 0; font: inherit; font-family: var(--sans); font-size: 16px; padding: 12px 16px; border: 0; background: transparent; color: var(--ink); }
+  .search input::placeholder { color: var(--muted); }
+  .search button { font: inherit; font-family: var(--sans); font-size: 15px; padding: 0 18px; border: 0; border-left: 1.5px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  .search input:focus-visible { outline-offset: -3px; }
+  .hint { font-family: var(--sans); font-size: 13px; color: var(--muted); margin: 10px 0 0; }
+
+  /* ---------- Directory: rail + entries ---------- */
+  .directory { display: grid; grid-template-columns: 240px 1fr; gap: 48px; padding: 44px 0 0; align-items: start; }
+  .directory > * { min-width: 0; }
+  .rail { position: sticky; top: 24px; }
+  .rail h2 { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 10px; }
+  .rail ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+  .rail li { border-bottom: 1px solid var(--rule); }
+  .rail button { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; font-size: 16px; padding: 9px 6px 9px 4px; background: transparent; border: 0; color: var(--ink); cursor: pointer; border-left: 3px solid transparent; }
+  .rail button .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--muted)); flex: none; }
+  .rail button .n { margin-left: auto; font-family: var(--sans); font-size: 13px; color: var(--muted); }
+  .rail button[aria-pressed="true"] { border-left-color: var(--ink); font-weight: 600; }
+  .rail .sort { display: block; margin-top: 22px; font-family: var(--sans); font-size: 13px; color: var(--muted); }
+  .rail select { display: block; width: 100%; margin-top: 6px; font: inherit; font-family: var(--sans); font-size: 14px; padding: 7px 8px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); color: var(--ink); }
+
+  .status { font-family: var(--sans); font-size: 14px; color: var(--muted); margin: 4px 0 18px; }
+  .entries { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 36px 32px; }
+  .entry { display: flex; flex-direction: column; }
+  .figure { display: block; border: 1px solid var(--ink); border-radius: 2px; background: var(--panel); aspect-ratio: 16 / 9; overflow: hidden; position: relative; }
+  .figure svg, .figure img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .figure::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--c); }
+  .entry .topicline { font-family: var(--sans); font-size: 13px; color: var(--c); margin: 12px 0 4px; font-weight: 600; }
+  .entry .topicline .beta { color: var(--muted); font-weight: 400; }
+  .entry .topicline .beta::before { content: ", "; }
+  .entry h3 { font-size: 22px; font-weight: 600; line-height: 1.2; margin: 0 0 6px; }
+  .entry h3 a { color: inherit; text-decoration: none; }
+  .entry h3 a:hover { text-decoration: underline; }
+  .entry p { margin: 0 0 10px; color: var(--muted); font-size: 16px; line-height: 1.5; flex: 1; }
+  .entry .meta { font-family: var(--sans); font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+  .entry .go { display: flex; gap: 18px; align-items: baseline; font-family: var(--sans); font-size: 15px; }
+  .entry .go .open { display: inline-block; padding: 7px 16px; background: var(--ink); color: #fff; border-radius: 3px; text-decoration: none; }
+  .entry .go .open:hover { background: var(--blue); }
+  .entry .go .dl { color: var(--muted); }
+  .empty { padding: 44px 0; color: var(--muted); max-width: var(--measure); }
+
+  /* ---------- About ---------- */
+  .about { margin-top: 72px; border-top: 1px solid var(--ink); padding-top: 32px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px 56px; }
+  .about h2 { font-size: 22px; font-weight: 600; margin: 0 0 10px; }
+  .about p { margin: 0 0 12px; max-width: var(--measure); }
+  .about code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px; background: var(--soft); padding: 1px 5px; border-radius: 3px; }
+  .elsewhere { margin-top: 36px; border-top: 1px solid var(--rule); padding-top: 24px; max-width: var(--measure); }
+  .elsewhere h2 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  .elsewhere p { margin: 0; color: var(--muted); }
+  footer { margin: 48px 0 56px; padding-top: 18px; border-top: 1px solid var(--rule); font-family: var(--sans); font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 28px; }
+
+  @media (max-width: 820px) {
+    .directory { grid-template-columns: 1fr; gap: 20px; padding-top: 28px; }
+    .rail { position: static; }
+    .rail ul { display: flex; overflow-x: auto; border-top: 0; gap: 6px; padding-bottom: 6px; scrollbar-width: thin; }
+    .rail li { border: 0; flex: none; }
+    .rail button { border: 1px solid var(--rule); border-radius: 999px; padding: 6px 12px; font-size: 15px; white-space: nowrap; }
+    .rail button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .rail button[aria-pressed="true"] .n { color: #C9D3D9; }
+    .rail .sort { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .rail select { width: auto; margin: 0; }
+    .about { grid-template-columns: 1fr; }
+    .hero .wrap { padding-top: 44px; padding-bottom: 40px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <canvas id="strobe" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <p class="nameplate"><b>Open Physics Sims</b>, a shared library for teaching</p>
+    <h1>Simulations you can read.</h1>
+    <p class="deck">Interactive physics for the classroom, each one a single file with the model written out in plain code. Nothing to install, no accounts, nothing loaded from anyone else's server. Open it, hand it to students, or download it and keep it.</p>
+    <form class="search" role="search" onsubmit="return false">
+      <input type="search" id="q" placeholder="Search by topic, concept, or apparatus" autocomplete="off" aria-label="Search simulations">
+      <button type="button" id="clear" aria-label="Clear search">Clear</button>
+    </form>
+    <p class="hint" id="hint"></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="directory">
+    <nav class="rail" aria-label="Topics">
+      <h2>Topics</h2>
+      <ul id="rail"></ul>
+      <label class="sort">Order
+        <select id="sort">
+          <option value="new">newest first</option>
+          <option value="az">alphabetical</option>
+          <option value="topic">grouped by topic</option>
+        </select>
+      </label>
+    </nav>
+    <section aria-label="Simulations">
+      <p class="status" id="status"></p>
+      <div class="entries" id="entries"></div>
+    </section>
+  </div>
+
+  <section class="about">
+    <div>
+      <h2>What this is</h2>
+      <p>A library of interactive simulations for introductory and intermediate physics, built for teaching. Several replace the Java simulations that no longer run in a browser; others cover topics that never had a good simulation.</p>
+      <p>Each simulation is one self-contained HTML file. The physics is in a few clearly named functions near the top of the script, so you can check the model, change a constant, or turn it into a different problem.</p>
+    </div>
+    <div>
+      <h2>Use it, share it, improve it</h2>
+      <p>Use any of these in a lesson, a course site, or a learning management system. Link to a simulation directly, or download the file and host it yourself; it keeps working without this site.</p>
+      <p>To report a problem or contribute a simulation, go to the <a id="repo" href="#">repository on GitHub</a>. A new simulation is one file in <code>sims/</code> and one entry in <code>sims.js</code>.</p>
+    </div>
+  </section>
+
+  <section class="elsewhere">
+    <h2>Good simulations elsewhere</h2>
+    <p>Some topics are already done well by others: <a href="https://phydemo.app/ray-optics/">Ray Optics Simulation</a> for geometric optics, <a href="https://www.myphysicslab.com/">myPhysicsLab</a> for mechanics with the equations shown, <a href="https://emanim.szialab.org/">EMANIM</a> for polarization and electromagnetic waves, and of course <a href="https://phet.colorado.edu/">PhET</a>. This library aims to fill the gaps around them, not to redo them.</p>
+  </section>
+
+  <footer>
+    <span id="license">Released under an open licence; see the repository for details.</span>
+    <span>Inspired by the PhET project at the University of Colorado Boulder.</span>
+  </footer>
+</main>
+
+<script src="sims.js"></script>
+<script>
+(function () {
+  'use strict';
+  const REPO_URL = 'https://github.com/YOUR-USERNAME/YOUR-REPO';    // <- set this
+  const $ = id => document.getElementById(id);
+  $('repo').href = REPO_URL;
+
+  const SIMS = window.SIMS || [], TOPICS = window.TOPICS || {};
+  const state = { q: '', topic: 'all', sort: 'new' };
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (hash.get('topic') && (hash.get('topic') === 'all' || TOPICS[hash.get('topic')])) state.topic = hash.get('topic');
+  if (hash.get('q')) { state.q = hash.get('q'); $('q').value = state.q; }
+
+  // ---------- Thumbnails: a schematic per topic in the topic colour ----------
+  function thumb(sim) {
+    const c = TOPICS[sim.topic] ? TOPICS[sim.topic].color : '#5C6B73';
+    if (sim.thumb) return '<img src="' + sim.thumb + '" alt="">';
+    const glyph = {
+      kinematics: '<path d="M30 130 Q 120 -20 220 130" fill="none" stroke="C" stroke-width="3" stroke-dasharray="7 6"/><circle cx="125" cy="55" r="7" fill="C"/><rect x="40" y="130" width="60" height="18" rx="3" fill="C" opacity=".85"/><line x1="0" y1="152" x2="320" y2="152" stroke="C" stroke-width="2"/>',
+      dynamics: '<line x1="0" y1="118" x2="320" y2="118" stroke="C" stroke-width="2"/><rect x="70" y="80" width="110" height="38" rx="4" fill="C" opacity=".85"/><line x1="180" y1="99" x2="270" y2="99" stroke="C" stroke-width="3"/><path d="M262 92 L276 99 L262 106 Z" fill="C"/><line x1="125" y1="80" x2="125" y2="30" stroke="C" stroke-width="3"/><path d="M118 38 L125 24 L132 38 Z" fill="C"/>',
+      rotation: '<circle cx="160" cy="90" r="52" fill="none" stroke="C" stroke-width="3"/><circle cx="160" cy="90" r="6" fill="C"/><line x1="160" y1="90" x2="205" y2="64" stroke="C" stroke-width="3"/><path d="M212 40 A 60 60 0 0 1 226 80" fill="none" stroke="C" stroke-width="3"/><path d="M220 84 L230 78 L230 90 Z" fill="C"/>',
+      oscillations: '<path d="M0 90 C 30 30, 60 30, 90 90 S 150 150, 180 90 S 240 30, 270 90 S 330 150, 360 90" fill="none" stroke="C" stroke-width="3"/><path d="M0 90 C 45 50, 90 50, 135 90 S 225 130, 270 90 S 360 50, 405 90" fill="none" stroke="C" stroke-width="2" opacity=".45"/>',
+      thermo: '<rect x="70" y="40" width="180" height="100" rx="6" fill="none" stroke="C" stroke-width="3"/><path d="M90 125 C 130 60, 190 60, 230 55" fill="none" stroke="C" stroke-width="3"/><path d="M90 125 C 150 120, 200 100, 230 55" fill="none" stroke="C" stroke-width="3" stroke-dasharray="6 5"/>',
+      em: '<circle cx="110" cy="90" r="9" fill="C"/><circle cx="210" cy="90" r="9" fill="none" stroke="C" stroke-width="3"/><path d="M119 90 Q 160 30 201 90 M119 90 Q 160 150 201 90 M119 90 L201 90" fill="none" stroke="C" stroke-width="2" opacity=".7"/><path d="M110 20 Q 160 90 110 160 M210 20 Q 160 90 210 160" fill="none" stroke="C" stroke-width="2" opacity=".35"/>',
+      optics: '<line x1="0" y1="90" x2="320" y2="90" stroke="C" stroke-width="1.5" stroke-dasharray="4 5"/><path d="M150 30 Q 175 90 150 150 Q 125 90 150 30 Z" fill="C" opacity=".35" stroke="C" stroke-width="2"/><path d="M20 55 L150 55 L280 100 M20 125 L150 125 L280 80" fill="none" stroke="C" stroke-width="2.5"/>',
+      modern: '<circle cx="160" cy="90" r="8" fill="C"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5" transform="rotate(60 160 90)"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5" transform="rotate(-60 160 90)"/>',
+      astronomy: '<circle cx="150" cy="95" r="12" fill="C"/><ellipse cx="160" cy="95" rx="110" ry="46" fill="none" stroke="C" stroke-width="2.5"/><ellipse cx="156" cy="95" rx="60" ry="24" fill="none" stroke="C" stroke-width="2" stroke-dasharray="5 5"/><circle cx="262" cy="70" r="6" fill="C"/><circle cx="102" cy="112" r="4" fill="C"/>',
+      materials: '<path d="M20 60 L130 60 Q 160 60 160 90 Q 160 120 190 120 L300 120" fill="none" stroke="C" stroke-width="3"/><path d="M20 120 L130 120 Q 160 120 160 150 Q 160 180 190 180 L300 180" fill="none" stroke="C" stroke-width="3" transform="translate(0,-25)"/><circle cx="60" cy="50" r="5" fill="C"/><circle cx="95" cy="50" r="5" fill="C"/><circle cx="230" cy="105" r="5" fill="none" stroke="C" stroke-width="2"/><circle cx="265" cy="105" r="5" fill="none" stroke="C" stroke-width="2"/>'
+    }[sim.topic] || '<circle cx="160" cy="90" r="40" fill="none" stroke="C" stroke-width="3"/>';
+    return '<svg viewBox="0 0 320 180" aria-hidden="true"><rect width="320" height="180" fill="#fff"/>' + glyph.split('C"').join(c + '"') + '</svg>';
+  }
+
+  // ---------- Rail, entries ----------
+  function rail() {
+    const counts = {}; SIMS.forEach(s => { counts[s.topic] = (counts[s.topic] || 0) + 1; });
+    const items = [['all', 'All simulations', null, SIMS.length]].concat(Object.keys(TOPICS).filter(k => counts[k]).map(k => [k, TOPICS[k].name, TOPICS[k].color, counts[k]]));
+    $('rail').innerHTML = items.map(([k, name, color, n]) =>
+      '<li><button data-topic="' + k + '" aria-pressed="' + (state.topic === k) + '"' + (color ? ' style="--c:' + color + '"' : '') + '>' +
+      (color ? '<span class="dot"></span>' : '') + name + '<span class="n">' + n + '</span></button></li>').join('');
+    $('rail').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { state.topic = b.dataset.topic; sync(); rail(); render(); }));
+  }
+  function matches(s) {
+    if (state.topic !== 'all' && s.topic !== state.topic) return false;
+    if (!state.q) return true;
+    const hay = [s.title, s.blurb, s.tags.join(' '), TOPICS[s.topic] ? TOPICS[s.topic].name : ''].join(' ').toLowerCase();
+    return state.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  function render() {
+    const list = SIMS.filter(matches);
+    list.sort((a, b) => state.sort === 'az' ? a.title.localeCompare(b.title)
+      : state.sort === 'topic' ? (a.topic.localeCompare(b.topic) || a.title.localeCompare(b.title))
+      : (b.added || '').localeCompare(a.added || '') || a.title.localeCompare(b.title));
+    const topicName = state.topic === 'all' ? '' : ' in ' + TOPICS[state.topic].name;
+    $('status').textContent = state.q ? list.length + ' match' + (list.length === 1 ? '' : 'es') + ' for \u201C' + state.q + '\u201D' + topicName
+      : (state.topic === 'all' ? SIMS.length + ' simulation' + (SIMS.length === 1 ? '' : 's') : list.length + topicName);
+    $('hint').textContent = SIMS.length + ' simulations so far. Try \u201Corbit\u201D, \u201Cframe\u201D, or \u201Cdiode\u201D.';
+    if (!list.length) {
+      $('entries').innerHTML = '<p class="empty">Nothing matches \u201C' + esc(state.q) + '\u201D' + topicName + '. Try a broader word, or <a href="#" id="showall">show everything</a>.</p>';
+      $('showall').addEventListener('click', e => { e.preventDefault(); state.q = ''; state.topic = 'all'; $('q').value = ''; sync(); rail(); render(); });
+      return;
+    }
+    $('entries').innerHTML = list.map(s => {
+      const t = TOPICS[s.topic] || { name: s.topic, color: '#5C6B73' };
+      const href = 'sims/' + s.slug + '.html';
+      return '<article class="entry" style="--c:' + t.color + '">' +
+        '<a class="figure" href="' + href + '" tabindex="-1" aria-hidden="true">' + thumb(s) + '</a>' +
+        '<div class="topicline">' + esc(t.name) + (s.status === 'beta' ? '<span class="beta">beta</span>' : '') + '</div>' +
+        '<h3><a href="' + href + '">' + esc(s.title) + '</a></h3>' +
+        '<p>' + esc(s.blurb) + '</p>' +
+        '<div class="meta">' + (s.level === 'intermediate' ? 'Intermediate' : 'Introductory') + (s.tags.length ? '. ' + s.tags.slice(0, 4).map(esc).join(', ') : '') + '</div>' +
+        '<div class="go"><a class="open" href="' + href + '">Open simulation</a><a class="dl" href="' + href + '" download>Download file</a></div>' +
+        '</article>';
+    }).join('');
+  }
+  function sync() {
+    const p = new URLSearchParams();
+    if (state.topic !== 'all') p.set('topic', state.topic);
+    if (state.q) p.set('q', state.q);
+    const h = p.toString();
+    history.replaceState(null, '', h ? '#' + h : location.pathname);
+  }
+  $('q').addEventListener('input', () => { state.q = $('q').value.trim(); sync(); render(); });
+  $('clear').addEventListener('click', () => { $('q').value = ''; state.q = ''; sync(); render(); $('q').focus(); });
+  $('sort').addEventListener('change', () => { state.sort = $('sort').value; render(); });
+  rail(); render();
+
+  // ---------- Hero: a strobe photograph of a bouncing ball, drawn live ----------
+  (function strobe() {
+    const cv = $('strobe'); const ctx = cv.getContext('2d');
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const G = 9.8, e = 0.7, vx = 1.3;                 // m/s^2, restitution, horizontal speed
+    let W = 0, H = 0, S = 60, t0 = null;
+    const h0 = 3.2; const bounces = [];
+    (function () { let v = Math.sqrt(2 * G * h0), tt = Math.sqrt(2 * h0 / G), x = 0; bounces.push({ t: 0, x: 0, vy: 0, h: h0, T: tt }); x += vx * tt;
+      for (let k = 0; k < 6; k++) { v *= e; const T = 2 * v / G; bounces.push({ t: bounces[k].t + bounces[k].T, x, vy: v, h: 0, T }); x += vx * T; } })();
+    const total = bounces[bounces.length - 1].t + bounces[bounces.length - 1].T;
+    function pos(t) {
+      let b = bounces[0]; for (const q of bounces) if (t >= q.t) b = q;
+      const dt = Math.min(t - b.t, b.T);
+      return { x: b.x + vx * dt, y: b.h + b.vy * dt - 0.5 * G * dt * dt };
+    }
+    function size() {
+      const dpr = window.devicePixelRatio || 1; const r = cv.getBoundingClientRect();
+      W = r.width; H = r.height; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const left = Math.max(640, (W - 1120) / 2 + 24 + 600);   // clear of the text column
+      S = Math.min((W - 40 - left) / (vx * total), (H - 70) / (h0 + 0.4));
+    }
+    function draw(t) {
+      ctx.clearRect(0, 0, W, H);
+      const ox = W - 40 - vx * total * S, oy = H - 34;     // right-aligned, floor near the bottom
+      const X = x => ox + x * S, Y = y => oy - y * S;
+      if (S < 34) return;                                  // no room beside the text: draw nothing
+      ctx.strokeStyle = 'rgba(23,33,40,0.35)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(-0.4), Y(0) + 0.5); ctx.lineTo(X(vx * total + 0.4), Y(0) + 0.5); ctx.stroke();
+      const dt = 1 / 12, n = Math.floor(t / dt);
+      for (let k = 0; k <= n; k++) {
+        const p = pos(k * dt); const age = (t - k * dt) / total;
+        ctx.fillStyle = 'rgba(29,79,115,' + (0.55 - 0.35 * age).toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 5.5, 0, Math.PI * 2); ctx.fill();
+      }
+      const p = pos(t);
+      ctx.fillStyle = '#E8A317'; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#172128'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+    size();
+    if (reduce) { draw(total); }
+    else {
+      let running = true;
+      function frame(ts) {
+        if (t0 === null) t0 = ts;
+        const t = ((ts - t0) / 1000) % (total + 1.6);        // pause on the finished photograph, then restart
+        draw(Math.min(t, total));
+        if (running) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      document.addEventListener('visibilitychange', () => { running = !document.hidden; if (running) { t0 = null; requestAnimationFrame(frame); } });
+    }
+    window.addEventListener('resize', () => { size(); if (reduce) draw(total); });
+  })();
+})();
+</script>
+</body>
+</html>
