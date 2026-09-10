@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'gauss-law',
+    title: "Gauss's law",
+    topic: 'em',
+    tags: ['electric flux', 'field lines', 'symmetry', 'line charge'],
+    blurb: 'Drag charges and drag a closed surface while the flux is measured piece by piece around the boundary and compared with the charge enclosed over epsilon-zero. Move a charge outside and the total falls to zero while the field does not.',
+    level: 'intermediate',
+    added: '2026-09-08',
+    status: 'ready'
+  },
+  {
     slug: 'rocket-staging',
     title: 'Rocket staging',
     topic: 'dynamics',

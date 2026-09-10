@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<!--
+  Gauss's law - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; the flux integral was checked
+  against lambda/eps0 for several shapes and charge positions, agreeing to better than 0.01%.
+  Credit: none; Gauss's law is a standard topic with, as far as we know, no existing interactive version.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gauss's law</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --pos: #C8321E; --neg: #1D4F73; --outward: #2E7D32; --inward: #B5306D; --surface: #172128;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 66ch; }
+
+  .setup { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; font-family: var(--sans); font-size: 14px; }
+  .setup span.lbl { color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { font: inherit; font-family: var(--sans); font-size: 14px; min-width: 0; padding: 6px 12px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; cursor: pointer; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 12px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 520; touch-action: none; cursor: crosshair; }
+  #around { aspect-ratio: 900 / 200; margin-top: 12px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); } .readout .no { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .controls .btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .toggles { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; align-items: center; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1; }
+    .setup { gap: 8px; }
+    .seg button { padding: 6px 9px; font-size: 13px; }
+    #around { aspect-ratio: 3 / 2; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Gauss's law</h1>
+  <p class="lede">Drag the charges and drag the surface. At every point around the loop the sim measures how much field is leaving or entering,
+    adds it all up, and compares the answer with the charge enclosed divided by ε₀. The two agree however you move things, which is what
+    Gauss's law says. Move a charge outside and the field on the surface is as strong as ever, but the total comes to zero.</p>
+
+  <div class="setup">
+    <span class="lbl">Surface</span>
+    <span class="seg" id="shapeseg" role="group" aria-label="Surface shape">
+      <button data-s="circle">circle</button><button data-s="square">square</button><button data-s="blob">irregular</button>
+    </span>
+    <span class="lbl">Try</span>
+    <span class="seg" id="preseg" role="group" aria-label="Presets">
+      <button data-p="one">one charge in</button><button data-p="out">charge outside</button><button data-p="dip">dipole in</button><button data-p="split">one in, one out</button>
+    </span>
+  </div>
+
+  <canvas id="scene"></canvas>
+  <canvas id="around"></canvas>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label><div class="row"><span>Size of the surface</span><span class="val" id="R_v"></span></div>
+      <input type="range" id="R" min="0.4" max="1.7" step="0.02" value="1"></label>
+    <label><div class="row"><span>Charge on the selected dot</span><span class="val" id="q_v"></span></div>
+      <input type="range" id="q" min="-3" max="3" step="0.5" value="1"></label>
+    <label><div class="row"><span>Charges</span><span class="val" id="n_v"></span></div>
+      <div class="btns">
+        <button id="addp" class="secondary">add +</button>
+        <button id="addn" class="secondary">add −</button>
+        <button id="del" class="secondary">delete</button>
+        <button id="clear" class="secondary">clear</button>
+      </div></label>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="arrows" checked> show the field</label>
+    <label><input type="checkbox" id="normals" checked> show what each piece of the surface contributes</label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> Drag the single charge around inside the loop. The pattern of arrows on the boundary changes completely, yet the
+      total never moves: the flux depends on the charge enclosed and on nothing else. Now drag it out through the boundary and watch the total
+      drop to zero the instant it crosses. Switch the surface to the irregular blob and the total is unchanged again, which is why you may
+      choose any surface you like when you use the law to find a field. Finally put a positive and a negative charge inside together: every
+      field line that goes in comes back out, and the sum is zero.</p>
+    <p><b>What the graph shows.</b> The second panel is <i>E</i>·<b>n̂</b> at each point as you walk once around the loop. Green above the line
+      is field leaving, magenta below is field entering, and the flux is the area between the curve and the line. With the charge outside, the
+      two areas are exactly equal and cancel.</p>
+    <p>Model: a two-dimensional world, so each dot is an infinitely long line of charge seen end-on and the field falls off as 1/<i>r</i>
+      rather than 1/<i>r</i>². The loop is the cross-section of a cylinder and the flux is per meter of its length. Charge is in nanocoulombs
+      per meter, so <i>E</i> = λ/(2πε₀<i>r</i>) and Gauss's law reads Φ = λ<sub>enclosed</sub>/ε₀. The integral is a sum over 720 straight
+      pieces of the boundary, which is accurate to better than a hundredth of a percent unless a charge is sitting almost on the surface.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const EPS0 = 8.8541878128e-12, K = 1 / (2 * Math.PI * EPS0), nC = 1e-9;
+  const NSEG = 720;
+
+  const st = { shape: 'circle', R: 1, cx: 0, cy: 0, sel: 0, arrows: true, normals: true,
+    charges: [{ x: 0.3, y: -0.15, q: 1 }] };
+  const WORLD = { x0: -2.6, x1: 2.6, y0: -1.5, y1: 1.5 };
+
+  // ================================================================
+  // 1. MODEL
+  //    Two dimensions: each dot is a line charge of density lambda seen end-on, so
+  //      E = lambda / (2 pi eps0 r)  pointing radially.
+  //    The boundary is a closed polygon walked counter-clockwise; for a segment from a to b,
+  //      E . n ds = Ex dy - Ey dx,
+  //    and the sum of that around the loop is the flux. Gauss's law predicts lambda_enclosed / eps0.
+  // ================================================================
+  function fieldAt(x, y) {
+    let ex = 0, ey = 0;
+    for (const c of st.charges) {
+      const dx = x - c.x, dy = y - c.y;
+      const r = Math.sqrt(Math.max(dx * dx + dy * dy, 1e-10));
+      const e = K * c.q * nC / r;
+      ex += e * dx / r; ey += e * dy / r;
+    }
+    return [ex, ey];
+  }
+  function polygon(n) {
+    const p = [], R = st.R, cx = st.cx, cy = st.cy;
+    if (st.shape === 'square') {
+      const s = R * Math.SQRT1_2 * 2, h = s / 2, per = 4 * s;
+      for (let i = 0; i < n; i++) {
+        const d = per * i / n;
+        if (d < s) p.push({ x: cx + h, y: cy - h + d });
+        else if (d < 2 * s) p.push({ x: cx + h - (d - s), y: cy + h });
+        else if (d < 3 * s) p.push({ x: cx - h, y: cy + h - (d - 2 * s) });
+        else p.push({ x: cx - h + (d - 3 * s), y: cy - h });
+      }
+    } else {
+      for (let i = 0; i < n; i++) {
+        const t = 2 * Math.PI * i / n;
+        const r = st.shape === 'blob' ? R * (1 + 0.26 * Math.sin(3 * t + 0.6) + 0.12 * Math.cos(5 * t)) : R;
+        p.push({ x: cx + r * Math.cos(t), y: cy + r * Math.sin(t) });
+      }
+    }
+    return p;
+  }
+  function inside(pts, x, y) {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++)
+      if ((pts[i].y > y) !== (pts[j].y > y) && x < (pts[j].x - pts[i].x) * (y - pts[i].y) / (pts[j].y - pts[i].y) + pts[i].x) c = !c;
+    return c;
+  }
+  let M;
+  function recompute() {
+    const pts = polygon(NSEG);
+    let total = 0, pos = 0, neg = 0, per = 0;
+    const samples = [];                              // E.n and arc length, for the graph and the arrows
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      const dx = b.x - a.x, dy = b.y - a.y, ds = Math.hypot(dx, dy);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const [ex, ey] = fieldAt(mx, my);
+      const contrib = ex * dy - ey * dx;             // = E . n ds
+      total += contrib; contrib > 0 ? pos += contrib : neg += contrib;
+      samples.push({ s: per, En: ds > 0 ? contrib / ds : 0, x: mx, y: my, nx: dy / ds, ny: -dx / ds, ds });
+      per += ds;
+    }
+    const enc = st.charges.filter(c => inside(pts, c.x, c.y));
+    const qEnc = enc.reduce((s, c) => s + c.q, 0) * nC;
+    const pred = qEnc / EPS0;
+    // is any charge sitting essentially on the boundary?
+    let onEdge = null;
+    for (const c of st.charges) {
+      let dmin = Infinity;
+      for (let i = 0; i < pts.length; i += 4) dmin = Math.min(dmin, Math.hypot(pts[i].x - c.x, pts[i].y - c.y));
+      if (dmin < 0.05 * st.R) onEdge = c;
+    }
+    M = { pts, samples, total, pos, neg, per, qEnc, pred, encCount: enc.length, onEdge,
+      agree: pred === 0 ? null : total / pred };
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  let T = null;                                       // world <-> screen transform, kept for pointer hits
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1.5) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(7, L * 0.55);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 1.6;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.42, y1 - uy * hd + ux * hd * 0.42);
+    ctx.lineTo(x1 - ux * hd + uy * hd * 0.42, y1 - uy * hd - ux * hd * 0.42); ctx.closePath(); ctx.fill();
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const m = 10;
+    const S = Math.min((W - 2 * m) / (WORLD.x1 - WORLD.x0), (H - 2 * m) / (WORLD.y1 - WORLD.y0));
+    const ox = W / 2, oy = H / 2;
+    T = { S, ox, oy };
+    const X = x => ox + x * S, Y = y => oy - y * S;
+
+    // the field, as a grid of arrows with a compressed length scale
+    if (st.arrows && st.charges.length) {
+      const step = compact ? 26 : 30;
+      let ref = 0; const vals = [];
+      for (let px = step / 2; px < W; px += step) for (let py = step / 2; py < H; py += step) {
+        const [ex, ey] = fieldAt((px - ox) / S, (oy - py) / S);
+        const mag = Math.hypot(ex, ey); vals.push({ px, py, ex, ey, mag }); ref = Math.max(ref, mag);
+      }
+      const med = vals.map(v => v.mag).sort((a, b) => a - b)[Math.floor(vals.length / 2)] || 1;
+      vals.forEach(v => {
+        if (v.mag < 1e-9) return;
+        const L = (step * 0.42) * Math.tanh(v.mag / (med * 1.6));
+        const ux = v.ex / v.mag, uy = v.ey / v.mag;
+        ctx.globalAlpha = 0.34 + 0.30 * Math.tanh(v.mag / (med * 2));
+        arrow(ctx, v.px - ux * L, v.py + uy * L, v.px + ux * L, v.py - uy * L, C('--twin'), 1.3);
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    // the surface
+    const pts = M.pts;
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(X(p.x), Y(p.y)) : ctx.moveTo(X(p.x), Y(p.y)));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(29,79,115,0.05)'; ctx.fill();
+    ctx.strokeStyle = C('--surface'); ctx.lineWidth = 2; ctx.stroke();
+    // centre handle for dragging the surface
+    ctx.fillStyle = C('--surface'); ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.arc(X(st.cx), Y(st.cy), 5, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    const clash = st.charges.some(c => Math.hypot(c.x - st.cx, c.y - st.cy) * S < 90);
+    if (!clash && !compact) { ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+      ctx.fillText('move the surface', X(st.cx) + 10, Y(st.cy) + 4); }
+
+    // what each piece of the boundary contributes
+    if (st.normals) {
+      const nArrows = compact ? 30 : 48, stride = Math.floor(M.samples.length / nArrows);
+      let maxEn = 1e-12;
+      for (let i = 0; i < M.samples.length; i += stride) maxEn = Math.max(maxEn, Math.abs(M.samples[i].En));
+      for (let i = 0; i < M.samples.length; i += stride) {
+        const s = M.samples[i];
+        const f = s.En / maxEn;
+        const L = (compact ? 20 : 30) * Math.sign(f) * Math.tanh(Math.abs(f) * 1.8);
+        const x0 = X(s.x), y0 = Y(s.y);
+        arrow(ctx, x0, y0, x0 + s.nx * L, y0 - s.ny * L, C(f >= 0 ? '--outward' : '--inward'), 1.7);
+      }
+    }
+
+    // charges
+    st.charges.forEach((c, i) => {
+      const px = X(c.x), py = Y(c.y), r = 9 + 3 * Math.min(2, Math.abs(c.q));
+      if (i === st.sel) { ctx.strokeStyle = C('--star'); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px, py, r + 5, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = C(c.q >= 0 ? '--pos' : '--neg');
+      ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold ' + (r + 2) + 'px ' + C('--sans'); ctx.textAlign = 'center';
+      ctx.fillText(c.q >= 0 ? '+' : '−', px, py + r * 0.38);
+      ctx.fillStyle = C('--ink'); ctx.font = '11px ' + C('--sans');
+      ctx.fillText(c.q.toFixed(1), px, py + r + 13);
+    });
+
+    // captions
+    ctx.font = '12px ' + C('--sans'); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText('drag the charges and the surface', 10, 16);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = C('--outward'); ctx.fillText('green: field leaving', W - 10, 16);
+    ctx.fillStyle = C('--inward'); ctx.fillText('magenta: field entering', W - 10, 32);
+    if (M.onEdge) { ctx.fillStyle = C('--hot'); ctx.textAlign = 'center';
+      ctx.fillText('a charge is sitting on the surface: move it clearly inside or outside', W / 2, H - 10); }
+  }
+
+  // E.n as you walk once around the loop; the area is the flux
+  function drawAround() {
+    const { ctx, W, H, compact } = fit($('around'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const ml = compact ? 40 : 62, mr = 14, mt = 24, mb = 26;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    let mx = 1e-12;
+    M.samples.forEach(s => { mx = Math.max(mx, Math.abs(s.En)); });
+    const X = s => ml + s / M.per * pw, Y = v => mt + ph / 2 - v / (mx * 1.12) * (ph / 2);
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ml, Y(0) + 0.5); ctx.lineTo(ml + pw, Y(0) + 0.5); ctx.stroke();
+    ctx.strokeRect(ml, mt, pw, ph);
+    // filled areas
+    [[1, '--outward'], [-1, '--inward']].forEach(([sgn, col]) => {
+      ctx.fillStyle = C(col); ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.moveTo(ml, Y(0));
+      M.samples.forEach(s => { const v = sgn > 0 ? Math.max(0, s.En) : Math.min(0, s.En); ctx.lineTo(X(s.s), Y(v)); });
+      ctx.lineTo(ml + pw, Y(0)); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+    });
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.6;
+    ctx.beginPath(); M.samples.forEach((s, i) => i ? ctx.lineTo(X(s.s), Y(s.En)) : ctx.moveTo(X(s.s), Y(s.En))); ctx.stroke();
+    // scale
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    [[mx, Y(mx)], [0, Y(0)], [-mx, Y(-mx)]].forEach(([v, y]) => ctx.fillText(v === 0 ? '0' : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(mx >= 100 ? 0 : 1), ml - 6, y + 4));
+    ctx.textAlign = 'left';
+    ctx.fillText('E·n̂ around the loop', ml, 15);
+    ctx.textAlign = 'right'; ctx.fillText('once around', ml + pw, H - 8);
+    ctx.textAlign = 'left'; ctx.fillText('start', ml, H - 8);
+    ctx.save(); ctx.translate(13, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
+    ctx.fillText('N/C', 0, 0); ctx.restore();
+    // the two areas and what they come to
+    const net = M.total;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = C('--outward'); ctx.fillText('leaving ' + fmt(M.pos), ml + pw, 15);
+    const w1 = ctx.measureText('leaving ' + fmt(M.pos)).width;
+    ctx.fillStyle = C('--inward'); ctx.fillText('entering ' + fmt(M.neg), ml + pw - w1 - 16, 15);
+    if (!compact) {
+      const w2 = ctx.measureText('entering ' + fmt(M.neg)).width;
+      ctx.fillStyle = Math.abs(net) < 0.5 ? C('--vel') : C('--ink');
+      ctx.fillText('net ' + fmt(net), ml + pw - w1 - w2 - 32, 15);
+    }
+  }
+  const fmt = v => { const a = Math.abs(v); if (a < 1e-9) return '0'; return (v >= 0 ? '+' : '−') + a.toFixed(a >= 100 ? 0 : a >= 10 ? 1 : 2); };
+
+  // ================================================================
+  // 3. READOUTS, CONTROLS, POINTER
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  function readout() {
+    const qn = M.qEnc / nC;
+    let html = '';
+    html += card('Charge enclosed', qn.toFixed(1) + ' nC/m',
+      M.encCount + ' of ' + st.charges.length + ' charge' + (st.charges.length === 1 ? '' : 's') + ' inside the surface');
+    html += card('Flux, measured', fmt(M.total) + ' N·m/C', 'adding up <i>E</i>·<b>n̂</b> over 720 pieces of the boundary');
+    const ok = M.pred === 0 ? Math.abs(M.total) < 0.5 : Math.abs(M.agree - 1) < 0.01;
+    html += card('Gauss\'s law says', fmt(M.pred) + ' N·m/C',
+      M.pred === 0 ? (ok ? 'nothing enclosed, and the measurement agrees' : 'nothing enclosed')
+        : 'λ<sub>enclosed</sub>/ε₀' + (ok ? ', matched to ' + (Math.abs(M.agree - 1) * 100).toFixed(3) + '%' : ''),
+      ok ? 'ok' : 'no');
+    $('readout').innerHTML = html;
+    $('R_v').textContent = st.R.toFixed(2) + ' m';
+    const sel = st.charges[st.sel];
+    $('q_v').textContent = sel ? sel.q.toFixed(1) + ' nC/m' : 'none selected';
+    $('q').value = sel ? String(sel.q) : '0';
+    $('q').disabled = !sel;
+    $('n_v').textContent = st.charges.length + ' placed';
+    $('del').disabled = !sel; $('clear').disabled = !st.charges.length;
+    $('addp').disabled = $('addn').disabled = st.charges.length >= 6;
+    $('shapeseg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === st.shape)));
+  }
+  function rebuild() { recompute(); readout(); drawScene(); drawAround(); }
+
+  const PRESETS = {
+    one: { shape: 'circle', R: 1, c: [{ x: 0.3, y: -0.15, q: 1 }] },
+    out: { shape: 'circle', R: 1, c: [{ x: 1.8, y: 0.35, q: 2 }] },
+    dip: { shape: 'blob', R: 1, c: [{ x: -0.45, y: 0.1, q: 2 }, { x: 0.45, y: -0.1, q: -2 }] },
+    split: { shape: 'square', R: 1, c: [{ x: -0.35, y: 0, q: 3 }, { x: 1.9, y: 0.3, q: -2 }] }
+  };
+  function preset(k) {
+    const p = PRESETS[k];
+    st.shape = p.shape; st.R = p.R; st.cx = 0; st.cy = 0;
+    st.charges = p.c.map(c => ({ ...c })); st.sel = 0;
+    $('R').value = String(st.R);
+    rebuild();
+  }
+  $('shapeseg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st.shape = b.dataset.s; rebuild(); }));
+  $('preseg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => preset(b.dataset.p)));
+  $('R').addEventListener('input', () => { st.R = +$('R').value; rebuild(); });
+  $('q').addEventListener('input', () => { const c = st.charges[st.sel]; if (c) { c.q = +$('q').value; rebuild(); } });
+  $('addp').addEventListener('click', () => { st.charges.push({ x: -1.6, y: 0.9, q: 1 }); st.sel = st.charges.length - 1; rebuild(); });
+  $('addn').addEventListener('click', () => { st.charges.push({ x: -1.6, y: -0.9, q: -1 }); st.sel = st.charges.length - 1; rebuild(); });
+  $('del').addEventListener('click', () => { if (st.charges[st.sel]) { st.charges.splice(st.sel, 1); st.sel = Math.max(0, st.sel - 1); rebuild(); } });
+  $('clear').addEventListener('click', () => { st.charges = []; st.sel = -1; rebuild(); });
+  $('arrows').addEventListener('change', () => { st.arrows = $('arrows').checked; drawScene(); });
+  $('normals').addEventListener('change', () => { st.normals = $('normals').checked; drawScene(); });
+  window.addEventListener('resize', () => { drawScene(); drawAround(); });
+
+  // dragging: charges first, then the surface handle
+  let drag = null;
+  const toWorld = e => {
+    const r = $('scene').getBoundingClientRect();
+    return { x: (e.clientX - r.left - T.ox) / T.S, y: (T.oy - (e.clientY - r.top)) / T.S };
+  };
+  $('scene').addEventListener('pointerdown', e => {
+    const w = toWorld(e), hit = 18 / T.S;
+    let best = -1, bd = hit;
+    st.charges.forEach((c, i) => { const d = Math.hypot(c.x - w.x, c.y - w.y); if (d < bd) { bd = d; best = i; } });
+    if (best >= 0) { st.sel = best; drag = { kind: 'charge', i: best, dx: st.charges[best].x - w.x, dy: st.charges[best].y - w.y }; }
+    else if (Math.hypot(st.cx - w.x, st.cy - w.y) < Math.max(hit, 0.28 * st.R)) drag = { kind: 'surface', dx: st.cx - w.x, dy: st.cy - w.y };
+    if (drag) { $('scene').setPointerCapture(e.pointerId); e.preventDefault(); rebuild(); }
+  });
+  $('scene').addEventListener('pointermove', e => {
+    if (!drag) return;
+    const w = toWorld(e);
+    const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    if (drag.kind === 'charge') { const c = st.charges[drag.i];
+      c.x = cl(w.x + drag.dx, WORLD.x0 + 0.1, WORLD.x1 - 0.1); c.y = cl(w.y + drag.dy, WORLD.y0 + 0.1, WORLD.y1 - 0.1); }
+    else { st.cx = cl(w.x + drag.dx, -1.2, 1.2); st.cy = cl(w.y + drag.dy, -0.7, 0.7); }
+    rebuild();
+  });
+  ['pointerup', 'pointercancel'].forEach(ev => $('scene').addEventListener(ev, () => { drag = null; }));
+
+  rebuild();
+})();
+</script>
+</body>
+</html>
