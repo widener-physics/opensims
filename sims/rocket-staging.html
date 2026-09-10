@@ -106,7 +106,7 @@
     <label><div class="row"><span>Payload</span><span class="val" id="pay_v"></span></div>
       <input type="range" id="pay" min="0.2" max="8" step="0.1" value="1.5"></label>
     <label id="lab_split"><div class="row"><span>Share of the rocket in the first stage</span><span class="val" id="split_v"></span></div>
-      <input type="range" id="split" min="40" max="95" step="1" value="80"></label>
+      <input type="range" id="split" min="40" max="98" step="0.1" value="80"></label>
     <label><div class="row"><span>Structure as a share of each stage</span><span class="val" id="eps_v"></span></div>
       <input type="range" id="eps" min="0.03" max="0.25" step="0.005" value="0.07"></label>
     <label><div class="row"><span>Exhaust speed, first stage</span><span class="val" id="ve1_v"></span></div>
@@ -125,7 +125,13 @@
     <p><b>What to try.</b> Start with two stages, then switch to one and watch the total collapse: the same 500 metric tons of hardware and fuel
       loses roughly three kilometres per second, because the single stage has to drag its whole empty structure all the way to burnout.
       Then push the structure slider up towards 0.25, the sort of number a steel water tank would give, and see even the two-stage rocket
-      fall short. Press "best split" to find the division that gets the most out of a given rocket, and notice it is nowhere near half and half.</p>
+      fall short. Press "best split" to find the division that gets the most out of a given rocket. The masses come out lopsided, around 89% in the
+      first stage, but that is exactly what makes the two stages contribute the same Δv, which is where the maximum sits. The first stage has
+      to be far bigger because it carries the second stage as part of its payload.</p>
+    <p><b>When equal Δv is the answer, and when it is not.</b> Splitting a rocket so that each stage supplies the same Δv is optimal only when
+      the stages are alike: same exhaust speed, same structure fraction, and no gravity loss. Give the upper stage a better engine and the
+      optimum shifts towards letting it do more of the work; turn gravity losses on and it shifts the other way, because the first stage loses
+      far more to gravity than the second. The readout says which case you are in, and the sim finds the true maximum numerically either way.</p>
     <p><b>About the climb angles.</b> Gravity steals <i>g</i> sin γ for every second the engine burns, where γ is how steeply the rocket is
       climbing. Set the second stage to 0° and its loss disappears: that is why a launcher pitches over early and spends its upper-stage burn
       flying almost sideways. Set it to 90° instead and the same rocket cannot reach orbit at all.</p>
@@ -181,8 +187,13 @@
   }
   function bestSplit(stages, grav) {
     let best = -1, bs = 80;
-    for (let s = 40; s <= 95; s += 0.25) { const t = build(stages, grav, s).total; if (t > best) { best = t; bs = s; } }
-    return { split: bs, total: best };
+    for (let s = 40; s <= 98; s += 0.02) { const t = build(stages, grav, s).total; if (t > best) { best = t; bs = s; } }
+    const at = build(stages, grav, bs);
+    // With equal exhaust speeds, equal structure fractions and no gravity loss, the maximum sits exactly
+    // where the two stages contribute the same delta-v. Anything that makes the stages differ moves it.
+    const d = at.out.map(o => o.dv);
+    const even = d.length === 2 && Math.abs(d[0] - d[1]) / Math.max(d[0], d[1]) < 0.02;
+    return { split: bs, total: best, dv: d, even };
   }
   const target = () => st.grav ? 8400 : 9400;
   let M, Malt, Mbest;
@@ -349,11 +360,14 @@
     const short = M.total - target();
     html += grounded ? card('Total', 'nothing', 'raise the thrust-to-weight ratio above 1 to get off the ground', 'no') : card('Total', km(M.total),
       (short >= 0 ? km(short) + ' more than it needs for orbit' : km(-short) + ' short of orbit') +
-      '. Payload ' + t2(M.mPay) + (M.stages === 2 ? '. Best split gives ' + km(Mbest.total) : ''),
+      '. Payload ' + t2(M.mPay) + (M.stages !== 2 ? '' :
+        '. Best split is ' + Mbest.split.toFixed(1) + '% for ' + km(Mbest.total) +
+        (Mbest.even ? ', where the two stages contribute the same Δv, ' + km(Mbest.dv[0])
+          : ', with the stages contributing ' + Mbest.dv.map(v => (v / 1000).toFixed(2)).join(' and ') + ' km/s')),
       short >= 0 ? 'ok' : 'no');
     $('readout').innerHTML = html;
     $('pay_v').textContent = st.pay.toFixed(1) + '% = ' + t2(st.pay / 100 * MTOT);
-    $('split_v').textContent = st.split + '% (' + t2(M.m1) + ' / ' + t2(M.m2) + ')';
+    $('split_v').textContent = st.split.toFixed(1) + '% (' + t2(M.m1) + ' / ' + t2(M.m2) + ')';
     $('eps_v').textContent = (st.eps * 100).toFixed(1) + '% structure';
     $('ve1_v').textContent = st.ve1 + ' m/s (Isp ' + (st.ve1 / G0).toFixed(0) + ' s)';
     $('ve2_v').textContent = st.ve2 + ' m/s (Isp ' + (st.ve2 / G0).toFixed(0) + ' s)';
@@ -370,7 +384,7 @@
   function rebuild() { recompute(); readout(); drawStack(); drawTrace(); }
   $('stageseg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st.stages = +b.dataset.s; rebuild(); }));
   $('grav').addEventListener('change', () => { st.grav = $('grav').checked; rebuild(); });
-  $('best').addEventListener('click', () => { st.split = Math.round(Mbest.split); $('split').value = String(st.split); rebuild(); });
+  $('best').addEventListener('click', () => { st.split = Math.round(Mbest.split * 10) / 10; $('split').value = String(st.split); rebuild(); });
   ['pay', 'split', 'eps', 've1', 've2', 'psi', 'g1', 'g2'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; rebuild(); }));
   window.addEventListener('resize', () => { drawStack(); drawTrace(); });
   rebuild();
