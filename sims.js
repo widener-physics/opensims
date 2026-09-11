@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'laser',
+    title: 'How a laser works',
+    topic: 'modern',
+    tags: ['stimulated emission', 'population inversion', 'threshold', 'optical cavity', 'energy levels'],
+    blurb: 'One atom first: absorption, spontaneous emission, and stimulated emission making a copy of the photon that caused it. Then a tube of atoms between mirrors, where a two-level scheme can never lase, three levels need a hard push, and four levels light up easily.',
+    level: 'intermediate',
+    added: '2026-09-08',
+    status: 'beta'
+  },
+  {
     slug: 'gauss-law',
     title: "Gauss's law",
     topic: 'em',
