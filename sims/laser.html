@@ -133,7 +133,7 @@
       <input type="range" id="rate" min="0.2" max="3" step="0.1" value="1.5"></label>
   </div>
   <div class="toggles">
-    <label id="lab_pumpon"><input type="checkbox" id="pumpon"> keep the atom pumped</label>
+    <label id="lab_pumpon"><input type="checkbox" id="pumpon"> shine pump light on it</label>
     <label><input type="checkbox" id="labels" checked> label each event as it happens</label>
   </div>
 
@@ -175,8 +175,8 @@
 
   // world box for the tube, in arbitrary units
   const TUBE = { x0: 0.05, x1: 0.95, y0: 0.36, y1: 0.64 };
-  let atoms = [], grid = new Map(), photons = [], flashes = [], tally = { abs: 0, spon: 0, stim: 0 };
-  let outMirror = 0, outSide = 0, hist = [], time = 0, emitAcc = 0;
+  let atoms = [], grid = new Map(), photons = [], flashes = [], tally = { abs: 0, spon: 0, stim: 0, pumped: 0 };
+  let outMirror = 0, outSide = 0, hist = [], time = 0, emitAcc = 0, pumpAcc = 0;
 
   function reset() {
     const S = SCH();
@@ -191,8 +191,8 @@
     }
     grid = new Map();
     atoms.forEach((a, i) => { const c = Math.floor(a.x / CELL); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(i); });
-    photons = []; flashes = []; tally = { abs: 0, spon: 0, stim: 0 };
-    outMirror = 0; outSide = 0; hist = []; time = 0; emitAcc = 0;
+    photons = []; flashes = []; tally = { abs: 0, spon: 0, stim: 0, pumped: 0 };
+    outMirror = 0; outSide = 0; hist = []; time = 0; emitAcc = 0; pumpAcc = 0;
     void S;
   }
 
@@ -202,8 +202,7 @@
     // --- atoms ---
     for (const a of atoms) {
       if (st.tab === 1) {
-        // pump at the same rate the atom decays, so it spends about half its time up whatever the lifetime
-        if (st.pumpon && a.L === S.pumpFrom && Math.random() < dt / st.tau) { a.L = S.pumpTo; continue; }
+        // on this tab the pump is a visible beam of pump photons, handled in the photon loop
       } else {
         if (a.L === S.pumpFrom && Math.random() < st.pump * dt) { a.L = S.pumpTo; continue; }
         if (st.k === 2 && a.L === S.pumpTo && Math.random() < st.pump * dt) { a.L = S.pumpFrom; continue; }
@@ -214,14 +213,18 @@
       if (a.L === S.upper && Math.random() < dt / st.tau) {                 // spontaneous
         a.L = S.lower; tally.spon++;
         const th = rnd(0, Math.PI * 2);
-        addPhoton(a.x, a.y, Math.cos(th), Math.sin(th), 'spon', a.id);
+        addPhoton(a.x, a.y, Math.cos(th), Math.sin(th), 'spon', a.id, 'laser');
         flashes.push({ x: a.x, y: a.y, t: 0, kind: 'spontaneous' });
       }
     }
-    // --- photons arriving from the left, tab 1 only ---
+    // --- tab 1: laser-transition photons from the left, pump photons from above ---
     if (st.tab === 1) {
       emitAcc += st.beam * dt;
-      while (emitAcc > 1) { emitAcc -= 1; addPhoton(0.02, 0.5, 1, 0, 'in'); }
+      while (emitAcc > 1) { emitAcc -= 1; addPhoton(0.02, 0.5, 1, 0, 'in', -1, 'laser'); }
+      if (st.pumpon) {
+        pumpAcc += 1.3 * dt;
+        while (pumpAcc > 1) { pumpAcc -= 1; addPhoton(atoms[0].x, 1.04, 0, -1, 'in', -1, 'pump'); }
+      }
     }
     // --- photons ---
     const speed = st.tab === 1 ? 0.5 : SPEED;
@@ -242,6 +245,25 @@
         const dx = a.x - p.x, dy = a.y - p.y;
         if (dx * dx + dy * dy > 0.0016) continue;
         if (a.id === p.skip) continue;                              // just came from this atom
+        if (p.type === 'pump') {
+          // A pump photon acts on the pump transition. In a two-level atom that is the same transition
+          // as the laser one, so pump light can knock the atom down as well as lift it up, which is
+          // exactly why a two-level scheme can never build an inversion.
+          if (a.L === S.pumpFrom && Math.random() < sig * dt) {
+            a.L = S.pumpTo; tally.pumped++;
+            flashes.push({ x: a.x, y: a.y, t: 0, kind: 'pumped' });
+            photons.splice(i, 1);
+            break;
+          }
+          if (st.k === 2 && a.L === S.pumpTo && Math.random() < sig * dt) {
+            a.L = S.pumpFrom; tally.stim++;
+            p.skip = a.id;
+            addPhoton(a.x + p.vx * 0.045 - p.vy * 0.016, a.y + p.vy * 0.045 + p.vx * 0.016, p.vx, p.vy, 'stim', a.id, 'pump');
+            flashes.push({ x: a.x, y: a.y, t: 0, kind: 'stimulated' });
+            break;
+          }
+          continue;                                                 // otherwise it passes straight by
+        }
         if (a.L === S.upper && Math.random() < sig * dt) {
           a.L = S.lower; tally.stim++;                     // the atom drops to the lower level
           p.skip = a.id;
@@ -284,11 +306,11 @@
       if (hist.length > 500) hist.shift();
     }
   }
-  function addPhoton(x, y, vx, vy, kind, skip) {
+  function addPhoton(x, y, vx, vy, kind, skip, type) {
     if (photons.length >= CAP) return;
     // `skip` is the atom this photon has just come from: it must leave that atom's neighbourhood
     // before it can interact with it again, otherwise one photon ping-pongs on a single atom.
-    photons.push({ x, y, vx, vy, kind, age: 0, skip: skip === undefined ? -1 : skip });
+    photons.push({ x, y, vx, vy, kind, age: 0, skip: skip === undefined ? -1 : skip, type: type || 'laser' });
   }
   const pops = () => { const S = SCH(), p = new Array(S.n).fill(0); atoms.forEach(a => p[a.L]++); return p; };
 
@@ -378,14 +400,14 @@
     // photons, drawn over the atoms so a newly made one is never hidden underneath
     photons.forEach(p => {
       const L = 9;
-      ctx.strokeStyle = C('--photon'); ctx.lineWidth = 2.2; ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = C(p.type === 'pump' ? '--pumplight' : '--photon'); ctx.lineWidth = 2.2; ctx.globalAlpha = 0.9;
       ctx.beginPath(); ctx.moveTo(X(p.x) - p.vx * L, Y(p.y) - p.vy * L); ctx.lineTo(X(p.x), Y(p.y)); ctx.stroke();
     });
     ctx.globalAlpha = 1;
 
     // event flashes
     if (st.labels) {
-      const kindColor = k => k === 'stimulated' ? C('--vel') : k === 'absorbed' ? C('--body') : C('--ghost');
+      const kindColor = k => k === 'stimulated' ? C('--vel') : k === 'absorbed' ? C('--body') : k === 'pumped' ? C('--pumplight') : C('--ghost');
       flashes.forEach(f => {
         const a = 1 - f.t / 0.5;
         ctx.strokeStyle = kindColor(f.kind); ctx.globalAlpha = st.tab === 1 ? a : a * 0.6;
@@ -398,7 +420,8 @@
         const f = flashes.reduce((m, x) => x.t < m.t ? x : m, flashes[0]);
         ctx.globalAlpha = Math.min(1, 2.5 * (1 - f.t / 0.5));
         ctx.fillStyle = kindColor(f.kind); ctx.font = '13px ' + C('--sans'); ctx.textAlign = 'center';
-        const wording = f.kind === 'stimulated' ? 'stimulated: two photons leave' : f.kind === 'absorbed' ? 'absorbed: the atom jumps up' : 'spontaneous: one photon, random direction';
+        const wording = f.kind === 'stimulated' ? 'stimulated: two photons leave' : f.kind === 'absorbed' ? 'absorbed: the atom jumps up'
+          : f.kind === 'pumped' ? 'pump photon absorbed: up to the pump level' : 'spontaneous: one photon, random direction';
         ctx.fillText(wording, X(f.x), Y(f.y) - 40);
         ctx.globalAlpha = 1;
       }
@@ -465,12 +488,12 @@
     const pw = W - ml - mr, ph = H - mt - mb;
     if (st.tab === 1) {
       // event tally instead of a trace
-      const rows = [['absorbed', tally.abs, '--body'], ['spontaneous', tally.spon, '--ghost'], ['stimulated', tally.stim, '--vel']];
+      const rows = [['pumped', tally.pumped, '--pumplight'], ['absorbed', tally.abs, '--body'], ['spontaneous', tally.spon, '--ghost'], ['stimulated', tally.stim, '--vel']];
       const ml2 = compact ? 74 : 92, pw2 = W - ml2 - mr;
       const mxv = Math.max(1, ...rows.map(r => r[1]));
       ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('what has happened so far', 8, 15);
       rows.forEach(([name, v, col], i) => {
-        const y = mt + i * (ph / 3) + 6, h = Math.min(26, ph / 3 - 14);
+        const y = mt + i * (ph / rows.length) + 5, h = Math.min(22, ph / rows.length - 12);
         ctx.fillStyle = C('--soft'); ctx.fillRect(ml2, y, pw2, h);
         ctx.fillStyle = C(col); ctx.fillRect(ml2, y, pw2 * v / mxv, h);
         ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(name, ml2 - 6, y + h / 2 + 4);
@@ -508,8 +531,8 @@
   }
   const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
   const TEXT = {
-    1: { lede: 'One atom, and light going past it. If the atom is in its ground state it can swallow a photon and jump up. If it is already excited it will drop on its own after a random wait, throwing its photon in a random direction. But if a photon goes past while it is excited, the atom is knocked down early and emits a copy: same direction, same energy. That copying is what a laser is built on.',
-         notes: '<p><b>What to try.</b> Tick "keep the atom pumped" and turn the incoming photons down to nothing. The atom lights up at random moments and its photons fly off in every direction, which is what a light bulb does. Now turn the photon stream back up and watch how often two photons leave together in the same direction. Count the tally: as the beam gets stronger, stimulated emission overtakes spontaneous, and the light coming out starts to remember which way it was going.</p>' },
+    1: { lede: 'One atom, with two beams of light. Orange photons from the left act on the laser transition: they can be swallowed, or, if the atom is already excited, knock it down early and leave as two identical photons. Purple photons from above are the pump, which lifts the atom to its top level. Turn the pump on and change the number of levels to see why the choice of scheme decides whether a laser is possible at all.',
+         notes: '<p><b>What to try.</b> With the pump on and the orange beam turned down to nothing, the atom lights up at random moments and throws its photons in every direction, which is what a lamp does. Turn the orange beam back up and watch how often two photons leave together, going the same way.</p><p><b>Now change the number of levels and watch the absorbed count.</b> With two levels, the pump light and the laser light are the same transition, so every purple photon that lifts the atom up can equally well knock it back down; you will see pump photons being copied too. With three levels the laser photons are readily swallowed, because the lower laser level is the ground state where the atom spends much of its time. With four levels the absorbed count stays at zero: the lower laser level empties so fast that there is nothing there to absorb a laser photon. That is the whole reason four-level lasers are easy to run and two-level ones are impossible.</p>' },
     2: { lede: 'Now a tube full of atoms between two mirrors. The pump lifts atoms to the top level, they fall to the metastable one and wait there. Photons that happen to travel along the tube get reflected back and forth, and each pass triggers more copies of themselves. Turn the pump up and at some point the copying outruns the losses, and the trickle of scattered light turns into a beam.',
          notes: '<p><b>What to try.</b> Start with four levels and raise the pump slowly. Below threshold the photons are few and scatter out of the sides; above it the cavity fills, the inversion stops rising because stimulated emission is now emptying the upper level as fast as the pump fills it, and a beam appears through the output mirror. Then switch to two levels and turn the pump to maximum. Nothing happens, ever: the same light that lifts an atom up also knocks it down, so the best you can reach is half and half, and half is not enough. Three levels do lase, but only after a much harder push, because you have to get more than half the atoms up before the ground state stops absorbing more than the upper level emits.</p><p>Drop the output mirror to 30% and the beam dies even at full pump: the light leaves faster than it can be amplified. That balance, gain against loss per round trip, is what threshold means.</p>' }
   };
