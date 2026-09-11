@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<!--
+  Forces in one dimension - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; the friction logic was checked
+  against hand calculations: static friction matching the applied force up to mu_s N, the drop to mu_k N
+  on breaking free, deceleration of exactly mu_k g after release, and constant velocity with friction off.
+  Credit: replaces the idea of PhET's discontinued Java "Forces in 1 Dimension" simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forces in one dimension</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --applied: #1D4F73; --friction: #B5306D; --net: #C8321E; --normal: #5C6B73; --weight: #D9651B;
+    --crate: #7A4B22; --floor: #4A5A63;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 66ch; min-height: 3em; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-width: 0; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 270; }
+  #graphs { aspect-ratio: 900 / 430; margin-top: 12px; }
+  #fric { aspect-ratio: 900 / 360; margin-top: 12px; }
+  [hidden] { display: none !important; }
+
+  .push { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; margin-top: 12px;
+    padding: 14px 18px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; font-family: var(--sans); font-size: 14px; }
+  .push .lbl { color: var(--muted); white-space: nowrap; }
+  .push .val { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 17px; }
+  .push input[type=range] { width: 100%; }
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); } .readout .no { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 4 / 3; }
+    #graphs { aspect-ratio: 3 / 4; }
+    #fric { aspect-ratio: 1 / 1; }
+    .push { grid-template-columns: 1fr auto; }
+    .push input[type=range] { grid-column: 1 / -1; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Forces in one dimension</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Push the crate</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>How friction responds</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <canvas id="scene"></canvas>
+
+  <div class="push">
+    <span class="lbl">Your push</span>
+    <input type="range" id="F" min="-500" max="500" step="1" value="0" aria-label="Applied force">
+    <span class="val"><span id="F_v">0</span> N<br><span id="Frange" style="font-size:12px;color:var(--muted)"></span></span>
+  </div>
+  <div class="row2">
+    <button id="play">Pause</button>
+    <button id="reset" class="secondary">Reset</button>
+    <button id="shove" class="secondary">give it a shove</button>
+    <button id="letgo" class="secondary">let go</button>
+    <label><input type="checkbox" id="fric" checked> friction</label>
+    <label><input type="checkbox" id="fbd" checked> free-body arrows</label>
+  </div>
+
+  <canvas id="graphs"></canvas>
+  <canvas id="fric_c" hidden></canvas>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label><div class="row"><span>Mass of the crate</span><span class="val" id="m_v"></span></div>
+      <input type="range" id="m" min="5" max="200" step="5" value="50"></label>
+    <label><div class="row"><span>Static friction coefficient μ<sub>s</sub></span><span class="val" id="mus_v"></span></div>
+      <input type="range" id="mus" min="0" max="1" step="0.05" value="0.5"></label>
+    <label><div class="row"><span>Kinetic friction coefficient μ<sub>k</sub></span><span class="val" id="muk_v"></span></div>
+      <input type="range" id="muk" min="0" max="1" step="0.05" value="0.3"></label>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G = 9.8;
+
+  const st = { tab: 1, F: 0, m: 50, mus: 0.5, muk: 0.3, fric: true, fbd: true, playing: true,
+    x: 0, v: 0, a: 0, f: 0, regime: 'at rest', t: 0, shoveUntil: -1 };
+  let hist = [];
+
+  // ================================================================
+  // 1. MODEL
+  //    Newton's second law along one axis, with Coulomb friction on a level floor:
+  //      N = mg
+  //      at rest:   static friction matches the push exactly, f = -F, while |F| <= mu_s N
+  //                 once |F| passes mu_s N the crate breaks free and friction drops to mu_k N
+  //      sliding:   f = -sign(v) mu_k N, always opposing the motion
+  //      a = (F + f) / m
+  //    A crate that is slowing down stops rather than being dragged backwards by friction:
+  //    if v changes sign in a step and the push cannot overcome static friction, v is set to zero.
+  // ================================================================
+  function step(dt) {
+    const F = st.shoveUntil > st.t ? shoveForce() : st.F;
+    const N = st.m * G;
+    const fsMax = st.fric ? st.mus * N : 0, fk = st.fric ? st.muk * N : 0;
+    const moving = Math.abs(st.v) > 1e-6;
+    let f;
+    if (!moving) {
+      if (Math.abs(F) <= fsMax) {
+        st.f = -F; st.a = 0; st.regime = F === 0 ? 'at rest' : 'held still by static friction';
+        record(F, -F); st.t += dt; return;
+      }
+      f = -Math.sign(F) * fk;
+      st.regime = 'sliding';
+    } else {
+      f = -Math.sign(st.v) * fk;
+      st.regime = 'sliding';
+    }
+    st.f = f;
+    st.a = (F + f) / st.m;
+    const vNew = st.v + st.a * dt;
+    if (moving && Math.sign(vNew) !== Math.sign(st.v) && Math.abs(F) <= fsMax) {
+      st.v = 0; st.a = 0; st.f = -F; st.regime = 'stopped, now held by static friction';
+      record(F, -F); st.t += dt; return;
+    }
+    st.v = vNew; st.x += st.v * dt;
+    record(F, f); st.t += dt;
+  }
+  let sampleAcc = 0;
+  function record(F, f) {
+    sampleAcc += 1;
+    if (sampleAcc % 6) return;                       // about 40 samples a second
+    hist.push({ t: st.t, F, f, net: F + f, a: st.a, v: st.v, x: st.x });
+    if (hist.length > 700) hist.shift();
+  }
+  function reset() {
+    st.x = 0; st.v = 0; st.a = 0; st.f = 0; st.t = 0; st.regime = 'at rest'; st.shoveUntil = -1;
+    st.F = 0; $('F').value = '0';
+    hist = [];
+  }
+  const fsMax = () => (st.fric ? st.mus : 0) * st.m * G;
+  const fkVal = () => (st.fric ? st.muk : 0) * st.m * G;
+  const shoveForce = () => Math.max(420, 1.6 * st.mus * st.m * G);
+  const curF = () => (st.shoveUntil > st.t ? shoveForce() : st.F);
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(11, L * 0.5);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2.6;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.75, y1 - uy * hd * 0.75); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45);
+    ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+  }
+  const N1 = v => (v >= 0 ? '' : '−') + Math.abs(v).toFixed(0) + ' N';
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const span = compact ? 8 : 14;                    // meters across the view
+    const S = W / span, floorY = Math.round(H * 0.62);
+    const X = x => W / 2 + (x - st.x) * S;
+    // floor, with the meter scale along the bottom edge
+    ctx.fillStyle = C('--soft'); ctx.fillRect(0, floorY, W, H - floorY);
+    ctx.strokeStyle = C('--floor'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(W, floorY); ctx.stroke();
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.strokeStyle = 'rgba(23,33,40,0.3)'; ctx.lineWidth = 1;
+    for (let x = Math.floor(st.x - span / 2); x <= st.x + span / 2; x++) {
+      const px = X(x); if (px < -20 || px > W + 20) continue;
+      ctx.beginPath(); ctx.moveTo(px, H - 22); ctx.lineTo(px, H - 16); ctx.stroke();
+      if (x % (compact ? 2 : 1) === 0) ctx.fillText(x + ' m', px, H - 4);
+    }
+    // where it started
+    ctx.strokeStyle = C('--rule'); ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(X(0), 30); ctx.lineTo(X(0), floorY); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = C('--muted'); ctx.fillText('start', X(0), 24);
+    // crate, sized a little by its mass
+    const side = (compact ? 34 : 44) * Math.pow(st.m / 50, 1 / 3);
+    const cx = W / 2, cy = floorY - side / 2;
+    ctx.fillStyle = C('--crate'); ctx.fillRect(cx - side / 2, floorY - side, side, side);
+    ctx.fillStyle = '#fff'; ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'center';
+    ctx.fillText(st.m + ' kg', cx, cy + 4);
+
+    if (st.fbd) {
+      const F = curF(), N = st.m * G;
+      // Horizontal arrows use a fixed number of pixels per newton, set only by the crate and the
+      // surface. It must not depend on the current push: if it did, a constant friction force would
+      // appear to shrink whenever you pushed harder. The vertical pair always cancels on a level
+      // floor, so it is drawn at a fixed length and labeled instead of being scaled with the rest.
+      const ref = Math.max(250, st.fric ? st.mus * N : 0);
+      const hScale = (compact ? 46 : 74) / ref;
+      const VLEN = compact ? 26 : 34;
+      if (Math.abs(F) > 0.5) {
+        arrow(ctx, cx, cy - 6, cx + F * hScale, cy - 6, C('--applied'));
+        ctx.fillStyle = C('--applied'); ctx.textAlign = F > 0 ? 'left' : 'right';
+        ctx.fillText('push ' + N1(F), cx + F * hScale + (F > 0 ? 7 : -7), cy - 12);
+      }
+      if (Math.abs(st.f) > 0.5) {
+        arrow(ctx, cx, cy + 8, cx + st.f * hScale, cy + 8, C('--friction'));
+        ctx.fillStyle = C('--friction'); ctx.textAlign = st.f > 0 ? 'left' : 'right';
+        ctx.fillText('friction ' + N1(st.f), cx + st.f * hScale + (st.f > 0 ? 7 : -7), cy + 22);
+      }
+      // the vertical pair, parked clear of the crate so it never collides with the push arrow
+      const vx = compact ? 30 : 54, vy = floorY - 14;
+      arrow(ctx, vx, vy, vx, vy - VLEN, C('--normal'), 2.2);
+      arrow(ctx, vx + 16, vy - VLEN, vx + 16, vy, C('--weight'), 2.2);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = C('--normal'); ctx.fillText('normal ' + N1(N), vx + 30, vy - VLEN + 6);
+      ctx.fillStyle = C('--weight'); ctx.fillText('weight ' + N1(N), vx + 30, vy - VLEN + 20);
+      if (!compact) { ctx.fillStyle = C('--muted'); ctx.fillText('equal and opposite, so they cancel', vx - 4, vy - VLEN - 8); }
+    }
+    // a reference bar, so an arrow's length can be read as a number of newtons
+    if (st.fbd) {
+      const ref = Math.max(250, st.fric ? st.mus * st.m * G : 0);
+      const hScale = (compact ? 46 : 74) / ref;
+      const barN = ref >= 800 ? 500 : ref >= 400 ? 200 : 100;
+      const bx = W - (compact ? 16 : 24), by = 48;
+      ctx.strokeStyle = C('--muted'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(bx - barN * hScale, by); ctx.lineTo(bx, by); ctx.stroke();
+      [0, 1].forEach(e => { const x = bx - (1 - e) * barN * hScale;
+        ctx.beginPath(); ctx.moveTo(x, by - 4); ctx.lineTo(x, by + 4); ctx.stroke(); });
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.font = '11px ' + C('--sans');
+      ctx.fillText('this long = ' + barN + ' N', bx, by - 8);
+    }
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillText(st.regime, 10, 18);
+    ctx.textAlign = 'right';
+    ctx.fillText('t = ' + st.t.toFixed(1) + ' s', W - 10, 18);
+  }
+
+  // four stacked traces sharing a time axis
+  function drawGraphs() {
+    const { ctx, W, H, compact } = fit($('graphs'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '11px ' + C('--sans');
+    const ml = compact ? 46 : 62, mr = 12, mt = 8, mb = 20;
+    const rows = [
+      { title: 'force (N)', series: [['F', '--applied', 'your push'], ['f', '--friction', 'friction'], ['net', '--net', 'net force']] },
+      { title: 'acceleration (m/s²)', series: [['a', '--net', '']] },
+      { title: 'velocity (m/s)', series: [['v', '--vel', '']] },
+      { title: 'position (m)', series: [['x', '--body', '']] }
+    ];
+    const rh = (H - mt - mb) / rows.length;
+    const tNow = Math.max(st.t, 8), t0 = Math.max(0, tNow - 8), t1 = t0 + 8;
+    const X = t => ml + (t - t0) / (t1 - t0) * (W - ml - mr);
+    rows.forEach((row, i) => {
+      const top = mt + i * rh, bot = top + rh - 8;
+      let lo = 0, hi = 0;
+      hist.forEach(h => row.series.forEach(([k]) => { lo = Math.min(lo, h[k]); hi = Math.max(hi, h[k]); }));
+      const pad = Math.max((hi - lo) * 0.15, 1e-6) || 1;
+      lo -= pad; hi += pad;
+      if (hi - lo < 1e-9) { lo = -1; hi = 1; }
+      const Y = v => bot - (v - lo) / (hi - lo) * (bot - top);
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(ml, top, W - ml - mr, bot - top);
+      if (lo < 0 && hi > 0) { ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.moveTo(ml, Y(0)); ctx.lineTo(W - mr, Y(0)); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      ctx.fillText(hi.toFixed(Math.abs(hi) < 10 ? 1 : 0), ml - 5, top + 9);
+      ctx.fillText(lo.toFixed(Math.abs(lo) < 10 ? 1 : 0), ml - 5, bot - 2);
+      ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText(row.title, ml + 5, top + 11);
+      let lx = ml + 5 + ctx.measureText(row.title).width + 14;
+      row.series.forEach(([k, col, name]) => {
+        ctx.strokeStyle = C(col); ctx.lineWidth = 1.8; ctx.beginPath();
+        let started = false;
+        hist.forEach(h => { if (h.t < t0) return; const px = X(h.t), py = Y(h[k]);
+          started ? ctx.lineTo(px, py) : ctx.moveTo(px, py); started = true; });
+        ctx.stroke();
+        if (name && !compact) { ctx.fillStyle = C(col); ctx.fillRect(lx, top + 4, 10, 3);
+          ctx.fillText(name, lx + 14, top + 11); lx += 14 + ctx.measureText(name).width + 14; }
+      });
+    });
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    ctx.fillText('the last 8 seconds', (ml + W - mr) / 2, H - 5);
+  }
+
+  // friction against the size of the push
+  function drawFriction() {
+    const { ctx, W, H, compact } = fit($('fric_c'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const ml = 64, mr = 20, mt = 30, mb = 40;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    const N = st.m * G, fs = st.mus * N, fk = st.muk * N;
+    const xMax = Math.max(fs * 1.6, 60), yMax = Math.max(fs * 1.25, 40);
+    const X = v => ml + v / xMax * pw, Y = v => mt + ph - v / yMax * ph;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(ml, mt, pw, ph);
+    // the curve: friction rises to match the push, then drops to the kinetic value and stays there
+    ctx.strokeStyle = C('--friction'); ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(fs), Y(fs)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X(fs), Y(fk)); ctx.lineTo(X(xMax), Y(fk)); ctx.stroke();
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(181,48,109,0.5)';
+    ctx.beginPath(); ctx.moveTo(X(fs), Y(fs)); ctx.lineTo(X(fs), Y(fk)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = C('--friction');
+    ctx.beginPath(); ctx.arc(X(fs), Y(fs), 4, 0, Math.PI * 2); ctx.fill();
+    // labels
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--muted');
+    if (!compact) {
+      ctx.fillText('static: friction grows to match you', X(fs * 0.08), Y(fs * 0.75));
+    }
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+    ctx.fillText('breaks free at ' + fs.toFixed(0) + ' N', X(fs), Y(fs) - 12);
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--muted');
+    ctx.fillText('sliding: fixed at ' + fk.toFixed(0) + ' N', X(fs) + 10, Y(fk) - 10);
+    // axes
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let v = 0; v <= xMax; v += Math.max(50, Math.round(xMax / 5 / 50) * 50)) ctx.fillText(v.toFixed(0), X(v), mt + ph + 16);
+    ctx.fillText('how hard you push (N)', ml + pw / 2, H - 8);
+    ctx.save(); ctx.translate(16, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('friction force (N)', 0, 0); ctx.restore();
+    ctx.textAlign = 'right';
+    for (let v = 0; v <= yMax; v += Math.max(50, Math.round(yMax / 4 / 50) * 50)) ctx.fillText(v.toFixed(0), ml - 6, Y(v) + 4);
+    // where you are now
+    const F = Math.abs(curF()), f = Math.abs(st.f);
+    ctx.fillStyle = C('--net');
+    ctx.beginPath(); ctx.arc(X(Math.min(F, xMax)), Y(Math.min(f, yMax)), 6, 0, Math.PI * 2); ctx.fill();
+    ctx.textAlign = 'left'; ctx.fillText('you are here', X(Math.min(F, xMax)) + 10, Y(Math.min(f, yMax)) + 4);
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  const TEXT = {
+    1: { lede: 'Push the crate by dragging the slider while it runs, and watch the graphs build up underneath. The thing to notice is that the force graph and the velocity graph look nothing like each other: a steady push does not give a steady speed, it gives a steady increase in speed. Let go and see what happens next.',
+         notes: '<p><b>What to try.</b> Turn friction off, push with a constant force, then let go. The crate does not slow down at all: with nothing left to push it, it keeps the speed it had, which is Newton’s first law and the hardest thing about this topic to believe. Turn friction back on and repeat; now the velocity graph slopes back down to zero at exactly μ<sub>k</sub><i>g</i>.</p><p>Then start from rest and creep the push up slowly. For a while nothing moves at all, and the friction trace sits as a mirror image of your push. Keep going and the crate suddenly lurches: the second screen shows why.</p>' },
+    2: { lede: 'The same crate, but plotted differently: how hard friction pushes back against how hard you push. While the crate is still, friction matches you exactly, point for point along the diagonal. It can only do that up to μ\ₛ times the normal force. Past that the crate breaks free and friction drops to the smaller sliding value, which is why a stuck object lurches once it finally moves.',
+         notes: '<p><b>What to try.</b> Move the push slider slowly and watch the red dot climb the diagonal. At the top it falls off the cliff to the flat line below, and in the scene above the crate takes off. Now bring the push back down: the dot stays on the flat line, because the crate is still sliding and sliding friction does not care how hard you push.</p><p>Set μ<sub>k</sub> equal to μ<sub>s</sub> and the cliff disappears, along with the lurch. That gap between the two coefficients is the whole reason it is harder to start something moving than to keep it moving.</p>' }
+  };
+  function readout() {
+    const F = curF(), net = F + st.f;
+    let html = '';
+    html += card('Net force', N1(net), 'your push ' + N1(F) + ' plus friction ' + N1(st.f), Math.abs(net) < 0.5 ? '' : '');
+    html += card('Acceleration', st.a.toFixed(2) + ' m/s²', 'a = net force ÷ mass = ' + N1(net) + ' ÷ ' + st.m + ' kg');
+    html += card('Velocity', st.v.toFixed(2) + ' m/s', st.regime + ', at ' + st.x.toFixed(2) + ' m from the start',
+      Math.abs(st.v) > 0.01 ? 'ok' : '');
+    $('readout').innerHTML = html;
+    $('F_v').textContent = curF().toFixed(0);
+    $('Frange').textContent = 'slider reaches ' + $('F').max + ' N';
+    $('m_v').textContent = st.m + ' kg (weight ' + (st.m * G).toFixed(0) + ' N)';
+    $('mus_v').textContent = st.mus.toFixed(2) + (st.fric ? ', breaks free at ' + fsMax().toFixed(0) + ' N' : '');
+    $('muk_v').textContent = st.muk.toFixed(2) + (st.fric ? ', sliding friction ' + fkVal().toFixed(0) + ' N' : '');
+  }
+  function setTab(n) {
+    st.tab = n;
+    [1, 2].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
+    $('graphs').hidden = n !== 1; $('fric_c').hidden = n !== 2;
+    draw();
+  }
+  function draw() { drawScene(); if (st.tab === 1) drawGraphs(); else drawFriction(); }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  $('F').addEventListener('input', () => { st.F = +$('F').value; st.shoveUntil = -1; readout(); });
+  function fitForceRange() {
+    // the slider has to be able to reach past the break-free force, or a heavy crate could never move
+    const need = Math.max(500, Math.ceil(1.35 * st.mus * st.m * G / 50) * 50);
+    $('F').min = String(-need); $('F').max = String(need);
+    if (Math.abs(st.F) > need) { st.F = Math.sign(st.F) * need; $('F').value = String(st.F); }
+  }
+  ['m', 'mus', 'muk'].forEach(id => $(id).addEventListener('input', () => {
+    st[id] = +$(id).value;
+    if (st.muk > st.mus) { st.muk = st.mus; $('muk').value = String(st.muk); }   // sliding friction is never the larger
+    fitForceRange(); readout(); draw();
+  }));
+  $('fric').addEventListener('change', () => { st.fric = $('fric').checked; readout(); });
+  $('fbd').addEventListener('change', () => { st.fbd = $('fbd').checked; draw(); });
+  $('reset').addEventListener('click', () => { reset(); readout(); draw(); });
+  $('shove').addEventListener('click', () => { st.shoveUntil = st.t + 0.45; });
+  $('letgo').addEventListener('click', () => { st.F = 0; $('F').value = '0'; st.shoveUntil = -1; readout(); });
+  $('play').addEventListener('click', () => {
+    st.playing = !st.playing; $('play').textContent = st.playing ? 'Pause' : 'Play';
+    if (st.playing) { last = null; requestAnimationFrame(frame); }
+  });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null, acc = 0;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    const raw = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
+    last = ts; acc += raw;
+    const dt = 1 / 240; let guard = 0;
+    while (acc > dt && guard++ < 30) { step(dt); acc -= dt; }
+    readout(); draw();
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { st.playing = false; $('play').textContent = 'Play'; }
+  fitForceRange(); setTab(1);
+  if (st.playing) requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
