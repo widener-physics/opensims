@@ -50,6 +50,7 @@
   .setup { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; font-family: var(--sans); font-size: 14px; }
   .setup span.lbl { color: var(--muted); }
   .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+  .seg[hidden], [hidden] { display: none !important; }
   .seg button { font: inherit; font-family: var(--sans); font-size: 14px; min-width: 0; padding: 6px 12px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; cursor: pointer; }
   .seg button:last-child { border-right: 0; }
   .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
@@ -160,7 +161,7 @@
   //    Nothing about a beam is built in. Direction survives only because stimulated emission copies it
   //    and because the mirrors return photons that travel along the tube.
   // ================================================================
-  const SCH = () => st.tab === 1 ? SCHEMES[2] : SCHEMES[st.k];
+  const SCH = () => SCHEMES[st.k];
   const SCHEMES = {
     2: { n: 2, E: [0, 1], pumpFrom: 0, pumpTo: 1, upper: 1, lower: 0, fast: [],
          names: ['ground', 'upper laser level'] },
@@ -181,11 +182,11 @@
     const S = SCH();
     atoms = [];
     if (st.tab === 1) {
-      atoms.push({ x: 0.42, y: 0.5, L: 0, t: 0 });
+      atoms.push({ id: 0, x: 0.42, y: 0.5, L: 0, t: 0 });
     } else {
       const cols = 16, rows = 3;
       for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++)
-        atoms.push({ x: TUBE.x0 + 0.04 + (TUBE.x1 - TUBE.x0 - 0.08) * i / (cols - 1),
+        atoms.push({ id: i * rows + j, x: TUBE.x0 + 0.04 + (TUBE.x1 - TUBE.x0 - 0.08) * i / (cols - 1),
                      y: TUBE.y0 + 0.05 + (TUBE.y1 - TUBE.y0 - 0.10) * j / (rows - 1), L: 0, t: 0 });
     }
     grid = new Map();
@@ -201,7 +202,8 @@
     // --- atoms ---
     for (const a of atoms) {
       if (st.tab === 1) {
-        if (st.pumpon && a.L === S.pumpFrom && Math.random() < 6 * dt) { a.L = S.pumpTo; continue; }
+        // pump at the same rate the atom decays, so it spends about half its time up whatever the lifetime
+        if (st.pumpon && a.L === S.pumpFrom && Math.random() < dt / st.tau) { a.L = S.pumpTo; continue; }
       } else {
         if (a.L === S.pumpFrom && Math.random() < st.pump * dt) { a.L = S.pumpTo; continue; }
         if (st.k === 2 && a.L === S.pumpTo && Math.random() < st.pump * dt) { a.L = S.pumpFrom; continue; }
@@ -212,7 +214,7 @@
       if (a.L === S.upper && Math.random() < dt / st.tau) {                 // spontaneous
         a.L = S.lower; tally.spon++;
         const th = rnd(0, Math.PI * 2);
-        addPhoton(a.x, a.y, Math.cos(th), Math.sin(th), 'spon');
+        addPhoton(a.x, a.y, Math.cos(th), Math.sin(th), 'spon', a.id);
         flashes.push({ x: a.x, y: a.y, t: 0, kind: 'spontaneous' });
       }
     }
@@ -231,12 +233,23 @@
       const c0 = Math.floor((p.x - 0.04) / CELL), c1 = Math.floor((p.x + 0.04) / CELL);
       const near = [];
       for (let c = c0; c <= c1; c++) { const b = grid.get(c); if (b) for (const j of b) near.push(atoms[j]); }
+      // release the previous atom only once the photon is genuinely clear of it
+      if (p.skip >= 0) {
+        const sa = atoms[p.skip];
+        if (!sa || (sa.x - p.x) * (sa.x - p.x) + (sa.y - p.y) * (sa.y - p.y) > 0.0016) p.skip = -1;
+      }
       for (const a of near) {
         const dx = a.x - p.x, dy = a.y - p.y;
         if (dx * dx + dy * dy > 0.0016) continue;
+        if (a.id === p.skip) continue;                              // just came from this atom
         if (a.L === S.upper && Math.random() < sig * dt) {
-          a.L = S.lower; tally.stim++;
-          addPhoton(a.x + p.vx * 0.02, a.y + p.vy * 0.02, p.vx, p.vy, 'stim');
+          a.L = S.lower; tally.stim++;                     // the atom drops to the lower level
+          p.skip = a.id;
+          // Two photons now travel on: the one that caused it and an identical copy. They share a
+          // direction, so the copy is started just clear of the atom and a little to one side purely
+          // so both can be seen; nothing about their motion differs.
+          const off = st.tab === 1 ? 0.045 : 0.02, side = st.tab === 1 ? 0.016 : 0.006;
+          addPhoton(a.x + p.vx * off - p.vy * side, a.y + p.vy * off + p.vx * side, p.vx, p.vy, 'stim', a.id);
           flashes.push({ x: a.x, y: a.y, t: 0, kind: 'stimulated' });
           break;
         }
@@ -271,9 +284,11 @@
       if (hist.length > 500) hist.shift();
     }
   }
-  function addPhoton(x, y, vx, vy, kind) {
+  function addPhoton(x, y, vx, vy, kind, skip) {
     if (photons.length >= CAP) return;
-    photons.push({ x, y, vx, vy, kind, age: 0 });
+    // `skip` is the atom this photon has just come from: it must leave that atom's neighbourhood
+    // before it can interact with it again, otherwise one photon ping-pongs on a single atom.
+    photons.push({ x, y, vx, vy, kind, age: 0, skip: skip === undefined ? -1 : skip });
   }
   const pops = () => { const S = SCH(), p = new Array(S.n).fill(0); atoms.forEach(a => p[a.L]++); return p; };
 
@@ -347,14 +362,6 @@
       ctx.beginPath(); ctx.moveTo(0, Y(0.5)); ctx.lineTo(W, Y(0.5)); ctx.stroke(); ctx.setLineDash([]);
     }
 
-    // photons
-    photons.forEach(p => {
-      const L = 9;
-      ctx.strokeStyle = C('--photon'); ctx.lineWidth = 2.2; ctx.globalAlpha = 0.9;
-      ctx.beginPath(); ctx.moveTo(X(p.x) - p.vx * L, Y(p.y) - p.vy * L); ctx.lineTo(X(p.x), Y(p.y)); ctx.stroke();
-    });
-    ctx.globalAlpha = 1;
-
     // atoms
     atoms.forEach(a => {
       const r = st.tab === 1 ? 17 : 7;
@@ -364,22 +371,38 @@
         ctx.fillStyle = '#fff'; ctx.font = 'bold 12px ' + C('--sans'); ctx.textAlign = 'center';
         ctx.fillText(String(a.L), X(a.x), Y(a.y) + 4);
         ctx.fillStyle = C('--muted'); ctx.font = '12px ' + C('--sans');
-        ctx.fillText(SCH().names[a.L], X(a.x), Y(a.y) + 36);
+        ctx.fillText(SCH().names[a.L], X(a.x), Y(a.y) + 48);
       }
     });
 
-    // event flashes
-    if (st.labels) flashes.forEach(f => {
-      const a = 1 - f.t / 0.5;
-      const col = f.kind === 'stimulated' ? C('--vel') : f.kind === 'absorbed' ? C('--body') : C('--ghost');
-      ctx.strokeStyle = col; ctx.globalAlpha = st.tab === 1 ? a : a * 0.6; ctx.lineWidth = st.tab === 1 ? 2 : 1.4;
-      ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), (st.tab === 1 ? 20 : 7) + (st.tab === 1 ? 26 : 9) * (1 - a), 0, Math.PI * 2); ctx.stroke();
-      if (st.tab === 1) {
-        ctx.fillStyle = col; ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'center';
-        ctx.fillText(f.kind, X(f.x), Y(f.y) - 34);
-      }
-      ctx.globalAlpha = 1;
+    // photons, drawn over the atoms so a newly made one is never hidden underneath
+    photons.forEach(p => {
+      const L = 9;
+      ctx.strokeStyle = C('--photon'); ctx.lineWidth = 2.2; ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.moveTo(X(p.x) - p.vx * L, Y(p.y) - p.vy * L); ctx.lineTo(X(p.x), Y(p.y)); ctx.stroke();
     });
+    ctx.globalAlpha = 1;
+
+    // event flashes
+    if (st.labels) {
+      const kindColor = k => k === 'stimulated' ? C('--vel') : k === 'absorbed' ? C('--body') : C('--ghost');
+      flashes.forEach(f => {
+        const a = 1 - f.t / 0.5;
+        ctx.strokeStyle = kindColor(f.kind); ctx.globalAlpha = st.tab === 1 ? a : a * 0.6;
+        ctx.lineWidth = st.tab === 1 ? 2 : 1.4;
+        ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), (st.tab === 1 ? 20 : 7) + (st.tab === 1 ? 26 : 9) * (1 - a), 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      });
+      // only the newest event is named, so labels never pile up on one another
+      if (st.tab === 1 && flashes.length) {
+        const f = flashes.reduce((m, x) => x.t < m.t ? x : m, flashes[0]);
+        ctx.globalAlpha = Math.min(1, 2.5 * (1 - f.t / 0.5));
+        ctx.fillStyle = kindColor(f.kind); ctx.font = '13px ' + C('--sans'); ctx.textAlign = 'center';
+        const wording = f.kind === 'stimulated' ? 'stimulated: two photons leave' : f.kind === 'absorbed' ? 'absorbed: the atom jumps up' : 'spontaneous: one photon, random direction';
+        ctx.fillText(wording, X(f.x), Y(f.y) - 40);
+        ctx.globalAlpha = 1;
+      }
+    }
 
     ctx.fillStyle = C('--muted'); ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'right';
     ctx.fillText(photons.length + ' photons' + (photons.length >= CAP ? ' (limit)' : ''), W - 10, 16);
@@ -527,7 +550,6 @@
     $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
     $('lab_pump').hidden = n === 1; $('lab_refl').hidden = n === 1;
     $('lab_beam').hidden = n === 2; $('lab_pumpon').hidden = n === 2;
-    $('schemeseg').hidden = n === 1; $('schemelbl').hidden = n === 1;
     st.tau = n === 1 ? 1.5 : 4; $('tau').value = String(st.tau);
     st.rate = n === 1 ? 1 : 1.5; $('rate').value = String(st.rate);
     $('scene').style.aspectRatio = n === 1 ? '900 / 300' : '900 / 230';
