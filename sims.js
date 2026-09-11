@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'forces-1d',
+    title: 'Forces in one dimension',
+    topic: 'dynamics',
+    tags: ["Newton's laws", 'friction', 'free-body diagram', 'acceleration'],
+    blurb: 'Push a crate while the graphs build up underneath, and watch the force trace look nothing like the velocity trace. A second screen plots friction against your push, showing the diagonal static region, the break-free point, and the flat sliding value that explains the lurch.',
+    level: 'intro',
+    added: '2026-09-08',
+    status: 'ready'
+  },
+  {
     slug: 'laser',
     title: 'How a laser works',
     topic: 'modern',
@@ -23,7 +33,7 @@ window.SIMS = [
     blurb: 'One atom first: absorption, spontaneous emission, and stimulated emission making a copy of the photon that caused it. Then a tube of atoms between mirrors, where a two-level scheme can never lase, three levels need a hard push, and four levels light up easily.',
     level: 'intermediate',
     added: '2026-09-08',
-    status: 'beta'
+    status: 'ready'
   },
   {
     slug: 'gauss-law',
