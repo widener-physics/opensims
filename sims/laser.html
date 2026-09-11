@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<!--
+  How a laser works - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; the level schemes were checked
+  by Monte Carlo, reproducing the result that a two-level system saturates at equal populations and never
+  inverts, while three- and four-level schemes invert above and below a pump threshold respectively.
+  Credit: replaces the idea of PhET's discontinued Java "Lasers" simulation; this is an independent build.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a laser works</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --ground: #9AA7AE; --pumped: #8B2E86; --upper: #C8321E; --lowerlas: #E8A317;
+    --photon: #D9651B; --beam: #C8321E; --mirror: #4A5A63; --pumplight: #8B2E86;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 66ch; min-height: 3em; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-width: 0; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 300; }
+  .panes { display: grid; grid-template-columns: 320px 1fr; gap: 12px; margin-top: 12px; align-items: start; }
+  #levels { aspect-ratio: 320 / 250; }
+  #plot { aspect-ratio: 568 / 250; }
+
+  .setup { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; font-family: var(--sans); font-size: 14px; }
+  .setup span.lbl { color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { font: inherit; font-family: var(--sans); font-size: 14px; min-width: 0; padding: 6px 12px; background: transparent; color: var(--ink); border: 0; border-right: 1px solid var(--ink); border-radius: 0; white-space: nowrap; cursor: pointer; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); } .readout .no { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls label[hidden] { display: none; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .toggles { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; align-items: center; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 4 / 3; }
+    .panes { grid-template-columns: 1fr; }
+    #levels { aspect-ratio: 4 / 3; }
+    #plot { aspect-ratio: 4 / 3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>How a laser works</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>One atom, three processes</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Building a laser</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="setup">
+    <span class="lbl" id="schemelbl">Energy levels</span>
+    <span class="seg" id="schemeseg" role="group" aria-label="Level scheme">
+      <button data-k="2">two</button><button data-k="3">three</button><button data-k="4">four</button>
+    </span>
+    <button id="play">Pause</button>
+    <button id="reset" class="secondary">Reset</button>
+  </div>
+
+  <canvas id="scene"></canvas>
+  <div class="panes">
+    <canvas id="levels"></canvas>
+    <canvas id="plot"></canvas>
+  </div>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_pump"><div class="row"><span id="pumplabel">Pump rate</span><span class="val" id="pump_v"></span></div>
+      <input type="range" id="pump" min="0" max="5" step="0.1" value="1.5"></label>
+    <label id="lab_beam"><div class="row"><span>Photons arriving from the left</span><span class="val" id="beam_v"></span></div>
+      <input type="range" id="beam" min="0" max="8" step="0.5" value="3"></label>
+    <label id="lab_tau"><div class="row"><span>Time an excited atom waits before emitting on its own</span><span class="val" id="tau_v"></span></div>
+      <input type="range" id="tau" min="0.5" max="10" step="0.5" value="4"></label>
+    <label id="lab_refl"><div class="row"><span>Output mirror reflectivity</span><span class="val" id="refl_v"></span></div>
+      <input type="range" id="refl" min="0.3" max="0.99" step="0.01" value="0.75"></label>
+    <label><div class="row"><span>Speed</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="0.2" max="3" step="0.1" value="1.5"></label>
+  </div>
+  <div class="toggles">
+    <label id="lab_pumpon"><input type="checkbox" id="pumpon"> keep the atom pumped</label>
+    <label><input type="checkbox" id="labels" checked> label each event as it happens</label>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  // ================================================================
+  // 1. MODEL
+  //    Every atom sits in one level. Each time step, with probability rate*dt:
+  //      pump           pumpFrom -> pumpTo   (in a two-level scheme the same light also drives
+  //                                           pumpTo -> pumpFrom, which is why it cannot invert)
+  //      fast decay     as listed per scheme, non-radiative
+  //      spontaneous    upper -> lower, one photon in a random direction, random moment
+  //      stimulated     a photon passing an atom in `upper` makes it drop and copies itself:
+  //                     the new photon travels in the same direction
+  //      absorption     a photon passing an atom in `lower` is swallowed, atom goes to `upper`
+  //    Nothing about a beam is built in. Direction survives only because stimulated emission copies it
+  //    and because the mirrors return photons that travel along the tube.
+  // ================================================================
+  const SCH = () => st.tab === 1 ? SCHEMES[2] : SCHEMES[st.k];
+  const SCHEMES = {
+    2: { n: 2, E: [0, 1], pumpFrom: 0, pumpTo: 1, upper: 1, lower: 0, fast: [],
+         names: ['ground', 'upper laser level'] },
+    3: { n: 3, E: [0, 1, 1.38], pumpFrom: 0, pumpTo: 2, upper: 1, lower: 0, fast: [[2, 1]],
+         names: ['ground and lower laser level', 'upper laser level (metastable)', 'pump level'] },
+    4: { n: 4, E: [0, 0.3, 1.05, 1.42], pumpFrom: 0, pumpTo: 3, upper: 2, lower: 1, fast: [[3, 2], [1, 0]],
+         names: ['ground', 'lower laser level (empties fast)', 'upper laser level (metastable)', 'pump level'] }
+  };
+  const FAST = 40, SIGMA = 2.4, CAP = 500, CELL = 0.06, SPEED = 2.6;
+  const st = { tab: 1, k: 4, pump: 1.5, beam: 2, tau: 4, refl: 0.75, rate: 1.5, pumpon: false, labels: true, playing: true };
+
+  // world box for the tube, in arbitrary units
+  const TUBE = { x0: 0.05, x1: 0.95, y0: 0.36, y1: 0.64 };
+  let atoms = [], grid = new Map(), photons = [], flashes = [], tally = { abs: 0, spon: 0, stim: 0 };
+  let outMirror = 0, outSide = 0, hist = [], time = 0, emitAcc = 0;
+
+  function reset() {
+    const S = SCH();
+    atoms = [];
+    if (st.tab === 1) {
+      atoms.push({ x: 0.42, y: 0.5, L: 0, t: 0 });
+    } else {
+      const cols = 16, rows = 3;
+      for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++)
+        atoms.push({ x: TUBE.x0 + 0.04 + (TUBE.x1 - TUBE.x0 - 0.08) * i / (cols - 1),
+                     y: TUBE.y0 + 0.05 + (TUBE.y1 - TUBE.y0 - 0.10) * j / (rows - 1), L: 0, t: 0 });
+    }
+    grid = new Map();
+    atoms.forEach((a, i) => { const c = Math.floor(a.x / CELL); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(i); });
+    photons = []; flashes = []; tally = { abs: 0, spon: 0, stim: 0 };
+    outMirror = 0; outSide = 0; hist = []; time = 0; emitAcc = 0;
+    void S;
+  }
+
+  function step(dt) {
+    const S = SCH();
+    time += dt;
+    // --- atoms ---
+    for (const a of atoms) {
+      if (st.tab === 1) {
+        if (st.pumpon && a.L === S.pumpFrom && Math.random() < 6 * dt) { a.L = S.pumpTo; continue; }
+      } else {
+        if (a.L === S.pumpFrom && Math.random() < st.pump * dt) { a.L = S.pumpTo; continue; }
+        if (st.k === 2 && a.L === S.pumpTo && Math.random() < st.pump * dt) { a.L = S.pumpFrom; continue; }
+      }
+      let jumped = false;
+      for (const [p, q] of S.fast) if (a.L === p && Math.random() < FAST * dt) { a.L = q; jumped = true; break; }
+      if (jumped) continue;
+      if (a.L === S.upper && Math.random() < dt / st.tau) {                 // spontaneous
+        a.L = S.lower; tally.spon++;
+        const th = rnd(0, Math.PI * 2);
+        addPhoton(a.x, a.y, Math.cos(th), Math.sin(th), 'spon');
+        flashes.push({ x: a.x, y: a.y, t: 0, kind: 'spontaneous' });
+      }
+    }
+    // --- photons arriving from the left, tab 1 only ---
+    if (st.tab === 1) {
+      emitAcc += st.beam * dt;
+      while (emitAcc > 1) { emitAcc -= 1; addPhoton(0.02, 0.5, 1, 0, 'in'); }
+    }
+    // --- photons ---
+    const speed = st.tab === 1 ? 0.5 : SPEED;
+    const sig = st.tab === 1 ? 40 : SIGMA;
+    for (let i = photons.length - 1; i >= 0; i--) {
+      const p = photons[i];
+      p.x += p.vx * speed * dt; p.y += p.vy * speed * dt; p.age += dt;
+      // interaction with the atoms in nearby columns only
+      const c0 = Math.floor((p.x - 0.04) / CELL), c1 = Math.floor((p.x + 0.04) / CELL);
+      const near = [];
+      for (let c = c0; c <= c1; c++) { const b = grid.get(c); if (b) for (const j of b) near.push(atoms[j]); }
+      for (const a of near) {
+        const dx = a.x - p.x, dy = a.y - p.y;
+        if (dx * dx + dy * dy > 0.0016) continue;
+        if (a.L === S.upper && Math.random() < sig * dt) {
+          a.L = S.lower; tally.stim++;
+          addPhoton(a.x + p.vx * 0.02, a.y + p.vy * 0.02, p.vx, p.vy, 'stim');
+          flashes.push({ x: a.x, y: a.y, t: 0, kind: 'stimulated' });
+          break;
+        }
+        if (a.L === S.lower && Math.random() < sig * dt) {
+          a.L = S.upper; tally.abs++;
+          flashes.push({ x: a.x, y: a.y, t: 0, kind: 'absorbed' });
+          photons.splice(i, 1);
+          break;
+        }
+      }
+      if (!photons[i] || photons[i] !== p) continue;
+      // walls
+      if (st.tab === 2) {
+        const focus = ph => { ph.vy *= 0.35; const n = Math.hypot(ph.vx, ph.vy) || 1; ph.vx /= n; ph.vy /= n; };
+        if (p.x < TUBE.x0) {                                              // back mirror, almost perfect
+          if (Math.random() < 0.995) { p.x = TUBE.x0; p.vx = -p.vx; focus(p); } else { photons.splice(i, 1); outSide++; continue; }
+        } else if (p.x > TUBE.x1) {                                       // output mirror
+          if (Math.random() < st.refl) { p.x = TUBE.x1; p.vx = -p.vx; focus(p); }
+          else { photons.splice(i, 1); outMirror++; continue; }
+        }
+        if (p.y < TUBE.y0 || p.y > TUBE.y1) { photons.splice(i, 1); outSide++; continue; }
+      } else if (p.x < -0.05 || p.x > 1.05 || p.y < -0.05 || p.y > 1.05) { photons.splice(i, 1); continue; }
+    }
+    for (const f of flashes) f.t += dt;
+    flashes = flashes.filter(f => f.t < 0.5);
+    if (flashes.length > 60) flashes = flashes.slice(-60);
+    // history for the plot
+    const S2 = SCH();
+    const pop = new Array(S2.n).fill(0); atoms.forEach(a => pop[a.L]++);
+    if (Math.floor(time * 40) !== Math.floor((time - dt) * 40)) {
+      hist.push({ t: time, n: photons.length, inv: (pop[S2.upper] - pop[S2.lower]) / atoms.length, out: outMirror });
+      if (hist.length > 500) hist.shift();
+    }
+  }
+  function addPhoton(x, y, vx, vy, kind) {
+    if (photons.length >= CAP) return;
+    photons.push({ x, y, vx, vy, kind, age: 0 });
+  }
+  const pops = () => { const S = SCH(), p = new Array(S.n).fill(0); atoms.forEach(a => p[a.L]++); return p; };
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 520 };
+  }
+  const levelColor = L => {
+    const S = SCH();
+    if (L === S.upper) return C('--upper');
+    if (L === S.lower && S.lower !== 0) return C('--lowerlas');
+    if (L === S.pumpTo && S.pumpTo !== S.upper) return C('--pumped');
+    return C('--ground');
+  };
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const X = x => x * W, Y = y => y * H;
+    const S = SCH();
+
+    if (st.tab === 2) {
+      // pump light along the tube
+      const pf = Math.min(1, st.pump / 4);
+      if (pf > 0.02) {
+        ctx.strokeStyle = C('--pumplight'); ctx.globalAlpha = 0.12 + 0.30 * pf; ctx.lineWidth = 2;
+        for (let i = 0; i < 14; i++) { const x = X(TUBE.x0 + (TUBE.x1 - TUBE.x0) * (i + 0.5) / 14);
+          ctx.beginPath(); ctx.moveTo(x, Y(TUBE.y0) - 16); ctx.lineTo(x, Y(TUBE.y0) - 4); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, Y(TUBE.y1) + 16); ctx.lineTo(x, Y(TUBE.y1) + 4); ctx.stroke(); }
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = C('--pumplight'); ctx.textAlign = 'left'; ctx.fillText('pump light', X(TUBE.x0), Y(TUBE.y0) - 22);
+      }
+      // tube
+      ctx.fillStyle = 'rgba(29,79,115,0.04)';
+      ctx.fillRect(X(TUBE.x0), Y(TUBE.y0), X(TUBE.x1 - TUBE.x0), Y(TUBE.y1 - TUBE.y0));
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+      ctx.strokeRect(X(TUBE.x0), Y(TUBE.y0), X(TUBE.x1 - TUBE.x0), Y(TUBE.y1 - TUBE.y0));
+      // mirrors
+      ctx.fillStyle = C('--mirror');
+      ctx.fillRect(X(TUBE.x0) - 9, Y(TUBE.y0), 9, Y(TUBE.y1 - TUBE.y0));
+      ctx.globalAlpha = 0.35 + 0.65 * st.refl;
+      ctx.fillRect(X(TUBE.x1), Y(TUBE.y0), 9, Y(TUBE.y1 - TUBE.y0));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+      if (!compact) { ctx.fillText('mirror', X(TUBE.x0) - 4, Y(TUBE.y1) + 18);
+        ctx.fillText((st.refl * 100).toFixed(0) + '% mirror', X(TUBE.x1) + 6, Y(TUBE.y1) + 18); }
+      // output beam
+      const rate = outRate();
+      if (rate > 1) {
+        const w = Math.min(Y(TUBE.y1 - TUBE.y0) * 0.6, 3 + rate * 0.5);
+        const g = ctx.createLinearGradient(X(TUBE.x1), 0, W, 0);
+        g.addColorStop(0, C('--beam')); g.addColorStop(1, 'rgba(200,50,30,0)');
+        ctx.fillStyle = g; ctx.globalAlpha = Math.min(0.92, 0.2 + rate / 45);
+        ctx.fillRect(X(TUBE.x1) + 9, Y(0.5) - w / 2, W - X(TUBE.x1) - 9, w);
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      // tab 1: a source on the left, one atom in the middle
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+      ctx.fillText('photons in', 8, Y(0.5) - 12);
+      ctx.strokeStyle = C('--rule'); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, Y(0.5)); ctx.lineTo(W, Y(0.5)); ctx.stroke(); ctx.setLineDash([]);
+    }
+
+    // photons
+    photons.forEach(p => {
+      const L = 9;
+      ctx.strokeStyle = C('--photon'); ctx.lineWidth = 2.2; ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.moveTo(X(p.x) - p.vx * L, Y(p.y) - p.vy * L); ctx.lineTo(X(p.x), Y(p.y)); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    // atoms
+    atoms.forEach(a => {
+      const r = st.tab === 1 ? 17 : 7;
+      ctx.fillStyle = levelColor(a.L);
+      ctx.beginPath(); ctx.arc(X(a.x), Y(a.y), r, 0, Math.PI * 2); ctx.fill();
+      if (st.tab === 1) {
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 12px ' + C('--sans'); ctx.textAlign = 'center';
+        ctx.fillText(String(a.L), X(a.x), Y(a.y) + 4);
+        ctx.fillStyle = C('--muted'); ctx.font = '12px ' + C('--sans');
+        ctx.fillText(SCH().names[a.L], X(a.x), Y(a.y) + 36);
+      }
+    });
+
+    // event flashes
+    if (st.labels) flashes.forEach(f => {
+      const a = 1 - f.t / 0.5;
+      const col = f.kind === 'stimulated' ? C('--vel') : f.kind === 'absorbed' ? C('--body') : C('--ghost');
+      ctx.strokeStyle = col; ctx.globalAlpha = st.tab === 1 ? a : a * 0.6; ctx.lineWidth = st.tab === 1 ? 2 : 1.4;
+      ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), (st.tab === 1 ? 20 : 7) + (st.tab === 1 ? 26 : 9) * (1 - a), 0, Math.PI * 2); ctx.stroke();
+      if (st.tab === 1) {
+        ctx.fillStyle = col; ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'center';
+        ctx.fillText(f.kind, X(f.x), Y(f.y) - 34);
+      }
+      ctx.globalAlpha = 1;
+    });
+
+    ctx.fillStyle = C('--muted'); ctx.font = '12px ' + C('--sans'); ctx.textAlign = 'right';
+    ctx.fillText(photons.length + ' photons' + (photons.length >= CAP ? ' (limit)' : ''), W - 10, 16);
+    void S;
+  }
+
+  // level diagram with population bars
+  function drawLevels() {
+    const { ctx, W, H } = fit($('levels'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const S = SCH(), p = pops(), N = atoms.length;
+    const ml = 30, mr = 96, mt = 26, mb = 22;
+    const Y = e => mt + (1 - e / 1.5) * (H - mt - mb);
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(atoms.length > 1 ? 'where the atoms are' : 'the atom', 8, 15);
+    // transitions
+    const arrow = (x, y0, y1, col, dash) => {
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8; ctx.setLineDash(dash || []);
+      ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); ctx.setLineDash([]);
+      const d = Math.sign(y1 - y0);
+      ctx.fillStyle = col; ctx.beginPath();
+      ctx.moveTo(x, y1); ctx.lineTo(x - 4, y1 - 8 * d); ctx.lineTo(x + 4, y1 - 8 * d); ctx.closePath(); ctx.fill();
+    };
+    arrow(ml + 16, Y(S.E[S.pumpFrom]), Y(S.E[S.pumpTo]), C('--pumplight'));
+    S.fast.forEach(([a, b], i) => arrow(ml + 40 + i * 16, Y(S.E[a]), Y(S.E[b]), C('--muted'), [3, 3]));
+    arrow(ml + 82, Y(S.E[S.upper]), Y(S.E[S.lower]), C('--upper'));
+    ctx.fillStyle = C('--pumplight'); ctx.textAlign = 'left'; ctx.font = '11px ' + C('--sans');
+    ctx.fillText('pump', ml + 8, H - 8);
+    ctx.fillStyle = C('--upper'); ctx.fillText('laser', ml + 74, H - 8);
+    // levels and bars
+    for (let L = S.n - 1; L >= 0; L--) {
+      const y = Y(S.E[L]);
+      ctx.strokeStyle = levelColor(L); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(W - mr - 8, y); ctx.stroke();
+      const frac = p[L] / N;
+      ctx.fillStyle = levelColor(L);
+      ctx.fillRect(W - mr, y - 7, (mr - 10) * frac, 14);
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(W - mr, y - 7, mr - 10, 14);
+      ctx.fillStyle = C('--muted'); ctx.font = '11px ' + C('--sans'); ctx.textAlign = 'right';
+      ctx.fillText(N === 1 ? (p[L] ? 'here' : '') : (100 * frac).toFixed(0) + '%', W - 4, y - 12);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      ctx.fillText(String(L), ml - 6, y + 4);
+    }
+    // inversion note
+    if (atoms.length > 1) {
+      const inv = (p[S.upper] - p[S.lower]) / N;
+      ctx.textAlign = 'right'; ctx.font = '12px ' + C('--sans');
+      ctx.fillStyle = inv > 0 ? C('--vel') : C('--hot');
+      ctx.fillText(inv > 0 ? 'inverted by ' + (inv * 100).toFixed(0) + '%' : 'not inverted', W - 8, 15);
+    }
+  }
+
+  // time plot: photons in the cavity and the inversion
+  function drawPlot() {
+    const { ctx, W, H, compact } = fit($('plot'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const ml = 40, mr = compact ? 14 : 74, mt = 26, mb = 24;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    if (st.tab === 1) {
+      // event tally instead of a trace
+      const rows = [['absorbed', tally.abs, '--body'], ['spontaneous', tally.spon, '--ghost'], ['stimulated', tally.stim, '--vel']];
+      const ml2 = compact ? 74 : 92, pw2 = W - ml2 - mr;
+      const mxv = Math.max(1, ...rows.map(r => r[1]));
+      ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('what has happened so far', 8, 15);
+      rows.forEach(([name, v, col], i) => {
+        const y = mt + i * (ph / 3) + 6, h = Math.min(26, ph / 3 - 14);
+        ctx.fillStyle = C('--soft'); ctx.fillRect(ml2, y, pw2, h);
+        ctx.fillStyle = C(col); ctx.fillRect(ml2, y, pw2 * v / mxv, h);
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(name, ml2 - 6, y + h / 2 + 4);
+        ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(String(v), ml2 + pw2 * v / mxv + 6, y + h / 2 + 4);
+      });
+      return;
+    }
+    const h = hist; if (h.length < 2) return;
+    const t0 = h[0].t, t1 = Math.max(h[h.length - 1].t, t0 + 1);
+    const nMax = Math.max(20, ...h.map(d => d.n)) * 1.15;
+    const X = t => ml + (t - t0) / (t1 - t0) * pw, Yn = v => mt + (1 - v / nMax) * ph;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(ml, mt, pw, ph);
+    // inversion band, -1..1 mapped to the same box
+    const Yi = v => mt + (1 - (v + 1) / 2) * ph;
+    ctx.strokeStyle = C('--rule'); ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.moveTo(ml, Yi(0)); ctx.lineTo(ml + pw, Yi(0)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = C('--vel'); ctx.lineWidth = 1.4;
+    ctx.beginPath(); h.forEach((d, i) => i ? ctx.lineTo(X(d.t), Yi(d.inv)) : ctx.moveTo(X(d.t), Yi(d.inv))); ctx.stroke();
+    ctx.strokeStyle = C('--photon'); ctx.lineWidth = 2;
+    ctx.beginPath(); h.forEach((d, i) => i ? ctx.lineTo(X(d.t), Yn(d.n)) : ctx.moveTo(X(d.t), Yn(d.n))); ctx.stroke();
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('photons in the cavity', ml, 15);
+    ctx.fillStyle = C('--vel'); ctx.textAlign = 'right'; ctx.fillText('inversion', ml + pw, 15);
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    ctx.fillText(nMax.toFixed(0), ml - 5, mt + 10); ctx.fillText('0', ml - 5, mt + ph);
+    ctx.textAlign = 'center'; ctx.fillText('time', ml + pw / 2, H - 6);
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  function outRate() {                                   // averaged over the last couple of seconds
+    if (hist.length < 20) return 0;
+    const a = hist[Math.max(0, hist.length - 80)], b = hist[hist.length - 1];
+    return b.t > a.t ? (b.out - a.out) / (b.t - a.t) : 0;
+  }
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  const TEXT = {
+    1: { lede: 'One atom, and light going past it. If the atom is in its ground state it can swallow a photon and jump up. If it is already excited it will drop on its own after a random wait, throwing its photon in a random direction. But if a photon goes past while it is excited, the atom is knocked down early and emits a copy: same direction, same energy. That copying is what a laser is built on.',
+         notes: '<p><b>What to try.</b> Tick "keep the atom pumped" and turn the incoming photons down to nothing. The atom lights up at random moments and its photons fly off in every direction, which is what a light bulb does. Now turn the photon stream back up and watch how often two photons leave together in the same direction. Count the tally: as the beam gets stronger, stimulated emission overtakes spontaneous, and the light coming out starts to remember which way it was going.</p>' },
+    2: { lede: 'Now a tube full of atoms between two mirrors. The pump lifts atoms to the top level, they fall to the metastable one and wait there. Photons that happen to travel along the tube get reflected back and forth, and each pass triggers more copies of themselves. Turn the pump up and at some point the copying outruns the losses, and the trickle of scattered light turns into a beam.',
+         notes: '<p><b>What to try.</b> Start with four levels and raise the pump slowly. Below threshold the photons are few and scatter out of the sides; above it the cavity fills, the inversion stops rising because stimulated emission is now emptying the upper level as fast as the pump fills it, and a beam appears through the output mirror. Then switch to two levels and turn the pump to maximum. Nothing happens, ever: the same light that lifts an atom up also knocks it down, so the best you can reach is half and half, and half is not enough. Three levels do lase, but only after a much harder push, because you have to get more than half the atoms up before the ground state stops absorbing more than the upper level emits.</p><p>Drop the output mirror to 30% and the beam dies even at full pump: the light leaves faster than it can be amplified. That balance, gain against loss per round trip, is what threshold means.</p>' }
+  };
+  function readout() {
+    let html = '';
+    const S = SCH(), p = pops();
+    if (st.tab === 1) {
+      const tot = tally.spon + tally.stim;
+      html += card('Stimulated emissions', String(tally.stim),
+        tot ? (100 * tally.stim / tot).toFixed(0) + '% of the light this atom has emitted' : 'each one is a copy of the photon that caused it');
+      html += card('Spontaneous emissions', String(tally.spon), 'random direction, random moment');
+      html += card('Absorptions', String(tally.abs), 'a ground-state atom swallowing a photon');
+    } else {
+      const inv = (p[S.upper] - p[S.lower]) / atoms.length;
+      const rate = outRate();
+      const beamFrac = (outMirror + outSide) > 30 ? outMirror / (outMirror + outSide) : 0;
+      const lasing = rate > 8 && beamFrac > 0.62 && inv > 0;
+      html += card('Population inversion', (inv >= 0 ? '+' : '') + (inv * 100).toFixed(0) + '%',
+        inv > 0 ? 'more atoms up than down, so light grows as it passes' : 'more atoms down than up, so light is absorbed',
+        inv > 0 ? 'ok' : 'no');
+      html += card('Photons in the cavity', String(photons.length),
+        'bouncing between the mirrors, each pass making more');
+      html += card(lasing ? 'Lasing' : 'Not lasing yet', rate.toFixed(0) + ' photons/s out of the mirror',
+        (beamFrac * 100).toFixed(0) + '% of the light that escapes leaves through the output mirror rather than the sides',
+        lasing ? 'ok' : 'no');
+    }
+    $('readout').innerHTML = html;
+    $('pump_v').textContent = st.pump.toFixed(1);
+    $('beam_v').textContent = st.beam.toFixed(1) + ' per second';
+    $('tau_v').textContent = st.tau.toFixed(1) + ' s';
+    $('refl_v').textContent = (st.refl * 100).toFixed(1) + '%';
+    $('rate_v').textContent = st.rate.toFixed(1) + '×';
+    $('schemeseg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.k === st.k)));
+  }
+  function setTab(n) {
+    st.tab = n;
+    [1, 2].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
+    $('lab_pump').hidden = n === 1; $('lab_refl').hidden = n === 1;
+    $('lab_beam').hidden = n === 2; $('lab_pumpon').hidden = n === 2;
+    $('schemeseg').hidden = n === 1; $('schemelbl').hidden = n === 1;
+    st.tau = n === 1 ? 1.5 : 4; $('tau').value = String(st.tau);
+    st.rate = n === 1 ? 1 : 1.5; $('rate').value = String(st.rate);
+    $('scene').style.aspectRatio = n === 1 ? '900 / 300' : '900 / 230';
+    reset(); readout(); drawAll();
+  }
+  function drawAll() { drawScene(); drawLevels(); drawPlot(); }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  $('schemeseg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { st.k = +b.dataset.k; reset(); readout(); drawAll(); }));
+  ['pump', 'beam', 'tau', 'refl', 'rate'].forEach(id => $(id).addEventListener('input', () => { st[id] = +$(id).value; readout(); }));
+  $('pumpon').addEventListener('change', () => { st.pumpon = $('pumpon').checked; });
+  $('labels').addEventListener('change', () => { st.labels = $('labels').checked; });
+  $('reset').addEventListener('click', () => { reset(); readout(); drawAll(); });
+  $('play').addEventListener('click', () => {
+    st.playing = !st.playing; $('play').textContent = st.playing ? 'Pause' : 'Play';
+    if (st.playing) { last = null; requestAnimationFrame(frame); }
+  });
+  window.addEventListener('resize', drawAll);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null, acc = 0;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    const raw = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    acc += raw * st.rate;
+    const dt = 1 / 240;
+    let guard = 0;
+    while (acc > dt && guard++ < 40) { step(dt); acc -= dt; }
+    readout(); drawAll();
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { st.playing = false; $('play').textContent = 'Play'; }
+  setTab(1);
+  if (st.playing) requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
