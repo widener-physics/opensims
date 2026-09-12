@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'atwood-machine',
+    title: 'Atwood machine',
+    topic: 'dynamics',
+    tags: ['Newton\'s laws', 'tension', 'pulley inertia', 'constant acceleration'],
+    blurb: 'Two hanging masses race over a pulley. Compare the ideal case with a pulley that has rotational inertia, and see how acceleration and rope tensions change.',
+    level: 'intro',
+    added: '2026-09-11',
+    status: 'beta'
+  },
+  {
     slug: 'forces-1d',
     title: 'Forces in one dimension',
     topic: 'dynamics',
