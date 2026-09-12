@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'ballistic-pendulum',
+    title: 'Ballistic pendulum',
+    topic: 'dynamics',
+    tags: ['inelastic collision', 'momentum', 'energy', 'pendulum'],
+    blurb: 'A projectile embeds in a hanging block, then the pair swings upward. Use the rise height to infer launch speed and compare it with the set value.',
+    level: 'intro',
+    added: '2026-09-11',
+    status: 'ready'
+  },
+  {
     slug: 'atwood-machine',
     title: 'Atwood machine',
     topic: 'dynamics',
@@ -23,7 +33,7 @@ window.SIMS = [
     blurb: 'Two hanging masses race over a pulley. Compare the ideal case with a pulley that has rotational inertia, and see how acceleration and rope tensions change.',
     level: 'intro',
     added: '2026-09-11',
-    status: 'beta'
+    status: 'ready'
   },
   {
     slug: 'forces-1d',

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<!--
+  Ballistic pendulum - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author.
+  Credit: none; the ballistic pendulum is a standard textbook model.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ballistic pendulum</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --rod: #4A5A63; --stand: #7A4B22;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; }
+
+  canvas { display: block; width: 100%; aspect-ratio: 900 / 420; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport input[type=range] { width: 100%; }
+  .transport .time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .toggles { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    canvas { aspect-ratio: 4 / 3; }
+    .transport { grid-template-columns: 1fr 1fr; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .time { grid-column: 1 / -1; text-align: center; margin-top: -4px; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Ballistic pendulum</h1>
+  <p class="lede">A projectile embeds in a hanging block, then the combined mass swings upward. The collision is inelastic, so momentum is the useful law during impact. After impact, mechanical energy connects the rise height to the speed just after collision.</p>
+
+  <canvas id="c"></canvas>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
+    <span class="time"><span id="tval">0.00</span> s</span>
+  </div>
+
+  <div class="readout">
+    <div><div class="k">Speed just after impact</div><div class="v" id="r_V0"></div><div class="f"><i>V</i><sub>0</sub> = <i>m</i><i>v</i> / (<i>M</i> + <i>m</i>)</div></div>
+    <div><div class="k">Maximum angle</div><div class="v" id="r_th"></div><div class="f">cos <i>&theta;</i><sub>max</sub> = 1 - <i>V</i><sub>0</sub><sup>2</sup> / (2<i>gL</i>)</div></div>
+    <div><div class="k">Rise of the center</div><div class="v" id="r_h"></div><div class="f"><i>h</i> = <i>L</i>(1 - cos <i>&theta;</i><sub>max</sub>)</div></div>
+    <div><div class="k">Inferred launch speed</div><div class="v" id="r_vinf"></div><div class="f"><i>v</i> = (<i>M</i> + <i>m</i>) / <i>m</i> &middot; &radic;(2<i>gh</i>)</div></div>
+    <div><div class="k">Momentum check</div><div class="v" id="r_p"></div><div class="f"><i>m</i><i>v</i> = (<i>M</i> + <i>m</i>)<i>V</i><sub>0</sub></div></div>
+    <div><div class="k">Current bob speed</div><div class="v" id="r_vnow"></div><div class="f">|<i>v</i>| = <i>L</i>|<i>&omega;</i>|</div></div>
+  </div>
+
+  <div class="controls">
+    <label><div class="row"><span>Projectile mass m</span><span class="val" id="m_v"></span></div>
+      <input type="range" id="m" min="0.05" max="0.35" step="0.01" value="0.12"></label>
+    <label><div class="row"><span>Pendulum mass M</span><span class="val" id="M_v"></span></div>
+      <input type="range" id="M" min="0.8" max="5" step="0.1" value="1.5"></label>
+    <label><div class="row"><span>Launch speed v</span><span class="val" id="v_v"></span></div>
+      <input type="range" id="v" min="1" max="10" step="0.1" value="6.0"></label>
+    <label><div class="row"><span>Pendulum length L</span><span class="val" id="L_v"></span></div>
+      <input type="range" id="L" min="0.8" max="2.0" step="0.1" value="1.2"></label>
+    <label><div class="row"><span>Playback speed</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="0.2" max="1.6" step="0.1" value="0.8"></label>
+  </div>
+
+  <div class="toggles">
+    <label><input type="checkbox" id="vec" checked> show velocity vectors</label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> Set <i>v</i> very small and confirm the rise is tiny. Keep <i>v</i> fixed and increase <i>M</i>: the post-collision speed and the peak angle both drop. Keep <i>M</i> fixed and increase <i>m</i>: more momentum goes into the block and the peak angle rises.</p>
+    <p>Units: kilograms, meters, seconds; <i>g</i> = 9.8 m/s<sup>2</sup>. Assumptions: the projectile is launched horizontally at the bob height with pre-impact drop neglected, collision is perfectly inelastic, the string is massless and rigid, the pivot is frictionless, and air drag is ignored. The run stops at the first peak angle.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G = 9.8;
+
+  // ================================================================
+  // 1. MODEL. Collision + swing equations are explicit here.
+  //    Inelastic impact: V0 = m v / (M + m)
+  //    Swing equation:   theta'' = -(g/L) sin(theta)
+  //    Peak relation:    h = L(1 - cos(theta_max)),  V0^2 = 2 g h
+  // ================================================================
+  const st = { m: 0.12, M: 1.5, v: 6, L: 1.2, rate: 0.8, vec: true, t: 0, playing: false };
+
+  function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+
+  function model() {
+    const total = st.M + st.m;
+    const V0 = st.m * st.v / total;
+    const hPred = V0 * V0 / (2 * G);
+    const thetaPred = Math.acos(clamp(1 - hPred / st.L, -1, 1));
+    const xLaunch = -1.35;
+    const tImpact = Math.abs(xLaunch) / st.v;
+    const dt = 1 / 240;
+
+    const states = [];
+    const push = (t, phase, theta, omega, xProj) => {
+      const xBob = st.L * Math.sin(theta);
+      const yBob = st.L * Math.cos(theta);
+      const h = st.L * (1 - Math.cos(theta));
+      states.push({ t, phase, theta, omega, xProj, xBob, yBob, h, vBob: Math.abs(st.L * omega) });
+    };
+
+    for (let t = 0; t < tImpact; t += dt) push(t, 0, 0, 0, xLaunch + st.v * t);
+    push(tImpact, 0, 0, 0, 0);
+
+    let theta = 0;
+    let omega = V0 / st.L;
+    let ts = 0;
+    let thetaPeak = 0;
+    let tPeak = 0;
+    push(tImpact, 1, theta, omega, null);
+
+    if (Math.abs(omega) > 1e-9) {
+      for (let n = 0; n < 50000; n++) {
+        const prevTheta = theta;
+        const prevOmega = omega;
+        const prevT = ts;
+        omega += -(G / st.L) * Math.sin(theta) * dt;
+        theta += omega * dt;
+        ts += dt;
+        if (omega <= 0) {
+          const f = prevOmega / (prevOmega - omega);
+          thetaPeak = prevTheta + (theta - prevTheta) * f;
+          tPeak = prevT + dt * f;
+          push(tImpact + tPeak, 1, thetaPeak, 0, null);
+          break;
+        }
+        push(tImpact + ts, 1, theta, omega, null);
+      }
+    }
+
+    const tEnd = tImpact + tPeak;
+    const hSim = st.L * (1 - Math.cos(thetaPeak));
+    const vInferred = (total / st.m) * Math.sqrt(2 * G * hSim);
+    const pBefore = st.m * st.v;
+    const pAfter = total * V0;
+
+    return {
+      states,
+      tImpact,
+      tEnd,
+      xLaunch,
+      V0,
+      thetaPred,
+      thetaPeak,
+      hSim,
+      vInferred,
+      vError: vInferred - st.v,
+      pBefore,
+      pAfter
+    };
+  }
+
+  function sample(t, M) {
+    const arr = M.states;
+    if (!arr.length) return { phase: 0, theta: 0, omega: 0, xProj: M.xLaunch, xBob: 0, yBob: st.L, h: 0, vBob: 0 };
+    if (t <= arr[0].t) return arr[0];
+    if (t >= arr[arr.length - 1].t) return arr[arr.length - 1];
+    let lo = 0;
+    let hi = arr.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (arr[mid].t <= t) lo = mid;
+      else hi = mid;
+    }
+    const a = arr[lo];
+    const b = arr[hi];
+    const den = b.t - a.t || 1;
+    const u = clamp((t - a.t) / den, 0, 1);
+    const lerp = (x, y) => x + (y - x) * u;
+    return {
+      phase: u < 0.5 ? a.phase : b.phase,
+      theta: lerp(a.theta, b.theta),
+      omega: lerp(a.omega, b.omega),
+      xProj: (a.xProj === null || b.xProj === null) ? (u < 0.5 ? a.xProj : b.xProj) : lerp(a.xProj, b.xProj),
+      xBob: lerp(a.xBob, b.xBob),
+      yBob: lerp(a.yBob, b.yBob),
+      h: lerp(a.h, b.h),
+      vBob: lerp(a.vBob, b.vBob)
+    };
+  }
+
+  let M = model();
+
+  // ================================================================
+  // 2. DRAWING.
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+
+  function arrow(ctx, x0, y0, x1, y1, color) {
+    const L = Math.hypot(x1 - x0, y1 - y0);
+    if (L < 3) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1 - ux * 8, y1 - uy * 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - ux * 10 - uy * 4.5, y1 - uy * 10 + ux * 4.5);
+    ctx.lineTo(x1 - ux * 10 + uy * 4.5, y1 - uy * 10 - ux * 4.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawArcPath(ctx, X, Y, thetaMax, color, dash, width) {
+    const N = Math.max(8, Math.round(Math.abs(thetaMax) * 30));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    for (let k = 0; k <= N; k++) {
+      const th = thetaMax * k / N;
+      const x = st.L * Math.sin(th);
+      const y = st.L * Math.cos(th);
+      if (k === 0) ctx.moveTo(X(x), Y(y));
+      else ctx.lineTo(X(x), Y(y));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function draw() {
+    const { ctx, W, H, compact } = fit($('c'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '13px ' + C('--sans');
+
+    const q = sample(st.t, M);
+
+    const xPeak = st.L * Math.sin(Math.max(M.thetaPred, M.thetaPeak));
+    const xMin = M.xLaunch - 0.35;
+    const xMax = Math.max(0.7, xPeak + 0.55);
+    const yMin = -0.28;
+    const yMax = st.L + 0.58;
+    const margin = compact ? 14 : 22;
+    const S = Math.min((W - 2 * margin) / (xMax - xMin), (H - 2 * margin) / (yMax - yMin));
+    const ox = margin + ((W - 2 * margin) - (xMax - xMin) * S) / 2 - xMin * S;
+    const oy = margin + ((H - 2 * margin) - (yMax - yMin) * S) / 2 - yMin * S;
+    const X = x => ox + x * S;
+    const Y = y => oy + y * S;
+
+    const floorY = st.L + 0.33;
+    ctx.fillStyle = C('--soft');
+    ctx.fillRect(0, Y(floorY), W, H - Y(floorY) + 4);
+    ctx.strokeStyle = C('--rule');
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(0, Y(floorY) + 0.5);
+    ctx.lineTo(W, Y(floorY) + 0.5);
+    ctx.stroke();
+
+    ctx.strokeStyle = C('--stand');
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(X(-0.08), Y(-0.18));
+    ctx.lineTo(X(0.08), Y(-0.18));
+    ctx.stroke();
+
+    ctx.strokeStyle = C('--ghost');
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.moveTo(X(M.xLaunch), Y(st.L));
+    ctx.lineTo(X(q.phase === 0 && q.xProj !== null ? q.xProj : 0), Y(st.L));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (q.phase === 1 && q.theta > 0) drawArcPath(ctx, X, Y, q.theta, C('--ghost'), [6, 5], 1.5);
+
+    if (q.phase === 0 && q.xProj !== null) {
+      ctx.strokeStyle = C('--ball');
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(X(M.xLaunch), Y(st.L));
+      ctx.lineTo(X(q.xProj), Y(st.L));
+      ctx.stroke();
+    }
+    if (q.phase === 1 && q.theta > 0) drawArcPath(ctx, X, Y, q.theta, C('--body'), [], 2.3);
+
+    ctx.strokeStyle = C('--rod');
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(X(0), Y(0));
+    ctx.lineTo(X(q.xBob), Y(q.yBob));
+    ctx.stroke();
+
+    ctx.fillStyle = C('--ink');
+    ctx.beginPath();
+    ctx.arc(X(0), Y(0), compact ? 4 : 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    const bobR = Math.max(9, 0.09 * S);
+    ctx.fillStyle = C('--body');
+    ctx.beginPath();
+    ctx.arc(X(q.xBob), Y(q.yBob), bobR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = C('--ink');
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    if (q.phase === 0 && q.xProj !== null) {
+      const pr = Math.max(4, 0.04 * S);
+      ctx.fillStyle = C('--ball');
+      ctx.beginPath();
+      ctx.arc(X(q.xProj), Y(st.L), pr, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const ex = X(q.xBob - 0.04);
+      const ey = Y(q.yBob);
+      ctx.fillStyle = C('--ball');
+      ctx.beginPath();
+      ctx.arc(ex, ey, Math.max(3.2, bobR * 0.24), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (st.vec) {
+      if (q.phase === 0 && q.xProj !== null) {
+        const x0 = X(q.xProj);
+        const y0 = Y(st.L);
+        const k = compact ? 0.10 : 0.12;
+        const xTip = Math.min(q.xProj + st.v * k, -0.06);
+        if (xTip > q.xProj + 0.01) arrow(ctx, x0, y0, X(xTip), y0, C('--vel'));
+      } else if (q.phase === 1 && q.vBob > 0.01) {
+        const vx = st.L * Math.cos(q.theta) * q.omega;
+        const vy = -st.L * Math.sin(q.theta) * q.omega;
+        const k = compact ? 0.18 : 0.24;
+        arrow(ctx, X(q.xBob), Y(q.yBob), X(q.xBob + vx * k), Y(q.yBob + vy * k), C('--vel'));
+      }
+    }
+
+    ctx.fillStyle = C('--muted');
+    ctx.font = '12px ' + C('--sans');
+    ctx.textAlign = 'left';
+    ctx.fillText(q.phase === 0 ? 'phase: projectile before impact' : 'phase: post-impact swing', 12, 18);
+    ctx.fillText(st.t >= M.tEnd ? 'stopped at first peak' : 'dashed guide appears only where motion has reached', 12, 34);
+    ctx.textAlign = 'right';
+    ctx.fillText('peak angle: ' + (M.thetaPeak * 180 / Math.PI).toFixed(1) + ' deg', W - 12, 18);
+  }
+
+  // ================================================================
+  // 3. READOUTS + CONTROLS.
+  // ================================================================
+  const scrub = $('scrub');
+
+  function readout() {
+    const q = sample(st.t, M);
+    $('m_v').textContent = st.m.toFixed(2) + ' kg';
+    $('M_v').textContent = st.M.toFixed(1) + ' kg';
+    $('v_v').textContent = st.v.toFixed(1) + ' m/s';
+    $('L_v').textContent = st.L.toFixed(1) + ' m';
+    $('rate_v').textContent = st.rate.toFixed(1) + 'x';
+    $('tval').textContent = st.t.toFixed(2);
+
+    $('r_V0').textContent = M.V0.toFixed(3) + ' m/s';
+    $('r_th').textContent = (M.thetaPeak * 180 / Math.PI).toFixed(2) + ' deg';
+    $('r_h').textContent = M.hSim.toFixed(3) + ' m';
+    $('r_vinf').innerHTML = M.vInferred.toFixed(2) + ' m/s <span class="ok">(' + (M.vError >= 0 ? '+' : '') + M.vError.toFixed(2) + ')</span>';
+    $('r_p').textContent = M.pBefore.toFixed(3) + ' = ' + M.pAfter.toFixed(3) + ' kg m/s';
+    $('r_vnow').textContent = q.vBob.toFixed(3) + ' m/s';
+
+    scrub.value = String(Math.round(st.t / Math.max(1e-9, M.tEnd) * 1000));
+  }
+
+  function rebuild() {
+    M = model();
+    st.t = 0;
+    st.playing = false;
+    $('play').textContent = 'Play';
+    readout();
+    draw();
+  }
+
+  ['m', 'M', 'v', 'L'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      st[id] = +$(id).value;
+      rebuild();
+    });
+  });
+  $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
+  $('vec').addEventListener('change', () => { st.vec = $('vec').checked; draw(); });
+  $('reset').addEventListener('click', rebuild);
+
+  scrub.addEventListener('input', () => {
+    st.t = (+scrub.value) / 1000 * M.tEnd;
+    st.playing = false;
+    $('play').textContent = 'Play';
+    readout();
+    draw();
+  });
+
+  $('play').addEventListener('click', () => {
+    if (st.playing) {
+      st.playing = false;
+      $('play').textContent = 'Play';
+      return;
+    }
+    if (st.t >= M.tEnd) st.t = 0;
+    st.playing = true;
+    $('play').textContent = 'Pause';
+    last = null;
+    requestAnimationFrame(frame);
+  });
+
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP. Starts paused and pauses when hidden.
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) {
+      last = null;
+      requestAnimationFrame(frame);
+      return;
+    }
+    if (last !== null) {
+      st.t += (ts - last) / 1000 * st.rate;
+      if (st.t >= M.tEnd) {
+        st.t = M.tEnd;
+        st.playing = false;
+        $('play').textContent = 'Play';
+      }
+    }
+    last = ts;
+    readout();
+    draw();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+
+  rebuild();
+})();
+</script>
+</body>
+</html>
