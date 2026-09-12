@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<!--
+  Atwood machine - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; physics verified by the author.
+  Credit: none; the Atwood machine is a standard textbook model.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atwood machine</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --rope: #4A5A63; --pulley: #7A4B22;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 66ch; min-height: 3em; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; min-width: 0; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; aspect-ratio: 900 / 420; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; touch-action: pan-y; }
+
+  .transport { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; margin: 12px 0 0; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; min-width: 72px; }
+  button.secondary { background: transparent; color: var(--ink); }
+  .transport input[type=range] { width: 100%; }
+  .transport .time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls label[hidden] { display: none; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .toggles { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    canvas { aspect-ratio: 4 / 3; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+    .transport { grid-template-columns: 1fr 1fr; }
+    .transport input[type=range] { grid-column: 1 / -1; }
+    .transport .time { grid-column: 1 / -1; text-align: center; margin-top: -4px; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Atwood machine</h1>
+
+  <div class="tabs" role="tablist" aria-label="Atwood variants">
+    <button id="tab1" role="tab" aria-selected="true"><span>1</span>Ideal rope and pulley</button>
+    <button id="tab2" role="tab" aria-selected="false"><span>2</span>Pulley with inertia</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <canvas id="scene"></canvas>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="reset" class="secondary">Reset</button>
+    <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
+    <span class="time"><span id="tval">0.00</span> s</span>
+  </div>
+
+  <div class="readout">
+    <div><div class="k">Acceleration</div><div class="v" id="r_a"></div><div class="f" id="f_a"></div></div>
+    <div><div class="k">Rope tension</div><div class="v" id="r_T"></div><div class="f" id="f_T"></div></div>
+    <div><div class="k">Time to reach the limit</div><div class="v" id="r_tstop"></div><div class="f"><i>t</i> = &radic;(2<i>d</i> / |<i>a</i>|)</div></div>
+    <div><div class="k">Speed at the limit</div><div class="v" id="r_vstop"></div><div class="f"><i>v</i> = |<i>a</i>|<i>t</i> = &radic;(2|<i>a</i>|<i>d</i>)</div></div>
+    <div><div class="k">Pulley angular speed</div><div class="v" id="r_omega"></div><div class="f"><i>&omega;</i> = |<i>v</i>| / <i>R</i></div></div>
+  </div>
+
+  <div class="controls">
+    <label><div class="row"><span>Left mass m<sub>1</sub></span><span class="val" id="m1_v"></span></div>
+      <input type="range" id="m1" min="0.5" max="5" step="0.1" value="1.0"></label>
+    <label><div class="row"><span>Right mass m<sub>2</sub></span><span class="val" id="m2_v"></span></div>
+      <input type="range" id="m2" min="0.5" max="5" step="0.1" value="2.0"></label>
+    <label id="lab_mp"><div class="row"><span>Pulley mass M<sub>p</sub> (solid disk)</span><span class="val" id="mp_v"></span></div>
+      <input type="range" id="mp" min="0.2" max="6" step="0.1" value="1.2"></label>
+    <label><div class="row"><span>Travel limit d</span><span class="val" id="d_v"></span></div>
+      <input type="range" id="d" min="0.4" max="2" step="0.1" value="1.2"></label>
+    <label><div class="row"><span>Playback speed</span><span class="val" id="rate_v"></span></div>
+      <input type="range" id="rate" min="0.2" max="1.6" step="0.1" value="0.7"></label>
+  </div>
+
+  <div class="toggles">
+    <label><input type="checkbox" id="forces" checked> show weight and tension arrows</label>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const G = 9.8;
+  const PULLEY_RADIUS_M = 0.18;
+  const TRAVEL_LIMIT_MAX = 2.0;
+
+  // 1) MODEL. Equations first.
+  // a_ideal = (m2 - m1) g / (m1 + m2)
+  // a_inertia = (m2 - m1) g / (m1 + m2 + I/R^2), with I = (1/2) Mp R^2 for a solid disk.
+  const st = { mode: 1, m1: 1.0, m2: 2.0, mp: 1.2, d: 1.2, rate: 0.7, forces: true, t: 0, playing: false };
+  const TEXT = {
+    1: {
+      lede: 'Two masses are connected by a light rope over an ideal pulley. Release from rest and the heavier side accelerates downward at a constant rate. The dashed guides show where each mass will stop when one side has traveled the chosen distance.',
+      notes: '<p><b>What to try.</b> Make m<sub>1</sub> = m<sub>2</sub> and confirm that nothing moves. Then keep the difference m<sub>2</sub> - m<sub>1</sub> fixed while increasing both masses; the acceleration falls because the same unbalanced weight is accelerating more total mass.</p><p>Units: kilograms, meters, seconds; g = 9.8 m/s<sup>2</sup>. Model assumptions: massless rope, frictionless axle, no slip, no air drag.</p>'
+    },
+    2: {
+      lede: 'Now the pulley has rotational inertia (solid disk). Some energy goes into spinning it, so the same mass pair accelerates less than in the ideal case. The two rope tensions are no longer equal: the descending side has the larger tension.',
+      notes: '<p><b>What to try.</b> Set M<sub>p</sub> near zero and compare with tab 1: they match. Increase M<sub>p</sub> and watch acceleration drop while the left and right tensions separate. With m<sub>1</sub> = m<sub>2</sub>, both tabs still give zero acceleration.</p><p>Units: kilograms, meters, seconds; g = 9.8 m/s<sup>2</sup>. Pulley model: solid disk with I = (1/2)M<sub>p</sub>R<sup>2</sup>; rope does not stretch or slip.</p>'
+    }
+  };
+
+  function model() {
+    const inertiaTerm = st.mode === 2 ? 0.5 * st.mp : 0;
+    const den = st.m1 + st.m2 + inertiaTerm;
+    const a = (st.m2 - st.m1) * G / den;
+    const moving = Math.abs(a) > 1e-7;
+    const tStop = moving ? Math.sqrt(2 * st.d / Math.abs(a)) : 0;
+    const tEnd = tStop;
+    const pos = t => {
+      if (!moving) return { s: 0, v: 0 };
+      const tt = Math.min(Math.max(0, t), tStop);
+      return { s: 0.5 * a * tt * tt, v: a * tt };
+    };
+    const Tleft = st.m1 * (G + a);
+    const Tright = st.m2 * (G - a);
+    const Tideal = 2 * st.m1 * st.m2 * G / (st.m1 + st.m2);
+    return {
+      inertiaTerm,
+      a,
+      moving,
+      tStop,
+      tEnd,
+      pos,
+      Tleft,
+      Tright,
+      Tideal,
+      vStop: Math.abs(a) * tStop,
+      sStop: moving ? Math.sign(a) * st.d : 0
+    };
+  }
+  let M = model();
+
+  // 2) DRAWING.
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+  function arrow(ctx, x0, y0, x1, y1, color, width) {
+    const L = Math.hypot(x1 - x0, y1 - y0);
+    if (L < 3) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = width || 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1 - ux * 8, y1 - uy * 8);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - ux * 10 - uy * 4.5, y1 - uy * 10 + ux * 4.5);
+    ctx.lineTo(x1 - ux * 10 + uy * 4.5, y1 - uy * 10 - ux * 4.5);
+    ctx.closePath();
+    ctx.fill();
+  }
+  function drawMass(ctx, x, y, w, h, color, label, compact) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x - w / 2, y - h / 2, w, h);
+    ctx.strokeStyle = C('--ink');
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(x - w / 2, y - h / 2, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.font = (compact ? 12 : 13) + 'px ' + C('--sans');
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x, y + 4);
+  }
+  function draw() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+
+    const cx = W * 0.5;
+    const cy = compact ? 72 : 78;
+    const R = compact ? 34 : 40;
+    const mw = compact ? 50 : 58;
+    const mh = compact ? 40 : 48;
+    const xL = cx - R;
+    const xR = cx + R;
+
+    const yMin = cy + R + mh / 2 + 10;
+    const yMax = H - mh / 2 - 18;
+    const y0 = (yMin + yMax) / 2;
+    const S = Math.min((y0 - yMin) / TRAVEL_LIMIT_MAX, (yMax - y0) / TRAVEL_LIMIT_MAX);
+
+    const q = M.pos(st.t);
+    const yShift = q.s * S;
+    const yGoal = M.sStop * S;
+    const yL = y0 - yShift;
+    const yR = y0 + yShift;
+    const yLgoal = y0 - yGoal;
+    const yRgoal = y0 + yGoal;
+
+    ctx.strokeStyle = C('--rule');
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(xL - 18, y0);
+    ctx.lineTo(xL - 18, yLgoal);
+    ctx.moveTo(xR + 18, y0);
+    ctx.lineTo(xR + 18, yRgoal);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (M.moving) {
+      const floorOnRight = M.sStop > 0;
+      const fyMass = floorOnRight ? yRgoal : yLgoal;
+      const floorY = fyMass + mh / 2 + 6;
+      ctx.strokeStyle = C('--ink');
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(12, floorY);
+      ctx.lineTo(W - 12, floorY);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = C('--rope');
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(xL, yL - mh / 2);
+    ctx.lineTo(xL, cy);
+    ctx.arc(cx, cy, R, Math.PI, 0, false);
+    ctx.lineTo(xR, yR - mh / 2);
+    ctx.stroke();
+
+    ctx.fillStyle = C('--pulley');
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = C('--panel');
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.48, 0, Math.PI * 2);
+    ctx.fill();
+
+    const spin = q.s / PULLEY_RADIUS_M;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(spin);
+    ctx.strokeStyle = C('--star');
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(R * 0.82, 0);
+    ctx.stroke();
+    ctx.fillStyle = C('--star');
+    ctx.beginPath();
+    ctx.arc(R * 0.82, 0, compact ? 3 : 3.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = C('--ink');
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.stroke();
+
+    drawMass(ctx, xL, yL, mw, mh, C('--body'), 'm1', compact);
+    drawMass(ctx, xR, yR, mw, mh, C('--ball'), 'm2', compact);
+
+    if (st.forces) {
+      const fScale = compact ? 1.5 : 1.9;
+      const lW1 = clamp(st.m1 * G * fScale, 12, 64);
+      const lW2 = clamp(st.m2 * G * fScale, 12, 64);
+      const lT1 = clamp(M.Tleft * fScale, 12, 64);
+      const lT2 = clamp(M.Tright * fScale, 12, 64);
+
+      arrow(ctx, xL - mw * 0.25, yL - mh * 0.36, xL - mw * 0.25, yL - mh * 0.36 - lT1, C('--vel'), 1.8);
+      arrow(ctx, xL + mw * 0.25, yL + mh * 0.36, xL + mw * 0.25, yL + mh * 0.36 + lW1, C('--ball'), 1.8);
+      arrow(ctx, xR - mw * 0.25, yR - mh * 0.36, xR - mw * 0.25, yR - mh * 0.36 - lT2, C('--vel'), 1.8);
+      arrow(ctx, xR + mw * 0.25, yR + mh * 0.36, xR + mw * 0.25, yR + mh * 0.36 + lW2, C('--ball'), 1.8);
+
+      if (!compact) {
+        ctx.fillStyle = C('--vel');
+        ctx.font = '12px ' + C('--sans');
+        ctx.textAlign = 'right';
+        ctx.fillText('T1', xL - mw * 0.25 - 8, yL - mh * 0.36 - lT1 * 0.55);
+        ctx.fillText('T2', xR - mw * 0.25 - 8, yR - mh * 0.36 - lT2 * 0.55);
+        ctx.fillStyle = C('--ball');
+        ctx.textAlign = 'left';
+        ctx.fillText('m1g', xL + mw * 0.25 + 5, yL + mh * 0.36 + lW1 + 14);
+        ctx.fillText('m2g', xR + mw * 0.25 + 5, yR + mh * 0.36 + lW2 + 14);
+      }
+    }
+
+    const dir = M.moving ? (M.a > 0 ? 'right mass down' : 'left mass down') : 'balanced: no motion';
+    ctx.fillStyle = C('--muted');
+    ctx.font = '12px ' + C('--sans');
+    ctx.textAlign = 'left';
+    ctx.fillText(dir, 12, 18);
+    ctx.fillText('travel limit d = ' + st.d.toFixed(1) + ' m', 12, 34);
+  }
+
+  // 3) READOUTS + CONTROLS.
+  const scrub = $('scrub');
+  const tabs = [$('tab1'), $('tab2')];
+  function updateFormulaText() {
+    if (st.mode === 1) {
+      $('f_a').innerHTML = '<i>a</i> = (<i>m</i><sub>2</sub> - <i>m</i><sub>1</sub>)<i>g</i> / (<i>m</i><sub>1</sub> + <i>m</i><sub>2</sub>)';
+      $('f_T').innerHTML = '<i>T</i> = 2<i>m</i><sub>1</sub><i>m</i><sub>2</sub><i>g</i> / (<i>m</i><sub>1</sub> + <i>m</i><sub>2</sub>)';
+    } else {
+      $('f_a').innerHTML = '<i>a</i> = (<i>m</i><sub>2</sub> - <i>m</i><sub>1</sub>)<i>g</i> / (<i>m</i><sub>1</sub> + <i>m</i><sub>2</sub> + <i>I</i>/<i>R</i><sup>2</sup>), <i>I</i> = &frac12;<i>M</i><sub>p</sub><i>R</i><sup>2</sup>';
+      $('f_T').innerHTML = '<i>T</i><sub>1</sub> = <i>m</i><sub>1</sub>(<i>g</i> + <i>a</i>), <i>T</i><sub>2</sub> = <i>m</i><sub>2</sub>(<i>g</i> - <i>a</i>)';
+    }
+  }
+  function readout() {
+    $('m1_v').textContent = st.m1.toFixed(1) + ' kg';
+    $('m2_v').textContent = st.m2.toFixed(1) + ' kg';
+    $('mp_v').textContent = st.mp.toFixed(1) + ' kg';
+    $('d_v').textContent = st.d.toFixed(1) + ' m';
+    $('rate_v').textContent = st.rate.toFixed(1) + 'x';
+    $('tval').textContent = st.t.toFixed(2);
+
+    if (!M.moving) {
+      $('r_a').textContent = '0.00 m/s^2';
+      $('r_T').textContent = st.mode === 1
+        ? M.Tideal.toFixed(2) + ' N'
+        : 'left ' + M.Tleft.toFixed(2) + ' N, right ' + M.Tright.toFixed(2) + ' N';
+      $('r_tstop').textContent = 'no motion';
+      $('r_vstop').textContent = '0.00 m/s';
+      $('r_omega').textContent = '0.00 rad/s';
+      scrub.value = '0';
+      return;
+    }
+
+    $('r_a').textContent = Math.abs(M.a).toFixed(2) + ' m/s^2 (' + (M.a > 0 ? 'm2 down' : 'm1 down') + ')';
+    $('r_T').textContent = st.mode === 1
+      ? M.Tideal.toFixed(2) + ' N'
+      : 'left ' + M.Tleft.toFixed(2) + ' N, right ' + M.Tright.toFixed(2) + ' N';
+    $('r_tstop').textContent = M.tStop.toFixed(2) + ' s';
+    $('r_vstop').textContent = M.vStop.toFixed(2) + ' m/s';
+    $('r_omega').textContent = (Math.abs(M.pos(st.t).v) / PULLEY_RADIUS_M).toFixed(2) + ' rad/s';
+    scrub.value = String(Math.round(st.t / Math.max(1e-9, M.tEnd) * 1000));
+  }
+  function rebuild() {
+    M = model();
+    st.t = 0;
+    st.playing = false;
+    $('play').textContent = 'Play';
+    updateFormulaText();
+    readout();
+    draw();
+  }
+  function setMode(mode) {
+    st.mode = mode;
+    tabs.forEach((tab, i) => tab.setAttribute('aria-selected', mode === i + 1 ? 'true' : 'false'));
+    $('lab_mp').hidden = mode !== 2;
+    $('lede').textContent = TEXT[mode].lede;
+    $('notes').innerHTML = TEXT[mode].notes;
+    rebuild();
+  }
+
+  tabs.forEach((tab, idx) => {
+    const mode = idx + 1;
+    tab.addEventListener('click', () => setMode(mode));
+    tab.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      e.preventDefault();
+      const next = e.key === 'ArrowRight' ? (idx + 1) % tabs.length : (idx + tabs.length - 1) % tabs.length;
+      tabs[next].focus();
+      setMode(next + 1);
+    });
+  });
+
+  ['m1', 'm2', 'd', 'mp'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      st[id] = +$(id).value;
+      rebuild();
+    });
+  });
+  $('rate').addEventListener('input', () => { st.rate = +$('rate').value; readout(); });
+  $('forces').addEventListener('change', () => { st.forces = $('forces').checked; draw(); });
+  $('reset').addEventListener('click', rebuild);
+  scrub.addEventListener('input', () => {
+    if (!M.moving) return;
+    st.t = (+scrub.value) / 1000 * M.tEnd;
+    st.playing = false;
+    $('play').textContent = 'Play';
+    readout();
+    draw();
+  });
+  $('play').addEventListener('click', () => {
+    if (!M.moving) return;
+    if (st.playing) {
+      st.playing = false;
+      $('play').textContent = 'Play';
+      return;
+    }
+    if (st.t >= M.tEnd) st.t = 0;
+    st.playing = true;
+    $('play').textContent = 'Pause';
+    last = null;
+    requestAnimationFrame(frame);
+  });
+  window.addEventListener('resize', draw);
+
+  // 4) LOOP. Pauses when hidden.
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) {
+      last = null;
+      requestAnimationFrame(frame);
+      return;
+    }
+    if (last !== null) {
+      st.t += (ts - last) / 1000 * st.rate;
+      if (st.t >= M.tEnd) {
+        st.t = M.tEnd;
+        st.playing = false;
+        $('play').textContent = 'Play';
+      }
+    }
+    last = ts;
+    readout();
+    draw();
+    if (st.playing) requestAnimationFrame(frame);
+  }
+
+  setMode(1);
+})();
+</script>
+</body>
+</html>
