@@ -4,9 +4,7 @@ Monkey and hunter; dropped vs. fired bullet
 
 ### Forces & momentum
 Forces in 1D, Ramp: Forces and Motion, The Ramp
-Atwood machine and variants
 Banked curve and loop-the-loop
-Ballistic pendulum
 
 ### Rotation
 Torque, Ladybug Revolution
