@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<!--
+  Newton's cannonball - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The orbit is the closed-form
+  conic for a tangential launch, and it was checked before the interface was built: the launch point
+  lands exactly on an apsis on both sides of circular speed, vis-viva holds at launch and at the far
+  apsis, energy and angular momentum are constant around the path to twelve figures, e and the energy
+  cross 0 and 1 exactly at escape speed, and the impact radius solves to the Earth's radius. The time
+  along the path comes from Kepler's equation - elliptic, Barker's for the parabola, hyperbolic beyond
+  escape - and agrees with an RK4 integration of a = -GM r / |r|^3 to about one part in 10^13. The
+  two are exact inverses over a whole flight rather than over one revolution, which matters for a
+  shot launched below circular speed: that one starts at apogee and runs its true anomaly from pi
+  to 3 pi, straight through the wrap in atan2. Every launch speed from 1 km/s to past escape has
+  been checked for a positive flight time, a true anomaly that only ever increases, and an endpoint
+  that lands on the ground or back at the launch radius as the case requires.
+  Credit: after the thought experiment in Newton's "A Treatise of the System of the World" (1728).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Newton's cannonball</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --ocean: #ACC8D9; --land: #AEC3A6; --air: #C6DCEA; --path: #C8321E; --past: #6E7C85; --rock: #7A6A55;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #sky { aspect-ratio: 900 / 660; }
+  [hidden] { display: none !important; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .ok { color: var(--vel); } .readout .no { color: var(--hot); } .readout .up { color: var(--body); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    #sky { aspect-ratio: 1 / 1; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Newton's cannonball</h1>
+
+  <p class="lede">Newton asked what would happen if you fired a cannon horizontally from a mountain high enough to
+  clear the air, harder and harder. The ball falls the whole way, always. What changes is how far the ground has
+  curved away beneath it by the time it gets there &mdash; until the ball falls around the world instead of into it.
+  Fire a few shots and leave them on the screen.</p>
+
+  <canvas id="sky" aria-label="The Earth with a mountain, and the path of a cannonball fired horizontally"></canvas>
+
+  <div class="row2">
+    <button id="fire">Fire</button>
+    <button id="play" class="secondary">Pause</button>
+    <button id="vcirc" class="secondary">circular speed</button>
+    <button id="vesc" class="secondary">escape speed</button>
+    <button id="clear" class="secondary">Clear shots</button>
+    <label><input type="checkbox" id="keep" checked> keep previous shots</label>
+  </div>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label><div class="row"><span>Launch speed</span><span class="val" id="v_v"></span></div>
+      <input type="range" id="v" min="0.5" max="13" step="0.01" value="6.5"></label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> Start slow and walk the speed up, firing as you go and leaving the old shots on screen.
+    The early paths look like ordinary projectile arcs, because over a few hundred kilometers the Earth is nearly
+    flat. They are not arcs though &mdash; each one is a piece of a very long ellipse whose far focus is the center
+    of the Earth, and you are only ever seeing the last sliver before it runs into the ground.</p>
+    <p>Creep up on circular speed and watch the impact point race away from you. Then find the moment it stops
+    coming back at all. That moment arrives <i>before</i> circular speed: all that is needed is for the perigee to
+    clear the surface, so the ball skims the far side of the world and returns to the mountain from behind. Watch
+    the perigee readout cross zero. Only at circular speed exactly does the path become a circle, and only then
+    does the ball stay the same height the whole way round.</p>
+    <p>Push past that and the mountain becomes the <i>near</i> point of the orbit rather than the far one &mdash;
+    the ball now climbs away and comes back, and the period stretches out fast. Keep going to escape speed and the
+    ellipse never closes at all. Notice that escape speed is only about 1.41 times circular speed, however high the
+    mountain: the same &radic;2 every time.</p>
+    <p><b>What this leaves out.</b> No air, which is the whole reason Newton specified a mountain above the
+    atmosphere; a real shot at these speeds would burn up. The Earth is a point mass with no bulge, it does not
+    rotate, and it is alone in the universe &mdash; no Moon, no Sun. The cannonball's own mass never enters, which
+    is why it is missing from every formula here. The mountain is drawn to scale but is far taller than any real one.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = Math.PI * 2;
+
+  const MU = 3.986004418e14;      // GM for the Earth, m^3/s^2
+  const RE = 6.371e6;             // m
+  const RATE = 700;               // seconds of flight per second of animation
+
+  const H0 = 8e5;                 // the mountain, fixed: tall enough to spread the family out
+  const st = { v: 6500, t: 0, maxR: 0, playing: true, keep: true, flying: true, shots: [] };
+  let view = 1.3 * RE;            // world radius the canvas currently shows, eased toward its target
+
+  // ================================================================
+  // 1. MODEL
+  //    One body under an inverse-square pull, fired horizontally from r0 = RE + h. Because the
+  //    launch velocity is perpendicular to the radius, the launch point is exactly an apsis, and
+  //    the whole path is a conic known in closed form - no integration, so scrubbing is exact.
+  //      L = r0 v0                    angular momentum per unit mass
+  //      E = v0^2/2 - mu/r0           energy per unit mass
+  //      p = L^2/mu                   semi-latus rectum
+  //      e = |r0 v0^2/mu - 1|         eccentricity, for this tangential launch only
+  //      r(nu) = p / (1 + e cos nu)   nu measured from perigee
+  //    Below circular speed the launch point is apogee (nu0 = pi) and the ball falls toward a
+  //    perigee on the far side; above it the launch point is perigee (nu0 = 0) and the ball climbs.
+  //    It strikes the ground where r = RE, that is cos nu = (p/RE - 1)/e, if such a nu exists.
+  //    Time along the path comes from Kepler's equation in whichever regime applies.
+  // ================================================================
+  function solve(h, v0) {
+    const r0 = RE + h, L = r0 * v0, E = v0 * v0 / 2 - MU / r0;
+    const p = L * L / MU, u = r0 * v0 * v0 / MU, e = Math.abs(u - 1);
+    const peri = u >= 1;                       // launched at perigee?
+    const nu0 = peri ? 0 : Math.PI;
+    const a = Math.abs(e - 1) < 1e-12 ? Infinity : p / (1 - e * e);
+    const rp = p / (1 + e), ra = e < 1 ? p / (1 - e) : Infinity;
+    const T = e < 1 ? TAU * Math.sqrt(a * a * a / MU) : Infinity;
+    // where it meets the ground, going forward from the launch
+    let nuHit = null, range = 0;
+    if (!peri && rp < RE) {
+      const c = (p / RE - 1) / e;
+      if (Math.abs(c) <= 1) { nuHit = TAU - Math.acos(c); range = (nuHit - nu0) * RE; }
+    }
+    const o = { r0, L, E, p, e, a, peri, nu0, rp, ra, T, nuHit, range,
+      vc: Math.sqrt(MU / r0), ve: Math.sqrt(2 * MU / r0), v0 };
+    o.nuMax = e < 1 ? nu0 + TAU : nu0 + (Math.acos(-1 / e) - 1e-3);   // one lap, or out to the asymptote
+    o.tEnd = tOf(nuHit !== null ? nuHit : o.nuMax, o) - tOf(nu0, o);
+    return o;
+  }
+  const rOf = (o, nu) => o.p / (1 + o.e * Math.cos(nu));
+
+  // Time since perigee at a given true anomaly.
+  //
+  // atan2 only ever returns a principal value, so the eccentric anomaly it gives wraps round at
+  // 2 pi. That matters here because a shot launched below circular speed starts at APOGEE, so its
+  // true anomaly runs from pi to 3 pi over one orbit - straight through the wrap. Left alone, the
+  // second half of every such flight came out at a negative time, the flight appeared to be over
+  // before it began, and the whole orbit was painted on screen at once. Both this function and its
+  // inverse below therefore strip whole revolutions off before using atan2 and add them back after,
+  // which keeps the two exact inverses over the entire flight rather than over one revolution.
+  function tOf(nu, o) {
+    const e = o.e;
+    if (Math.abs(e - 1) < 1e-10) {                       // parabola
+      const D = Math.tan(nu / 2), q = o.p / 2;
+      return Math.sqrt(2 * q * q * q / MU) * (D + D * D * D / 3);
+    }
+    if (e < 1) {
+      const k = Math.floor((nu + Math.PI) / TAU), nuP = nu - k * TAU;
+      const E = 2 * Math.atan2(Math.sqrt(1 - e) * Math.sin(nuP / 2), Math.sqrt(1 + e) * Math.cos(nuP / 2));
+      return (E - e * Math.sin(E) + k * TAU) / Math.sqrt(MU / (o.a * o.a * o.a));
+    }
+    const A = -o.a;
+    const H = 2 * Math.atanh(Math.sqrt((e - 1) / (e + 1)) * Math.tan(nu / 2));
+    return (e * Math.sinh(H) - H) / Math.sqrt(MU / (A * A * A));
+  }
+  // and the inverse: true anomaly at a given time since perigee
+  function nuOf(t, o) {
+    const e = o.e;
+    if (Math.abs(e - 1) < 1e-10) {                       // Barker's equation, solved in closed form
+      const q = o.p / 2, A = 3 * Math.sqrt(MU / (2 * q * q * q)) * t / 2;
+      const B = Math.cbrt(A + Math.sqrt(A * A + 1));
+      return 2 * Math.atan(B - 1 / B);
+    }
+    if (e < 1) {
+      const n = Math.sqrt(MU / (o.a * o.a * o.a)), M = n * t;
+      let E = M + e * Math.sin(M);
+      for (let i = 0; i < 80; i++) {
+        const d = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+        E -= d; if (Math.abs(d) < 1e-14) break;
+      }
+      const k = Math.floor((E + Math.PI) / TAU), EP = E - k * TAU;
+      return 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(EP / 2), Math.sqrt(1 - e) * Math.cos(EP / 2)) + k * TAU;
+    }
+    const A = -o.a, M = Math.sqrt(MU / (A * A * A)) * t;
+    let H = Math.asinh(M / e + 0.5);
+    for (let i = 0; i < 200; i++) {
+      const d = (e * Math.sinh(H) - H - M) / (e * Math.cosh(H) - 1);
+      H -= d; if (Math.abs(d) < 1e-14) break;
+    }
+    return 2 * Math.atan2(Math.sqrt(e + 1) * Math.sinh(H / 2), Math.sqrt(e - 1) * Math.cosh(H / 2));
+  }
+
+  // The orbit plane is drawn so the launch point sits at the top of the screen and the ball sets
+  // off to the right, which means world angle runs backwards from the true anomaly.
+  const worldAngle = (o, nu) => Math.PI / 2 - (nu - o.nu0);
+  function xy(o, nu) {
+    const r = rOf(o, nu), a = worldAngle(o, nu);
+    return [r * Math.cos(a), r * Math.sin(a)];
+  }
+  // Two orbits are in play. `orb` is whatever the speed slider currently describes, which the
+  // readouts report on so you can aim before you shoot. `shot` is the one actually in the air or
+  // already landed, and it is the only one the canvas ever draws. They are the same object from
+  // the moment Fire is pressed until the slider is next moved, and moving the slider never puts
+  // anything in the air - only Fire does that.
+  let orb = solve(H0, st.v), shot = orb;
+  const nuNow = () => nuOf(tOf(shot.nu0, shot) + Math.min(st.t, shot.tEnd), shot);
+  function refit() { orb = solve(H0, st.v); }
+  function launch() {
+    // the shot that was on screen becomes a ghost, so walking the speed up builds the family
+    if (st.keep && shot && shot !== orb && st.t > 0) {
+      st.shots.push(shot);
+      if (st.shots.length > 10) st.shots.shift();
+    }
+    shot = orb;
+    st.t = 0; st.flying = true; st.maxR = shot.r0;
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  let G = { cx: 0, cy: 0, S: 1 };
+  const PX = (wx, wy) => [G.cx + wx * G.S, G.cy - wy * G.S];
+
+  function pathPoints(o, nuEnd) {
+    const pts = [], n = 420;
+    for (let i = 0; i <= n; i++) {
+      const nu = o.nu0 + (nuEnd - o.nu0) * i / n;
+      const r = rOf(o, nu);
+      if (r > 60 * RE || r < 0) break;
+      pts.push(xy(o, nu));
+    }
+    return pts;
+  }
+  function stroke(ctx, pts, color, w, alpha) {
+    if (pts.length < 2) return;
+    ctx.save(); if (alpha != null) ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    pts.forEach((q, i) => { const [x, y] = PX(q[0], q[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.stroke(); ctx.restore();
+  }
+
+  function draw() {
+    const { ctx, W, H, compact } = fit($('sky'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+
+    // Ease the zoom toward what is actually on screen. It follows how far the ball has climbed so
+    // far, never the apogee it is heading for - otherwise the view widens the instant you pick a
+    // fast shot and the surprise is gone before the cannon fires. Shots already flown are included,
+    // since those hold no surprise and the family should stay in frame.
+    let ghost = 0;
+    st.shots.forEach(o => { ghost = Math.max(ghost, o.nuHit !== null ? o.r0 : (o.e < 1 ? o.ra : 9 * RE)); });
+    const want = Math.min(12 * RE, Math.max(1.28 * shot.r0, 1.30 * st.maxR, 1.12 * ghost));
+    view += (want - view) * 0.10;
+    G = { cx: W / 2, cy: H * 0.56, S: Math.min(W, H) * 0.46 / view };
+    const { cx, cy, S } = G;
+
+    // A pale Earth on purpose: a saturated globe puts the trajectories at about 1.1 contrast
+    // against it, which is no contrast at all, and the low shots are exactly the ones that run
+    // along the surface. Against this the red path sits at about 3.4 and the gray ghosts at 2.8.
+    // The atmosphere is drawn only once it is thick enough on screen to be worth a band, and it is
+    // the reason Newton specified a mountain: the ball has to start above it.
+    const air = 1.0e5;
+    if (air * S > 2.5) {
+      ctx.fillStyle = C('--air');
+      ctx.beginPath(); ctx.arc(cx, cy, (RE + air) * S, 0, TAU); ctx.fill();
+    }
+    const grd = ctx.createRadialGradient(cx, cy, RE * S * 0.2, cx, cy, RE * S);
+    grd.addColorStop(0, '#C2D9E5'); grd.addColorStop(1, C('--ocean'));
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(cx, cy, RE * S, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(23,33,40,0.55)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(cx, cy, RE * S, 0, TAU); ctx.stroke();
+
+    // the mountain, drawn at true scale at the top of the globe
+    const half = 0.075, apex = PX(0, orb.r0);
+    ctx.fillStyle = C('--rock');
+    ctx.beginPath();
+    ctx.moveTo(...PX(Math.cos(Math.PI / 2 - half) * RE, Math.sin(Math.PI / 2 - half) * RE));
+    ctx.lineTo(apex[0], apex[1]);
+    ctx.lineTo(...PX(Math.cos(Math.PI / 2 + half) * RE, Math.sin(Math.PI / 2 + half) * RE));
+    ctx.arc(cx, cy, RE * S, -(Math.PI / 2 + half), -(Math.PI / 2 - half));
+    ctx.closePath(); ctx.fill();
+
+    // the shots already fired, oldest faintest
+    st.shots.forEach((s, i) => {
+      const a = 0.42 + 0.38 * (i + 1) / st.shots.length;
+      stroke(ctx, pathPoints(s, s.nuHit !== null ? s.nuHit : s.nuMax), C('--past'), 1.8, a);
+      if (s.nuHit !== null) {
+        const [x, y] = PX(...xy(s, s.nuHit));
+        ctx.fillStyle = C('--past'); ctx.globalAlpha = a + 0.25;
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+      }
+    });
+
+    // Only the part already flown is drawn. Sketching the rest in advance would give away where
+    // the shot ends up before it gets there, which is the one moment this simulation exists for.
+    const nu = nuNow();
+    stroke(ctx, pathPoints(shot, nu), C('--path'), 2.4);
+
+    // where it landed - shown once it has actually landed, for the same reason
+    if (shot.nuHit !== null && !st.flying) {
+      const [hx, hy] = PX(...xy(shot, shot.nuHit));
+      ctx.strokeStyle = C('--path'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hx, hy, 5, 0, TAU); ctx.stroke();
+    }
+
+    // the cannonball
+    const [bx, by] = PX(...xy(shot, nu));
+    ctx.fillStyle = C('--ball');
+    ctx.beginPath(); ctx.arc(bx, by, 4.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke();
+
+    // scale bar, because none of these distances mean anything without one
+    const barKm = niceKm(view / 4 / 1e3), barPx = barKm * 1e3 * S;
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(14, H - 22); ctx.lineTo(14 + barPx, H - 22); ctx.stroke();
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText(barKm.toLocaleString() + ' km', 14, H - 8);
+    if (!compact) {
+      ctx.textAlign = 'right';
+      // a running clock rather than the orbit's period: the period would announce how long the
+      // flight is going to be before the ball has gone anywhere. It also puts a number on the
+      // animation, which runs at RATE times real time.
+      ctx.fillText(st.flying ? dur(st.t) + ' into the flight'
+        : (shot.nuHit !== null ? 'flight lasted ' + dur(st.t)
+           : (shot.e < 1 ? 'one orbit: ' + dur(shot.T) : 'it never comes back')), W - 14, H - 8);
+    }
+  }
+  const niceKm = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); return [1, 2, 5, 10].find(m => m * p >= v * 0.5) * p; };
+  function dur(s) {
+    if (!isFinite(s)) return '—';
+    if (s < 10800) return (s / 60).toFixed(1) + ' min';
+    if (s < 86400 * 2) return (s / 3600).toFixed(2) + ' h';
+    return (s / 86400).toFixed(2) + ' days';
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  const km = m => (m / 1e3).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  function shape(o) {
+    if (o.e < 1e-4) return ['circle', 'ok'];
+    if (o.e > 1 + 1e-9) return ['hyperbola', 'up'];
+    if (Math.abs(o.e - 1) < 1e-9) return ['parabola', 'up'];
+    return [o.nuHit !== null ? 'ellipse, cut short by the ground' : 'ellipse', o.nuHit !== null ? 'no' : 'ok'];
+  }
+  function readout() {
+    const o = orb, [name, cls] = shape(o);
+    let html = '';
+    html += card('Launch speed', (o.v0 / 1e3).toFixed(2) + ' km/s',
+      'circular ' + (o.vc / 1e3).toFixed(2) + ', escape ' + (o.ve / 1e3).toFixed(2)
+      + ' km/s from an ' + km(H0) + ' km mountain');
+    html += card('Path', name, 'eccentricity <i>e</i> = ' + (o.e > 40 ? '&gt;40' : o.e.toFixed(3)), cls);
+    html += card('Outcome',
+      o.nuHit !== null ? 'strikes the ground' : (o.e < 1 ? 'completes the orbit' : 'escapes'),
+      o.nuHit !== null ? km(o.range) + ' km downrange, ' + (o.range / (TAU * RE) * 100).toFixed(1) + '% of the way around'
+        : (o.e < 1 ? 'back to the mountain after ' + dur(o.T)
+           : (Math.abs(o.e - 1) < 1e-9 ? 'only just &mdash; energy is exactly zero, so it arrives at infinity with nothing left'
+              : 'gone for good &mdash; energy is positive, so it still has speed to spare at infinity')),
+      o.nuHit !== null ? 'no' : 'ok');
+    html += card('Highest point', o.e < 1 ? km(o.ra - RE) + ' km up' : '&infin;',
+      o.e < 1 ? (o.peri ? 'apogee, on the far side of the world' : 'apogee is the mountain itself') : 'it keeps climbing forever',
+      'up');
+    html += card('Lowest point', (o.rp >= RE ? km(o.rp - RE) + ' km up' : km(RE - o.rp) + ' km below the surface'),
+      o.rp >= RE ? 'perigee clears the ground, so it comes round' : 'the ground is in the way, so the ellipse never finishes',
+      o.rp >= RE ? 'ok' : 'no');
+    html += card('Period', dur(o.T),
+      o.e >= 1 ? 'an open path has no period'
+        : (o.nuHit !== null ? 'what it would be if the ground were not in the way'
+           : '<i>T</i> = 2π√(<i>a</i>³/GM), with <i>a</i> = ' + km(o.a) + ' km'));
+    $('readout').innerHTML = html;
+    $('v_v').textContent = (st.v / 1e3).toFixed(2) + ' km/s (' + (st.v / o.vc).toFixed(2) + ' × circular)';
+  }
+
+  $('v').addEventListener('input', () => { st.v = +$('v').value * 1e3; refit(); readout(); draw(); });
+  const setV = v => { st.v = v; $('v').value = (v / 1e3).toFixed(2); refit(); readout(); draw(); };
+  $('vcirc').addEventListener('click', () => setV(orb.vc));
+  $('vesc').addEventListener('click', () => setV(orb.ve));
+  // Fire is the only thing that puts a ball in the air. It banks the shot that was on screen as
+  // a ghost first, but never the one it is about to launch - that would paint the whole path on
+  // screen before the ball had flown any of it.
+  $('fire').addEventListener('click', () => {
+    launch();
+    if (!st.playing) { st.playing = true; $('play').textContent = 'Pause'; last = null; requestAnimationFrame(frame); }
+  });
+  $('clear').addEventListener('click', () => { st.shots = []; draw(); });
+  $('keep').addEventListener('change', () => { st.keep = $('keep').checked; });
+  $('play').addEventListener('click', () => {
+    st.playing = !st.playing; $('play').textContent = st.playing ? 'Pause' : 'Play';
+    if (st.playing) { last = null; requestAnimationFrame(frame); }
+  });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    const dt = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (st.flying) {
+      st.t += dt * RATE;
+      if (st.t >= shot.tEnd) { st.t = shot.tEnd; st.flying = false; }
+      st.maxR = Math.max(st.maxR, rOf(shot, nuNow()));
+    }
+    readout(); draw();
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { st.playing = false; $('play').textContent = 'Play'; }
+  readout(); draw();
+  if (st.playing) requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

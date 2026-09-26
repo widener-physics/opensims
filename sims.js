@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'newtons-cannon',
+    title: "Newton's cannonball",
+    topic: 'astronomy',
+    tags: ['orbits', 'gravitation', 'escape speed', 'Kepler', 'conic sections', 'projectile motion'],
+    blurb: "Fire a cannon horizontally from a mountain above the air, harder and harder, and leave the shots on the screen to build Newton's family of curves. The path is the exact conic throughout, so you can watch the impact point race away, the perigee rise above the ground before circular speed is reached, and the ellipse finally refuse to close at escape speed.",
+    level: 'intro',
+    added: '2026-09-25',
+    status: 'ready'
+  },
+  {
     slug: 'angular-velocity',
     title: 'Angular and linear velocity',
     topic: 'rotation',
