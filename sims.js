@@ -16,23 +16,13 @@ window.TOPICS = {
 
 window.SIMS = [
   {
-    slug: 'ballistic-pendulum',
-    title: 'Ballistic pendulum',
-    topic: 'dynamics',
-    tags: ['inelastic collision', 'momentum', 'energy', 'pendulum'],
-    blurb: 'A projectile embeds in a hanging block, then the pair swings upward. Use the rise height to infer launch speed and compare it with the set value.',
+    slug: 'angular-velocity',
+    title: 'Angular and linear velocity',
+    topic: 'rotation',
+    tags: ['angular velocity', 'tangential speed', 'centripetal acceleration', 'period', 'rigid body'],
+    blurb: 'Drag a ladybug anywhere on a spinning turntable. Every point shares one angular velocity, but the speed each point travels at grows with the radius. Velocity and centripetal acceleration arrows on fixed scales, with both plotted against radius so the slopes are omega and omega squared.',
     level: 'intro',
-    added: '2026-09-11',
-    status: 'ready'
-  },
-  {
-    slug: 'atwood-machine',
-    title: 'Atwood machine',
-    topic: 'dynamics',
-    tags: ['Newton\'s laws', 'tension', 'pulley inertia', 'constant acceleration'],
-    blurb: 'Two hanging masses race over a pulley. Compare the ideal case with a pulley that has rotational inertia, and see how acceleration and rope tensions change.',
-    level: 'intro',
-    added: '2026-09-11',
+    added: '2026-09-25',
     status: 'ready'
   },
   {

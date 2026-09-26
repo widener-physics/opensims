@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<!--
+  Angular and linear velocity - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction; the rigid-rotation relations
+  were checked numerically before the interface was built - v = omega r, a = omega^2 r = v^2/r,
+  T = 2 pi / omega, arc length v T = 2 pi r, and the position found by integrating the velocity field
+  v = omega z-hat cross r agreeing with r(cos omega t, sin omega t) to nine figures.
+  Credit: replaces the idea of PhET's discontinued Java "Ladybug Revolution" simulation, without torque.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Angular and linear velocity</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --disk: #E7EDF1; --spoke: #1D4F73; --acc: #B5306D; --bug: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 16px; max-width: 66ch; }
+
+  .stage { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #disk { aspect-ratio: 1 / 1; touch-action: none; cursor: grab; }
+  #disk.grabbing { cursor: grabbing; }
+  #plot { aspect-ratio: 1 / 1; }
+  [hidden] { display: none !important; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .green { color: var(--vel); } .readout .pink { color: var(--acc); } .readout .blue { color: var(--body); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 70ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 14px 48px; }
+    .stage { grid-template-columns: 1fr; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Angular and linear velocity</h1>
+
+  <p class="lede">A ladybug rides a turntable. Drag her anywhere on the disk, or use the sliders. Every point on
+  a rigid turntable shares one angular velocity &omega;, but the speed each point actually travels at depends on
+  how far out it sits: <i>v</i> = &omega;<i>r</i>. The green arrow is her velocity, always along the rim; the pink
+  one is her centripetal acceleration, always straight at the axle.</p>
+
+  <div class="stage">
+    <canvas id="disk" aria-label="Turntable seen from above with a draggable ladybug"></canvas>
+    <canvas id="plot" aria-label="Speed and centripetal acceleration plotted against radius"></canvas>
+  </div>
+
+  <div class="row2">
+    <button id="play">Pause</button>
+    <button id="reset" class="secondary">Reset</button>
+    <label><input type="checkbox" id="spoke"> velocity all along the spoke</label>
+    <label><input type="checkbox" id="showa" checked> centripetal acceleration</label>
+  </div>
+
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label><div class="row"><span>Rotation speed &omega;</span><span class="val" id="w_v"></span></div>
+      <input type="range" id="w" min="-3" max="3" step="0.1" value="2"></label>
+    <label><div class="row"><span>Radius <i>r</i> (how far out she sits)</span><span class="val" id="r_v"></span></div>
+      <input type="range" id="r" min="0" max="1" step="0.01" value="0.6"></label>
+  </div>
+
+  <div class="notes">
+    <p><b>What to try.</b> Park the ladybug at the rim and note her speed. Now slide her halfway in without touching
+    the rotation slider. The turntable is turning exactly as fast as it was &mdash; the period readout does not budge
+    &mdash; but her own speed has halved. That is the whole content of <i>v</i> = &omega;<i>r</i>: &omega; belongs to
+    the turntable, <i>v</i> belongs to the point. Turning on <i>velocity all along the spoke</i> makes the same point
+    in one picture: a row of arrows sharing one &omega;, each one longer than the last.</p>
+    <p>Then hold the radius fixed and double &omega;. The velocity arrow doubles, as you would expect. The pink
+    acceleration arrow does not: it grows by a factor of four, because <i>a</i> = &omega;<sup>2</sup><i>r</i>. On the
+    graph you can watch the same thing happen to the two slopes &mdash; the green line tilts up twice as fast, the
+    pink one four times as fast.</p>
+    <p>Drag the ladybug all the way to the center. Her speed and her acceleration both fall to zero even though the
+    turntable is still spinning, which is why the axle is the only place on a merry-go-round where nothing pushes on
+    you. Finally, drag &omega; through zero to the negative side: the turntable reverses, the velocity arrow flips
+    with it, and the acceleration arrow does not &mdash; it still points inward, because the sign of &omega; is squared away.</p>
+    <p><b>What this leaves out.</b> &omega; changes the instant you move the slider, so there is no angular
+    acceleration and no tangential component to the acceleration; the pink arrow is purely centripetal. Nothing here
+    depends on the ladybug's mass, and no force is drawn &mdash; this is kinematics only. The disk is rigid and she
+    never slips on it, which is the assumption that lets every point share a single &omega;.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = Math.PI * 2;
+
+  const W_MAX = 3;          // rad/s, the ends of the rotation slider
+  const R_MAX = 1;          // m, the rim of the turntable
+  const V_MAX = W_MAX * R_MAX;            // 3 m/s at the rim, full speed
+  const A_MAX = W_MAX * W_MAX * R_MAX;    // 9 m/s^2 there
+
+  // phi   is the turntable's own rotation angle
+  // beta  is where the ladybug sits on the disk, measured from the painted mark
+  // so she is always found at angle phi + beta, a distance rad from the axle
+  const st = { w: 2, rad: 0.6, phi: 0, beta: 0, t: 0, turned: 0,
+    playing: true, dragging: false, heading: Math.PI / 2,
+    spoke: false, showa: true };
+
+  // ================================================================
+  // 1. MODEL
+  //    Rigid rotation about a fixed axle. Every point shares omega; only r differs.
+  //      angle of the bug   theta = phi + beta,        d(phi)/dt = omega
+  //      position           r_vec = r (cos theta, sin theta)
+  //      velocity           v_vec = omega z-hat x r_vec = omega r (-sin theta, cos theta)
+  //                         so the speed is |v| = |omega| r, always along the tangent
+  //      acceleration       a_vec = -omega^2 r_vec, magnitude omega^2 r = v^2 / r,
+  //                         always pointing straight back at the axle
+  //      period             T = 2 pi / |omega|, the same for every point on the disk
+  //    omega is piecewise constant between slider moves, so stepping phi by omega*dt is exact.
+  // ================================================================
+  function step(dt) {
+    if (st.dragging) { st.t += dt; return; }
+    st.phi += st.w * dt;
+    st.turned += st.w * dt;
+    st.t += dt;
+    if (Math.abs(st.w) > 1e-6) st.heading = theta() + (st.w > 0 ? Math.PI / 2 : -Math.PI / 2);
+  }
+  const theta = () => st.phi + st.beta;
+  const speed = () => Math.abs(st.w) * st.rad;                 // v = omega r
+  const accel = () => st.w * st.w * st.rad;                    // a = omega^2 r = v^2 / r
+  const period = () => (Math.abs(st.w) < 1e-6 ? Infinity : TAU / Math.abs(st.w));
+
+  function reset() {
+    st.w = 2; st.rad = 0.6; st.phi = 0; st.beta = 0; st.t = 0; st.turned = 0;
+    st.heading = Math.PI / 2;
+    $('w').value = '2'; $('r').value = '0.6';
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 360 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w, alpha) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(11, L * 0.5);
+    ctx.save(); if (alpha != null) ctx.globalAlpha = alpha;
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2.6;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.75, y1 - uy * hd * 0.75); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45);
+    ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // Both arrow scales are fixed by the ends of the sliders, never by the value being drawn.
+  // A velocity arrow twice as long always means twice the speed, whatever else has been changed.
+  let geom = { cx: 0, cy: 0, S: 1, vS: 1, aS: 1 };
+  function setGeom(W, H) {
+    const S = Math.min(W, H) * 0.36;               // pixels per meter on the disk
+    geom = { cx: W / 2, cy: H / 2, S,
+      vS: 0.70 * S / V_MAX,                        // pixels per (m/s)
+      aS: 0.70 * S / A_MAX };                      // pixels per (m/s^2)
+  }
+  const PX = (r, a) => [geom.cx + r * geom.S * Math.cos(a), geom.cy - r * geom.S * Math.sin(a)];
+
+  function drawDisk() {
+    const { ctx, W, H, compact } = fit($('disk'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    setGeom(W, H);
+    const { cx, cy, S } = geom;
+    const th = theta(), R = R_MAX * S;
+
+    // The turntable is painted as a checkerboard in polar coordinates: four rings a quarter meter
+    // wide, each cut into quadrants, tinted so that neighbors always differ. The pattern is painted
+    // on the disk, so it rides phi and the rotation reads at every radius at once - and the outer
+    // patches visibly sweep past faster than the inner ones while sharing a single omega, which is
+    // the point of the whole simulation. Two close tints keep it quiet under the vectors.
+    const TINT = ['#EAEFF3', '#D5DFE8'];
+    for (let i = 0; i < 4; i++) {
+      const r0 = i * 0.25 * S, r1 = (i + 1) * 0.25 * S;
+      for (let q = 0; q < 4; q++) {
+        const a0 = -(st.phi + (q + 1) * Math.PI / 2), a1 = -(st.phi + q * Math.PI / 2);
+        ctx.fillStyle = ctx.strokeStyle = TINT[(i + q) % 2];
+        ctx.beginPath();
+        ctx.arc(cx, cy, r1, a0, a1);
+        ctx.arc(cx, cy, r0, a1, a0, true);
+        ctx.closePath();
+        ctx.fill(); ctx.lineWidth = 1; ctx.stroke();       // the stroke hides the seams between patches
+      }
+    }
+    ctx.strokeStyle = C('--body'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+
+    // a ruler straight down from the axle, to read the radius off the rings
+    ctx.strokeStyle = 'rgba(92,107,115,0.55)'; ctx.lineWidth = 1;
+    for (let r = 0.25; r <= R_MAX + 1e-9; r += 0.25) {
+      ctx.beginPath(); ctx.moveTo(cx - 4, cy + r * S); ctx.lineTo(cx + 4, cy + r * S); ctx.stroke();
+    }
+    ctx.textAlign = 'left';
+    for (let r = 0.5; r <= R_MAX + 1e-9; r += 0.5) {
+      const y = cy + r * S, tx = cx + 8, label = r.toFixed(1) + ' m';
+      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ctx.fillRect(tx - 2, y - 8, ctx.measureText(label).width + 4, 15);
+      ctx.fillStyle = C('--muted'); ctx.fillText(label, tx, y + 4);
+    }
+
+    // the spoke the ladybug rides on, and the velocity all along it
+    const [sx, sy] = PX(R_MAX, th);
+    ctx.strokeStyle = C('--spoke'); ctx.lineWidth = 1.5; ctx.globalAlpha = 0.55;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(sx, sy); ctx.stroke(); ctx.globalAlpha = 1;
+    if (st.spoke) {
+      // one point every quarter meter: same omega, and the arrows grow in step with r
+      for (let r = 0.25; r <= R_MAX + 1e-9; r += 0.25) {
+        const [px, py] = PX(r, th);
+        const v = st.w * r, L = v * geom.vS;
+        ctx.fillStyle = C('--spoke'); ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.arc(px, py, 2.5, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+        arrow(ctx, px, py, px - L * Math.sin(th), py - L * Math.cos(th), C('--vel'), 1.6, 0.38);
+      }
+    }
+
+    // the ladybug first, then her vectors over the top of her, so neither is buried
+    const [bx, by] = PX(st.rad, th);
+    drawBug(ctx, bx, by, st.heading);
+    if (st.showa) {
+      const L = accel() * geom.aS;
+      arrow(ctx, bx, by, bx - L * Math.cos(th), by + L * Math.sin(th), C('--acc'), 2.6);
+    }
+    const Lv = st.w * st.rad * geom.vS;
+    arrow(ctx, bx, by, bx - Lv * Math.sin(th), by - Lv * Math.cos(th), C('--vel'), 2.8);
+
+    // the axle
+    ctx.fillStyle = C('--ink');
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, TAU); ctx.fill();
+
+    // how long an arrow means what, so the two scales can be read off the picture
+    ctx.textAlign = 'left'; ctx.font = '11px ' + C('--sans');
+    let ly = H - 14;
+    if (st.showa) { bar(ctx, 12, ly, 5 * geom.aS, C('--acc'), '5 m/s²'); ly -= 15; }
+    bar(ctx, 12, ly, 1 * geom.vS, C('--vel'), '1 m/s');
+    ctx.textAlign = 'right'; ctx.fillStyle = C('--muted');
+    ctx.fillText(st.dragging ? 'let go to start her spinning' : 'drag the ladybug', W - 12, H - 14);
+  }
+  function bar(ctx, x, y, len, color, label) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+    ctx.fillStyle = C('--muted'); ctx.fillText(label, x + len + 6, y + 4);
+  }
+  function drawBug(ctx, x, y, head) {
+    const s = Math.max(6.5, geom.S * 0.062);
+    ctx.save(); ctx.translate(x, y); ctx.rotate(-head + Math.PI / 2);   // nose along the heading
+    ctx.fillStyle = C('--bug');
+    ctx.beginPath(); ctx.ellipse(0, 0, s * 0.78, s, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#20262A';
+    ctx.beginPath(); ctx.ellipse(0, -s * 0.78, s * 0.5, s * 0.36, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#20262A'; ctx.lineWidth = Math.max(1, s * 0.12);
+    ctx.beginPath(); ctx.moveTo(0, -s * 0.45); ctx.lineTo(0, s * 0.9); ctx.stroke();
+    ctx.fillStyle = '#20262A';
+    [[-0.40, -0.18], [0.40, -0.18], [-0.34, 0.42], [0.34, 0.42]].forEach(p => {
+      ctx.beginPath(); ctx.arc(p[0] * s, p[1] * s, s * 0.15, 0, TAU); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // speed and centripetal acceleration against radius, on axes that never rescale,
+  // so the two slopes really can be compared as omega is moved
+  function drawPlot() {
+    const { ctx, W, H, compact } = fit($('plot'));
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = '12px ' + C('--sans');
+    const ml = 46, mr = 46, mt = 34, mb = 44;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    const X = r => ml + r / R_MAX * pw;
+    const YV = v => mt + ph - v / V_MAX * ph;
+    const YA = a => mt + ph - a / A_MAX * ph;
+    const w = Math.abs(st.w);
+
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(ml, mt, pw, ph);
+    ctx.strokeStyle = 'rgba(211,220,226,0.8)';
+    for (let r = 0.25; r < R_MAX; r += 0.25) { ctx.beginPath(); ctx.moveTo(X(r), mt); ctx.lineTo(X(r), mt + ph); ctx.stroke(); }
+
+    // v = omega r, a straight line whose slope is omega itself
+    ctx.strokeStyle = C('--vel'); ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(X(0), YV(0)); ctx.lineTo(X(R_MAX), YV(Math.min(w * R_MAX, V_MAX))); ctx.stroke();
+    // a = omega^2 r, same shape, four times the slope when omega doubles
+    if (st.showa) {
+      ctx.strokeStyle = C('--acc'); ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(X(0), YA(0)); ctx.lineTo(X(R_MAX), YA(Math.min(w * w * R_MAX, A_MAX))); ctx.stroke();
+    }
+    // where she is on each line
+    const v = speed(), a = accel();
+    ctx.strokeStyle = 'rgba(92,107,115,0.5)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(X(st.rad), mt + ph); ctx.lineTo(X(st.rad), mt); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = C('--vel');
+    ctx.beginPath(); ctx.arc(X(st.rad), YV(Math.min(v, V_MAX)), 5, 0, TAU); ctx.fill();
+    if (st.showa) {
+      ctx.fillStyle = C('--acc');
+      ctx.beginPath(); ctx.arc(X(st.rad), YA(Math.min(a, A_MAX)), 5, 0, TAU); ctx.fill();
+    }
+
+    // axes
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let r = 0; r <= R_MAX + 1e-9; r += 0.5) ctx.fillText(r.toFixed(1), X(r), mt + ph + 16);
+    ctx.fillText('radius r (m)', ml + pw / 2, H - 8);
+    ctx.textAlign = 'right'; ctx.fillStyle = C('--vel');
+    for (let u = 0; u <= V_MAX + 1e-9; u += 1) ctx.fillText(u.toFixed(0), ml - 6, YV(u) + 4);
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--acc');
+    if (st.showa) for (let u = 0; u <= A_MAX + 1e-9; u += 3) ctx.fillText(u.toFixed(0), ml + pw + 6, YA(u) + 4);
+
+    ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillStyle = C('--vel'); ctx.fillText('v (m/s)', ml - 40, mt - 12);
+    if (st.showa) { ctx.textAlign = 'right'; ctx.fillStyle = C('--acc'); ctx.fillText('a (m/s²)', W - 8, mt - 12); }
+
+    // the slopes, spelled out: that is where omega lives on this graph
+    ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    if (!compact) {
+      ctx.fillStyle = C('--vel');
+      ctx.fillText('slope = |ω| = ' + w.toFixed(2), ml + 8, mt + 16);
+      if (st.showa) { ctx.fillStyle = C('--acc'); ctx.fillText('slope = ω² = ' + (w * w).toFixed(2), ml + 8, mt + 32); }
+    }
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  function readout() {
+    const w = st.w, r = st.rad, v = speed(), a = accel(), T = period();
+    const dir = Math.abs(w) < 1e-6 ? 'at rest' : (w > 0 ? 'counterclockwise' : 'clockwise');
+    let html = '';
+    html += card('Angular velocity ω', w.toFixed(2) + ' rad/s',
+      dir + ' &mdash; shared by every point on the disk', 'blue');
+    html += card('Radius r', r.toFixed(2) + ' m',
+      'one turn covers 2π<i>r</i> = ' + (TAU * r).toFixed(2) + ' m');
+    html += card('Linear speed v', v.toFixed(2) + ' m/s',
+      '<i>v</i> = ω<i>r</i> = ' + Math.abs(w).toFixed(2) + ' × ' + r.toFixed(2), 'green');
+    html += card('Centripetal acceleration a', a.toFixed(2) + ' m/s²',
+      '<i>a</i> = ω²<i>r</i> = <i>v</i>²/<i>r</i> = ' + (w * w).toFixed(2) + ' × ' + r.toFixed(2), 'pink');
+    html += card('Period T', T === Infinity ? '—' : T.toFixed(2) + ' s',
+      T === Infinity ? 'it never comes around' : '<i>T</i> = 2π/ω, and it does not depend on <i>r</i>');
+    const rev = st.turned / TAU;
+    html += card('Turned so far', rev.toFixed(2) + ' rev',
+      'θ = ω<i>t</i> = ' + st.turned.toFixed(1) + ' rad, arc <i>s</i> = <i>r</i>θ = ' + Math.abs(r * st.turned).toFixed(1) + ' m');
+    $('readout').innerHTML = html;
+    $('w_v').textContent = w.toFixed(2) + ' rad/s' + (T === Infinity ? '' : ' (' + T.toFixed(2) + ' s per turn)');
+    $('r_v').textContent = r.toFixed(2) + ' m';
+  }
+
+  $('w').addEventListener('input', () => { st.w = +$('w').value; readout(); draw(); });
+  $('r').addEventListener('input', () => { st.rad = +$('r').value; readout(); draw(); });
+  $('spoke').addEventListener('change', () => { st.spoke = $('spoke').checked; draw(); });
+  $('showa').addEventListener('change', () => { st.showa = $('showa').checked; draw(); });
+  $('reset').addEventListener('click', () => { reset(); readout(); draw(); });
+  $('play').addEventListener('click', () => {
+    st.playing = !st.playing; $('play').textContent = st.playing ? 'Pause' : 'Play';
+    if (st.playing) { last = null; requestAnimationFrame(frame); }
+  });
+
+  // dragging: the disk holds still under your finger while she slides to a new spot on it,
+  // so beta is what changes, not phi. Both sliders and the graph follow along live.
+  const cv = $('disk');
+  function place(ev) {
+    const b = cv.getBoundingClientRect();
+    const dx = ev.clientX - b.left - geom.cx, dy = -(ev.clientY - b.top - geom.cy);
+    st.rad = Math.min(R_MAX, Math.hypot(dx, dy) / geom.S);
+    if (st.rad > 0.02) { st.beta = Math.atan2(dy, dx) - st.phi; st.heading = theta() + (st.w >= 0 ? Math.PI / 2 : -Math.PI / 2); }
+    $('r').value = st.rad.toFixed(2);
+    readout(); draw();
+  }
+  cv.addEventListener('pointerdown', ev => {
+    st.dragging = true; cv.classList.add('grabbing');
+    cv.setPointerCapture(ev.pointerId); place(ev); ev.preventDefault();
+  });
+  cv.addEventListener('pointermove', ev => { if (st.dragging) { place(ev); ev.preventDefault(); } });
+  const drop = () => { st.dragging = false; cv.classList.remove('grabbing'); };
+  cv.addEventListener('pointerup', drop);
+  cv.addEventListener('pointercancel', drop);
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  function draw() { drawDisk(); drawPlot(); }
+  let last = null, acc = 0;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    const raw = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
+    last = ts; acc += raw;
+    const dt = 1 / 240; let guard = 0;
+    while (acc > dt && guard++ < 30) { step(dt); acc -= dt; }
+    readout(); draw();
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { st.playing = false; $('play').textContent = 'Play'; }
+  readout(); draw();
+  if (st.playing) requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
