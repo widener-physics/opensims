@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'heat-engines',
+    title: 'Heat engines on a PV diagram',
+    topic: 'thermo',
+    tags: ['PV diagram', 'first law', 'heat engine', 'efficiency', 'Carnot', 'Otto', 'Stirling', 'Brayton', 'refrigerator'],
+    blurb: 'Run Carnot, Otto, Stirling and Brayton cycles beside a piston, with the work of each leg shaded as the area under it and the net work as the area the loop encloses. Or build your own cycle leg by leg, and find that the internal energy always returns to where it started while the work and heat depend on the route.',
+    level: 'intro',
+    added: '2026-09-26',
+    status: 'ready'
+  },
+  {
     slug: 'newtons-cannon',
     title: "Newton's cannonball",
     topic: 'astronomy',

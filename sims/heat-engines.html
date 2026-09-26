@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<!--
+  Heat engines on a PV diagram - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged: the closed-form work
+  for each of the four processes agrees with a numerical integral of P dV to ten figures; every leg
+  obeys the first law and keeps its defining quantity fixed; all four named cycles close exactly, with
+  the change in internal energy round the loop zero, the net work equal to the heat in minus the heat
+  out and to the area enclosed, and each efficiency equal to its textbook formula and no greater than
+  the Carnot limit. Carnot efficiency was confirmed independent of the expansion ratio and Otto
+  efficiency independent of the peak temperature. Every snap point offered while building a cycle by
+  hand lies exactly on its own process curve and on the closing curve it claims.
+  Credit: fills a gap - there has been no PhET simulation of PV diagrams or engine cycles.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heat engines on a PV diagram</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --heatin: #C8321E; --heatout: #1D4F73; --workby: #2E7D32; --workon: #B5306D; --loop: #E8A317;
+    --guide: #7D8B93; --metal: #4A5A63; --state: #D9651B;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 960px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  .stage { display: grid; grid-template-columns: 1fr 2.1fr; gap: 12px; }
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #piston { aspect-ratio: 300 / 440; }
+  #pv { aspect-ratio: 630 / 440; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .hint { font-family: var(--sans); font-size: 14px; color: var(--muted); margin-top: 8px; min-height: 1.5em; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .effbar { position: relative; height: 8px; background: var(--soft); border-radius: 4px; margin-top: 8px; }
+  .effbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--loop); }
+  .effbar b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+
+  table.legs { width: 100%; border-collapse: collapse; margin-top: 14px; font-family: var(--sans); font-size: 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  table.legs th, table.legs td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--soft); font-variant-numeric: tabular-nums; }
+  table.legs th { color: var(--muted); font-weight: 500; }
+  table.legs th:nth-child(-n+2), table.legs td:nth-child(-n+2) { text-align: left; }
+  table.legs tr.on td { background: #FDF3DF; }
+  table.legs tr.total td { font-weight: 600; border-bottom: 0; border-top: 1px solid var(--rule); }
+  table.legs .pos { color: var(--heatin); } table.legs .neg { color: var(--heatout); }
+  table.legs td small { color: var(--muted); font-weight: 400; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    .stage { grid-template-columns: 1fr; }
+    #piston { aspect-ratio: 16 / 9; }
+    #pv { aspect-ratio: 1 / 1; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+    table.legs th, table.legs td { padding: 6px 6px; font-size: 13px; }
+    table.legs .desc { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Heat engines on a PV diagram</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Named cycles</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Build your own</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="stage">
+    <canvas id="piston" aria-label="A cylinder of gas with a piston, and the heat flowing in or out"></canvas>
+    <canvas id="pv" aria-label="Pressure against volume for the gas, with the cycle drawn on it"></canvas>
+  </div>
+
+  <div class="row2" id="row1">
+    <button id="play">Pause</button>
+    <div class="seg" id="cycles" role="group" aria-label="Cycle">
+      <button data-c="carnot" aria-pressed="true">Carnot</button>
+      <button data-c="otto" aria-pressed="false">Otto</button>
+      <button data-c="stirling" aria-pressed="false">Stirling</button>
+      <button data-c="brayton" aria-pressed="false">Brayton</button>
+    </div>
+  </div>
+
+  <div id="row2" hidden>
+    <div class="row2">
+      <button id="play2">Pause</button>
+      <div class="seg" id="types" role="group" aria-label="Next process">
+        <button data-t="isothermal" aria-pressed="true">isothermal</button>
+        <button data-t="adiabatic" aria-pressed="false">adiabatic</button>
+        <button data-t="isobaric" aria-pressed="false">isobaric</button>
+        <button data-t="isochoric" aria-pressed="false">isochoric</button>
+      </div>
+      <button id="close" class="secondary">Close the cycle</button>
+      <button id="undo" class="secondary">Undo</button>
+      <button id="clear" class="secondary">Clear</button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="readout" id="readout"></div>
+  <table class="legs" id="legs"></table>
+
+  <div class="controls" id="controls"></div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = Math.PI * 2;
+  const LEG_T = 2.2;              // seconds of animation per leg; the processes are quasi-static, so this is display only
+
+  // ================================================================
+  // 1. MODEL
+  //    One mole of monatomic ideal gas, gamma = 5/3, U = (3/2) n R T. Pressure in kPa and volume in
+  //    liters makes P V come out directly in joules. W is the work done BY the gas, the integral of
+  //    P dV, so it is the area under the path on the diagram; the first law is then dU = Q - W.
+  //    Every quantity for every leg is in closed form. The block between the markers below is the
+  //    one that was tested on its own, copied in unchanged.
+  // ================================================================
+  // ---- physics core: this block is copied verbatim into the sim ----
+  // One mole of monatomic ideal gas. P in kPa and V in L, so P*V comes out directly in joules.
+  const R = 8.314462618, N = 1, G = 5 / 3;         // gamma
+  const T_of = (P, V) => P * V / (N * R);
+  const P_of = (T, V) => N * R * T / V;
+  const U_of = (P, V) => 1.5 * P * V;              // U = (3/2) n R T = (3/2) P V
+  // A leg runs from a = {P, V} to b = {P, V} along one of four constraints.
+  // W is work done BY the gas, so dU = Q - W.
+  function legW(type, a, b) {
+    switch (type) {
+      case 'isothermal': return a.P * a.V * Math.log(b.V / a.V);
+      case 'adiabatic':  return (a.P * a.V - b.P * b.V) / (G - 1);
+      case 'isobaric':   return a.P * (b.V - a.V);
+      case 'isochoric':  return 0;
+    }
+  }
+  function legQ(type, a, b) { return type === 'adiabatic' ? 0 : U_of(b.P, b.V) - U_of(a.P, a.V) + legW(type, a, b); }
+  // the point a fraction s of the way along a leg, following its constraint
+  function legAt(type, a, b, s) {
+    if (type === 'isochoric') return { V: a.V, P: a.P + (b.P - a.P) * s };
+    const V = a.V + (b.V - a.V) * s;
+    if (type === 'isobaric')   return { V, P: a.P };
+    if (type === 'isothermal') return { V, P: a.P * a.V / V };
+    return { V, P: a.P * Math.pow(a.V / V, G) };     // adiabatic
+  }
+  // where a leg of this type, starting at a, ends if it is taken to volume V (or pressure P for isochoric)
+  function legTo(type, a, x) {
+    if (type === 'isochoric')  return { V: a.V, P: x };
+    if (type === 'isobaric')   return { V: x, P: a.P };
+    if (type === 'isothermal') return { V: x, P: a.P * a.V / x };
+    return { V: x, P: a.P * Math.pow(a.V / x, G) };
+  }
+  // ---- named cycles ----
+  function carnot(Th, Tc, ratio, VA) {
+    const A = { V: VA, P: P_of(Th, VA) };
+    const B = { V: VA * ratio, P: P_of(Th, VA * ratio) };
+    const k = Math.pow(Th / Tc, 1 / (G - 1));        // T V^(gamma-1) is fixed along an adiabat
+    const C = { V: B.V * k, P: P_of(Tc, B.V * k) };
+    const D = { V: A.V * k, P: P_of(Tc, A.V * k) };
+    return [['isothermal', A, B], ['adiabatic', B, C], ['isothermal', C, D], ['adiabatic', D, A]];
+  }
+  function otto(r, Tpeak, Vmax, Tlow) {
+    const s1 = { V: Vmax, P: P_of(Tlow, Vmax) };
+    const V2 = Vmax / r, s2 = legTo('adiabatic', s1, V2);
+    const s3 = { V: V2, P: P_of(Tpeak, V2) };
+    const s4 = legTo('adiabatic', s3, Vmax);
+    return [['adiabatic', s1, s2], ['isochoric', s2, s3], ['adiabatic', s3, s4], ['isochoric', s4, s1]];
+  }
+  function stirling(Th, Tc, r, Vmax) {
+    const s1 = { V: Vmax, P: P_of(Tc, Vmax) }, s2 = { V: Vmax / r, P: P_of(Tc, Vmax / r) };
+    const s3 = { V: Vmax / r, P: P_of(Th, Vmax / r) }, s4 = { V: Vmax, P: P_of(Th, Vmax) };
+    return [['isothermal', s1, s2], ['isochoric', s2, s3], ['isothermal', s3, s4], ['isochoric', s4, s1]];
+  }
+  function brayton(rp, Tpeak, Vmax, Tlow) {
+    const s1 = { V: Vmax, P: P_of(Tlow, Vmax) };
+    const P2 = s1.P * rp, V2 = s1.V * Math.pow(1 / rp, 1 / G), s2 = { V: V2, P: P2 };
+    const s3 = { P: P2, V: N * R * Tpeak / P2 };
+    const V4 = s3.V * Math.pow(rp, 1 / G), s4 = { V: V4, P: s1.P };
+    return [['adiabatic', s1, s2], ['isobaric', s2, s3], ['adiabatic', s3, s4], ['isobaric', s4, s1]];
+  }
+  function summarize(legs) {
+    let W = 0, Qin = 0, Qout = 0, dU = 0, Tmax = -Infinity, Tmin = Infinity;
+    legs.forEach(([t, a, b]) => {
+      const w = legW(t, a, b), q = legQ(t, a, b);
+      W += w; dU += U_of(b.P, b.V) - U_of(a.P, a.V);
+      if (q > 0) Qin += q; else Qout -= q;
+      for (let i = 0; i <= 50; i++) { const p = legAt(t, a, b, i / 50), T = T_of(p.P, p.V); Tmax = Math.max(Tmax, T); Tmin = Math.min(Tmin, T); }
+    });
+    return { W, Qin, Qout, dU, eff: W / Qin, carnot: 1 - Tmin / Tmax, Tmax, Tmin };
+  }
+  // ---- free-build: where a pending leg from E meets the four closing curves through the start S ----
+  function closers(type, E, S) {
+    const kS = S.P * S.V, aS = S.P * Math.pow(S.V, G), kE = E.P * E.V, aE = E.P * Math.pow(E.V, G);
+    const out = [];
+    const add = (P, V, via) => { if (P > 0 && V > 0 && isFinite(P) && isFinite(V)) out.push({ P, V, via }); };
+    if (type === 'isothermal') { add(kE / S.V, S.V, 'isochoric'); add(S.P, kE / S.P, 'isobaric'); { const V = Math.pow(aS / kE, 1 / (G - 1)); add(kE / V, V, 'adiabatic'); } }
+    if (type === 'adiabatic')  { add(aE / Math.pow(S.V, G), S.V, 'isochoric'); { const V = Math.pow(aE / S.P, 1 / G); add(S.P, V, 'isobaric'); } { const V = Math.pow(aE / kS, 1 / (G - 1)); add(kS / V, V, 'isothermal'); } }
+    if (type === 'isobaric')   { add(E.P, S.V, 'isochoric'); add(E.P, kS / E.P, 'isothermal'); add(E.P, Math.pow(aS / E.P, 1 / G), 'adiabatic'); }
+    if (type === 'isochoric')  { add(S.P, E.V, 'isobaric'); add(kS / E.V, E.V, 'isothermal'); add(aS / Math.pow(E.V, G), E.V, 'adiabatic'); }
+    return out;
+  }
+  // which single leg, if any, takes E straight back to S
+  function closingType(E, S, tol) {
+    const rel = (x, y) => Math.abs(x - y) <= tol * Math.max(Math.abs(x), Math.abs(y));
+    if (rel(E.V, S.V)) return 'isochoric';
+    if (rel(E.P, S.P)) return 'isobaric';
+    if (rel(E.P * E.V, S.P * S.V)) return 'isothermal';
+    if (rel(E.P * Math.pow(E.V, G), S.P * Math.pow(S.V, G))) return 'adiabatic';
+    return null;
+  }
+  // ---- end of core ----
+
+  const NAMES = {
+    otto: ['compression stroke', 'ignition', 'power stroke', 'exhaust'],
+    brayton: ['compressor', 'combustor', 'turbine', 'exhaust'],
+  };
+  const SPEC = {
+    carnot: [
+      { id: 'Th', label: 'Hot reservoir <i>T</i><sub>H</sub>', min: 400, max: 1200, step: 10, v: 600, unit: ' K' },
+      { id: 'Tc', label: 'Cold reservoir <i>T</i><sub>C</sub>', min: 200, max: 600, step: 10, v: 300, unit: ' K' },
+      { id: 'ratio', label: 'How far the hot expansion goes, <i>V</i><sub>2</sub>/<i>V</i><sub>1</sub>', min: 1.2, max: 4, step: 0.1, v: 2, unit: '×' }],
+    otto: [
+      { id: 'r', label: 'Compression ratio <i>V</i><sub>max</sub>/<i>V</i><sub>min</sub>', min: 2, max: 12, step: 0.5, v: 6, unit: '' },
+      { id: 'Tp', label: 'Peak temperature, just after ignition', min: 800, max: 3000, step: 20, v: 1800, unit: ' K' }],
+    stirling: [
+      { id: 'Th', label: 'Hot side <i>T</i><sub>H</sub>', min: 400, max: 1200, step: 10, v: 600, unit: ' K' },
+      { id: 'Tc', label: 'Cold side <i>T</i><sub>C</sub>', min: 200, max: 600, step: 10, v: 300, unit: ' K' },
+      { id: 'r', label: 'Compression ratio <i>V</i><sub>max</sub>/<i>V</i><sub>min</sub>', min: 1.5, max: 8, step: 0.5, v: 4, unit: '' }],
+    brayton: [
+      { id: 'rp', label: 'Pressure ratio <i>P</i><sub>max</sub>/<i>P</i><sub>min</sub>', min: 2, max: 20, step: 0.5, v: 8, unit: '' },
+      { id: 'Tp', label: 'Peak temperature, at the turbine inlet', min: 700, max: 2400, step: 20, v: 1400, unit: ' K' }],
+  };
+  const par = {};
+  Object.keys(SPEC).forEach(k => { par[k] = {}; SPEC[k].forEach(s => par[k][s.id] = s.v); });
+
+  const st = { tab: 1, cyc: 'carnot', playing: true, t: 0,
+    b: { S: { V: 10, P: P_of(400, 10) }, legs: [], type: 'isothermal', hover: null, closed: false } };
+
+  // the named cycle for the current settings, with any setting that would make it impossible pulled
+  // back into range (a cold side hotter than the hot side, or a peak cooler than compression alone gives)
+  function namedLegs() {
+    const p = par[st.cyc];
+    if (st.cyc === 'carnot' || st.cyc === 'stirling') {
+      if (p.Tc > p.Th - 50) { p.Tc = p.Th - 50; }
+      return st.cyc === 'carnot' ? carnot(p.Th, p.Tc, p.ratio, 5) : stirling(p.Th, p.Tc, p.r, 20);
+    }
+    if (st.cyc === 'otto') {
+      const T2 = 300 * Math.pow(p.r, G - 1);
+      if (p.Tp < T2 * 1.05) p.Tp = Math.ceil(T2 * 1.05 / 20) * 20;
+      return otto(p.r, p.Tp, 20, 300);
+    }
+    const T2 = 300 * Math.pow(p.rp, (G - 1) / G);
+    if (p.Tp < T2 * 1.05) p.Tp = Math.ceil(T2 * 1.05 / 20) * 20;
+    return brayton(p.rp, p.Tp, 20, 300);
+  }
+  // the legs being shown right now, in either tab
+  function legsNow() { return st.tab === 1 ? namedLegs() : st.b.legs; }
+  function cycleReady() { return st.tab === 1 || st.b.closed; }
+
+  // where the animation is: which leg, how far along it, and the state of the gas there
+  function where() {
+    const legs = legsNow();
+    if (!legs.length) return { i: -1, s: 0, p: st.b.S, legs };
+    if (!cycleReady()) { const L = legs[legs.length - 1]; return { i: legs.length - 1, s: 1, p: L[2], legs }; }
+    const u = (st.t / LEG_T) % legs.length, i = Math.floor(u), s = u - i;
+    return { i, s, p: legAt(legs[i][0], legs[i][1], legs[i][2], s), legs };
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 420 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(10, L * 0.5);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2.4;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.75, y1 - uy * hd * 0.75); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45);
+    ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+  }
+  // gas color on a fixed temperature scale, so the same temperature looks the same in every cycle
+  // The ramp passes through a near-white middle rather than going straight from blue to orange:
+  // a straight RGB blend between those two hues runs through a muddy gray-green on the way.
+  const RAMP = [[0, [128, 176, 218]], [0.28, [242, 240, 234]], [0.62, [240, 168, 108]], [1, [204, 78, 52]]];
+  function gasColor(T) {
+    const t = Math.max(0, Math.min(1, (Math.log(T) - Math.log(220)) / (Math.log(2800) - Math.log(220))));
+    let k = 0; while (k < RAMP.length - 2 && t > RAMP[k + 1][0]) k++;
+    const [t0, c0] = RAMP[k], [t1, c1] = RAMP[k + 1], f = (t - t0) / (t1 - t0);
+    return 'rgb(' + c0.map((v, j) => Math.round(v + (c1[j] - v) * f)).join(',') + ')';
+  }
+  const f0 = x => Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) >= 10 ? x.toFixed(1) : x.toFixed(2);
+
+  // the plot's range: fitted to the cycle for the named ones, fixed while you build your own
+  let range = { V: 40, P: 900 };
+  function fitRange(legs) {
+    if (st.tab === 2) { range = { V: 40, P: 900 }; return; }
+    let V = 0, P = 0;
+    legs.forEach(([t, a, b]) => { for (let i = 0; i <= 40; i++) { const q = legAt(t, a, b, i / 40); V = Math.max(V, q.V); P = Math.max(P, q.P); } });
+    range = { V: V * 1.1, P: P * 1.1 };
+  }
+  let PVG = { ml: 60, mr: 16, mt: 18, mb: 42, pw: 1, ph: 1 };
+  const X = V => PVG.ml + V / range.V * PVG.pw;
+  const Y = P => PVG.mt + PVG.ph - P / range.P * PVG.ph;
+  const unX = x => (x - PVG.ml) / PVG.pw * range.V;
+  const unY = y => (PVG.mt + PVG.ph - y) / PVG.ph * range.P;
+  const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); return [1, 2, 2.5, 5, 10].find(m => m * p >= v) * p; };
+
+  function tracePath(ctx, t, a, b, n) {
+    for (let i = 0; i <= n; i++) { const q = legAt(t, a, b, i / n); ctx.lineTo(X(q.V), Y(q.P)); }
+  }
+  function drawPV() {
+    const { ctx, W, H, compact } = fit($('pv'));
+    ctx.clearRect(0, 0, W, H);
+    PVG = { ml: compact ? 48 : 60, mr: 16, mt: 18, mb: 42 };
+    PVG.pw = W - PVG.ml - PVG.mr; PVG.ph = H - PVG.mt - PVG.mb;
+    const w = where(), legs = w.legs;
+    fitRange(legs);
+    ctx.font = '12px ' + C('--sans');
+
+    // axes and grid
+    const dv = nice(range.V / 6), dp = nice(range.P / 5);
+    ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1;
+    for (let v = dv; v < range.V; v += dv) { ctx.beginPath(); ctx.moveTo(X(v), Y(0)); ctx.lineTo(X(v), Y(range.P)); ctx.stroke(); }
+    for (let p = dp; p < range.P; p += dp) { ctx.beginPath(); ctx.moveTo(X(0), Y(p)); ctx.lineTo(X(range.V), Y(p)); ctx.stroke(); }
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(X(0), Y(range.P)); ctx.lineTo(X(0), Y(0)); ctx.lineTo(X(range.V), Y(0)); ctx.stroke();
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    const tk = (x, step) => x.toFixed(step >= 1 ? 0 : step >= 0.1 ? 1 : 2);
+    for (let v = 0; v <= range.V + 1e-9; v += dv) ctx.fillText(tk(v, dv), X(v), Y(0) + 16);
+    ctx.fillText('volume V (L)', PVG.ml + PVG.pw / 2, H - 6);
+    ctx.textAlign = 'right';
+    for (let p = 0; p <= range.P + 1e-9; p += dp) ctx.fillText(tk(p, dp), X(0) - 6, Y(p) + 4);
+    ctx.save(); ctx.translate(13, PVG.mt + PVG.ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
+    ctx.fillText('pressure P (kPa)', 0, 0); ctx.restore();
+
+    // net work: the area the loop encloses
+    if (legs.length && cycleReady()) {
+      ctx.fillStyle = C('--loop'); ctx.globalAlpha = 0.40;
+      ctx.beginPath(); legs.forEach(([t, a, b]) => tracePath(ctx, t, a, b, 60)); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // the work of the leg under way: the area under it so far, down to the axis
+    if (w.i >= 0 && cycleReady()) {
+      const [t, a, b] = legs[w.i];
+      if (t !== 'isochoric' && w.s > 0) {
+        const by = b.V > a.V;
+        ctx.fillStyle = by ? C('--workby') : C('--workon'); ctx.globalAlpha = 0.22;
+        ctx.beginPath(); ctx.moveTo(X(a.V), Y(0));
+        const n = 60; for (let k = 0; k <= n; k++) { const q = legAt(t, a, b, w.s * k / n); ctx.lineTo(X(q.V), Y(q.P)); }
+        ctx.lineTo(X(w.p.V), Y(0)); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 0.6; ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(X(a.V), Y(0)); ctx.lineTo(X(a.V), Y(a.P)); ctx.moveTo(X(w.p.V), Y(0)); ctx.lineTo(X(w.p.V), Y(w.p.P)); ctx.stroke();
+        ctx.globalAlpha = 1;
+        if (!compact) {
+          ctx.fillStyle = by ? C('--workby') : C('--workon'); ctx.textAlign = 'center';
+          ctx.fillText(by ? 'gas does work' : 'work done on gas', X((a.V + w.p.V) / 2), Y(0) - 8);
+        }
+      }
+    }
+
+    // free build: the curves through point 1 that a single last leg could ride home on
+    if (st.tab === 2 && !st.b.closed && st.b.legs.length >= 1) drawGuides(ctx);
+
+    // the legs themselves, with a direction arrow on each
+    legs.forEach(([t, a, b], i) => {
+      ctx.strokeStyle = C('--ink'); ctx.lineWidth = i === w.i && cycleReady() ? 2.6 : 1.8;
+      ctx.beginPath(); tracePath(ctx, t, a, b, 80); ctx.stroke();
+      const m0 = legAt(t, a, b, 0.48), m1 = legAt(t, a, b, 0.56);
+      const x0 = X(m0.V), y0 = Y(m0.P), x1 = X(m1.V), y1 = Y(m1.P), d = Math.hypot(x1 - x0, y1 - y0);
+      if (d > 0.5) arrow(ctx, x0 - (x1 - x0) / d * 5, y0 - (y1 - y0) / d * 5, x0 + (x1 - x0) / d * 6, y0 + (y1 - y0) / d * 6, C('--ink'), 1.8);
+    });
+    // the leg being drawn right now, by hand
+    if (st.tab === 2 && !st.b.closed && st.b.hover) {
+      const E = st.b.legs.length ? st.b.legs[st.b.legs.length - 1][2] : st.b.S, h = st.b.hover;
+      ctx.strokeStyle = C('--state'); ctx.lineWidth = 2.2; ctx.setLineDash([6, 4]);
+      ctx.beginPath(); tracePath(ctx, st.b.type, E, h.p, 60); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--state');
+      ctx.beginPath(); ctx.arc(X(h.p.V), Y(h.p.P), 4, 0, TAU); ctx.fill();
+      if (h.snap) {
+        ctx.strokeStyle = C('--state'); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(X(h.p.V), Y(h.p.P), 9, 0, TAU); ctx.stroke();
+      }
+    }
+    // the corners, numbered, pushed outward from the middle of the loop so they clear the lines
+    let cx = 0, cy = 0;
+    const corners = legs.length ? legs.map(L => L[1]) : [st.b.S];
+    if (st.tab === 2 && !st.b.closed && legs.length) corners.push(legs[legs.length - 1][2]);
+    corners.forEach(p => { cx += X(p.V); cy += Y(p.P); }); cx /= corners.length; cy /= corners.length;
+    ctx.font = '600 12px ' + C('--sans'); ctx.textAlign = 'center';
+    const tags = corners.map(p => {
+      const x = X(p.V), y = Y(p.P), dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) || 1;
+      if (corners.length === 1) return { x, y, lx: x - 12, ly: y - 12 };
+      return { x, y, lx: x + dx / d * 14, ly: y + dy / d * 14 };
+    });
+    // two corners can sit a few pixels apart (Otto's 4 and 1 on a tall axis); spread their labels
+    for (let i = 0; i < tags.length; i++) for (let j = 0; j < i; j++) {
+      const a = tags[j], b = tags[i], d = Math.hypot(b.lx - a.lx, b.ly - a.ly);
+      if (d < 15) { const ux = d ? (b.lx - a.lx) / d : 0, uy = d ? (b.ly - a.ly) / d : 1; b.lx = a.lx + ux * 15; b.ly = a.ly + uy * 15; if (!d) { b.lx = a.lx + 15; b.ly = a.ly; } }
+    }
+    tags.forEach((t, i) => {
+      ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(t.x, t.y, 3, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('--muted'); ctx.fillText(String(i + 1), t.lx, t.ly + 4);
+    });
+    // where the gas is now
+    if (legs.length || st.tab === 2) {
+      ctx.fillStyle = C('--state'); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(X(w.p.V), Y(w.p.P), 6, 0, TAU); ctx.fill(); ctx.stroke();
+    }
+  }
+
+  function drawGuides(ctx) {
+    const S = st.b.S, kS = S.P * S.V, aS = S.P * Math.pow(S.V, G);
+    ctx.save(); ctx.strokeStyle = C('--guide'); ctx.lineWidth = 1; ctx.setLineDash([2, 4]); ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.moveTo(X(S.V), Y(0)); ctx.lineTo(X(S.V), Y(range.P)); ctx.stroke();         // isochore
+    ctx.beginPath(); ctx.moveTo(X(0), Y(S.P)); ctx.lineTo(X(range.V), Y(S.P)); ctx.stroke();         // isobar
+    const curve = f => { ctx.beginPath(); let on = false;
+      for (let i = 1; i <= 200; i++) { const V = range.V * i / 200, P = f(V); if (P > range.P * 1.05) { on = false; continue; } on ? ctx.lineTo(X(V), Y(P)) : ctx.moveTo(X(V), Y(P)); on = true; }
+      ctx.stroke(); };
+    curve(V => kS / V);                              // isotherm
+    curve(V => aS / Math.pow(V, G));                 // adiabat
+    ctx.restore();
+  }
+
+  function drawPiston() {
+    const { ctx, W, H, compact } = fit($('piston'));
+    ctx.clearRect(0, 0, W, H);
+    const w = where(), legs = w.legs, p = w.p, T = T_of(p.P, p.V);
+    const leg = w.i >= 0 && cycleReady() ? legs[w.i] : null;
+    const type = leg ? leg[0] : (st.tab === 2 ? st.b.type : 'isothermal');
+    const q = leg ? legQ(leg[0], leg[1], leg[2]) : 0;
+    const wide = W > H;                               // on a phone the canvas is landscape
+
+    // the cylinder
+    const cw = wide ? W * 0.26 : W * 0.52, x0 = wide ? W * 0.52 : (W - cw) / 2, x1 = x0 + cw;
+    const top = H * 0.06, bot = H * (wide ? 0.72 : 0.76), inner = bot - top;
+    const Vtop = Math.max(range.V, 1);
+    const gasH = Math.max(4, inner * 0.94 * p.V / Vtop), pistY = bot - gasH;
+    // the gas
+    ctx.fillStyle = gasColor(T); ctx.fillRect(x0, pistY, cw, gasH);
+    // walls
+    ctx.strokeStyle = C('--metal'); ctx.lineWidth = 4; ctx.lineCap = 'square';
+    ctx.beginPath(); ctx.moveTo(x0, top); ctx.lineTo(x0, bot); ctx.lineTo(x1, bot); ctx.lineTo(x1, top); ctx.stroke();
+    // piston and rod
+    ctx.fillStyle = C('--metal'); ctx.fillRect(x0 + 2, pistY - 12, cw - 4, 12);
+    const rodTop = Math.max(2, top - 20); ctx.fillRect(x0 + cw / 2 - 3, rodTop, 6, pistY - 12 - rodTop);
+    // what the piston is doing
+    if (type === 'isochoric') {                       // locked in place
+      ctx.fillStyle = C('--ink');
+      [x0 - 9, x1 + 1].forEach(x => ctx.fillRect(x, pistY - 9, 8, 6));
+    }
+    if (type === 'isobaric') {                        // a fixed load keeps the pressure fixed
+      ctx.fillStyle = '#8A7A63'; ctx.fillRect(x0 + cw * 0.18, pistY - 34, cw * 0.64, 22);
+      ctx.fillStyle = '#fff'; ctx.font = '11px ' + C('--sans'); ctx.textAlign = 'center';
+      ctx.fillText('load', x0 + cw / 2, pistY - 19);
+    }
+    // what the base is: a reservoir, a heater, or insulation
+    const by = bot + 3, bh = H * 0.07;
+    if (type === 'adiabatic') {
+      ctx.fillStyle = C('--soft'); ctx.fillRect(x0 - 6, by, cw + 12, bh);
+      ctx.strokeStyle = C('--guide'); ctx.lineWidth = 1;
+      ctx.save(); ctx.beginPath(); ctx.rect(x0 - 6, by, cw + 12, bh); ctx.clip();
+      for (let x = x0 - 6 - bh; x < x1 + 6; x += 7) { ctx.beginPath(); ctx.moveTo(x, by + bh); ctx.lineTo(x + bh, by); ctx.stroke(); }
+      ctx.restore();
+    } else {
+      ctx.fillStyle = !leg ? C('--soft') : type === 'isothermal' ? gasColor(T) : (q >= 0 ? '#E7A08A' : '#9DBBD1');
+      ctx.fillRect(x0 - 6, by, cw + 12, bh);
+      ctx.strokeStyle = C('--metal'); ctx.lineWidth = 1; ctx.strokeRect(x0 - 6, by, cw + 12, bh);
+    }
+    // heat, through the base
+    if (leg && type !== 'adiabatic' && Math.abs(q) > 1e-6) {
+      const col = q > 0 ? C('--heatin') : C('--heatout');
+      for (let k = 0; k < 3; k++) {
+        const ax = x0 + cw * (0.25 + 0.25 * k);
+        if (q > 0) arrow(ctx, ax, by + bh - 2, ax, bot - 10, col, 2.6);
+        else arrow(ctx, ax, bot - 10, ax, by + bh - 2, col, 2.6);
+      }
+    }
+    // labels
+    ctx.textAlign = wide ? 'left' : 'center'; const lx = wide ? 14 : W / 2;
+    ctx.fillStyle = C('--ink'); ctx.font = '600 20px ' + C('--sans');
+    const ly = wide ? H * 0.2 : H * 0.905;
+    ctx.fillText(T.toFixed(0) + ' K', lx, ly);
+    ctx.font = '12px ' + C('--sans'); ctx.fillStyle = C('--muted');
+    ctx.fillText(f0(p.P) + ' kPa   ' + f0(p.V) + ' L', lx, ly + 17);
+    let what;
+    if (!leg) what = st.tab === 2 && !st.b.closed ? 'next leg: ' + st.b.type : '';
+    else if (type === 'adiabatic') what = 'insulated: no heat in or out';
+    else if (type === 'isothermal') what = (q > 0 ? 'heat in' : 'heat out') + ', held at ' + T.toFixed(0) + ' K';
+    else if (type === 'isochoric') what = (q > 0 ? 'heat in' : 'heat out') + ', piston locked';
+    else what = (q > 0 ? 'heat in' : 'heat out') + ', pressure held';
+    ctx.fillText(what, lx, ly + 33);
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const J = x => (Math.abs(x) < 0.5 ? '0' : (x < 0 ? '−' : '') + Math.abs(x).toFixed(0)) + ' J';
+  const card = (k, v, f, extra) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div>' + (extra || '') + '</div>';
+  // what a leg does: its name if the cycle has named strokes, otherwise what happens to the gas,
+  // followed by what the process holds fixed
+  function describe(t, a, b, name) {
+    const q = legQ(t, a, b), T = T_of(a.P, a.V);
+    const verb = name || ((t === 'isothermal' || t === 'adiabatic') ? (b.V > a.V ? 'expansion' : 'compression') : (q > 0 ? 'heating' : 'cooling'));
+    const held = t === 'isothermal' ? 'held at ' + T.toFixed(0) + ' K' : t === 'adiabatic' ? 'no heat in or out'
+      : t === 'isobaric' ? 'pressure held at ' + f0(a.P) + ' kPa' : 'volume held fixed';
+    return verb + ', ' + held;
+  }
+  function readout() {
+    const w = where(), legs = w.legs;
+    const names = st.tab === 1 ? NAMES[st.cyc] : null;
+    // the table: one row per leg
+    let rows = '<tr><th>Leg</th><th class="desc">What happens</th><th>W by gas</th><th>Q into gas</th><th>ΔU</th></tr>';
+    let sW = 0, sQ = 0, sU = 0;
+    legs.forEach(([t, a, b], i) => {
+      const W = legW(t, a, b), Q = legQ(t, a, b), dU = U_of(b.P, b.V) - U_of(a.P, a.V);
+      sW += W; sQ += Q; sU += dU;
+      const on = i === w.i && cycleReady();
+      rows += '<tr' + (on ? ' class="on"' : '') + '><td>' + (i + 1) + '→' + (i + 1 === legs.length && cycleReady() ? 1 : i + 2) +
+        ' <small>' + t + '</small></td><td class="desc">' + describe(t, a, b, names && names[i]) + '</td>' +
+        '<td>' + J(W) + '</td><td class="' + (Q > 0.5 ? 'pos' : Q < -0.5 ? 'neg' : '') + '">' + J(Q) + '</td><td>' + J(dU) + '</td></tr>';
+    });
+    if (legs.length)
+      rows += '<tr class="total"><td>' + (cycleReady() ? 'whole cycle' : 'so far') + '</td><td class="desc">' +
+        (cycleReady() ? 'back where it started, so ΔU = 0' : 'the loop is still open') + '</td><td>' + J(sW) + '</td><td>' + J(sQ) + '</td><td>' + J(sU) + '</td></tr>';
+    $('legs').innerHTML = rows;
+    $('legs').hidden = !legs.length;
+
+    // the summary
+    let html = '';
+    if (!legs.length || !cycleReady()) {
+      html += card('Net work', '—', 'close the cycle to see it');
+      html += card('Heat', '—', 'in and out, once the loop is closed');
+      html += card('Efficiency', '—', 'only a closed cycle is an engine');
+    } else {
+      const s = summarize(legs);
+      if (s.W >= 0) {
+        const eff = s.eff, lim = s.carnot;
+        html += card('Net work per cycle', J(s.W), 'the area inside the loop');
+        html += card('Heat', J(s.Qin) + ' in, ' + J(s.Qout) + ' out', 'the difference is the net work');
+        html += card('Efficiency <i>W</i>/<i>Q</i><sub>in</sub>', (100 * eff).toFixed(1) + '%',
+          'Carnot limit between ' + s.Tmin.toFixed(0) + ' K and ' + s.Tmax.toFixed(0) + ' K: ' + (100 * lim).toFixed(1) + '%',
+          '<div class="effbar" title="efficiency against the Carnot limit"><i style="width:' + (100 * eff).toFixed(1) + '%"></i><b style="left:' + (100 * lim).toFixed(1) + '%"></b></div>');
+      } else {
+        // run backwards, the same loop is a refrigerator: work goes in, heat is pumped out of the cold side
+        const cop = s.Qin / -s.W, lim = s.Tmin / (s.Tmax - s.Tmin);
+        html += card('Net work per cycle', J(s.W), 'negative: the loop runs anticlockwise, so work is done on the gas');
+        html += card('Heat', J(s.Qin) + ' in, ' + J(s.Qout) + ' out', 'it absorbs heat cold and dumps more of it hot');
+        html += card('As a refrigerator', 'COP ' + cop.toFixed(2),
+          'heat pulled in per joule of work; the Carnot limit between ' + s.Tmin.toFixed(0) + ' K and ' + s.Tmax.toFixed(0) + ' K is ' + lim.toFixed(2));
+      }
+    }
+    $('readout').innerHTML = html;
+  }
+
+  // sliders for whichever named cycle is showing
+  function buildSliders() {
+    const box = $('controls');
+    if (st.tab !== 1) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = SPEC[st.cyc].map(s => '<label><div class="row"><span>' + s.label + '</span><span class="val" id="' + s.id + '_v"></span></div>' +
+      '<input type="range" id="sl_' + s.id + '" min="' + s.min + '" max="' + s.max + '" step="' + s.step + '" value="' + par[st.cyc][s.id] + '"></label>').join('');
+    SPEC[st.cyc].forEach(s => $('sl_' + s.id).addEventListener('input', e => {
+      par[st.cyc][s.id] = +e.target.value; syncSliders(); readout(); draw();
+    }));
+    syncSliders();
+  }
+  function syncSliders() {
+    namedLegs();                                        // applies any clamping first
+    // Move the slider ends themselves so an impossible cycle simply cannot be dialed in: the
+    // cold side stays below the hot side, and the peak stays above what compression alone reaches.
+    const p = par[st.cyc], lim = {};
+    if (st.cyc === 'carnot' || st.cyc === 'stirling') lim.Tc = { max: p.Th - 50 };
+    if (st.cyc === 'otto') lim.Tp = { min: Math.ceil(300 * Math.pow(p.r, G - 1) * 1.05 / 20) * 20 };
+    if (st.cyc === 'brayton') lim.Tp = { min: Math.ceil(300 * Math.pow(p.rp, (G - 1) / G) * 1.05 / 20) * 20 };
+    SPEC[st.cyc].forEach(s => {
+      const el = $('sl_' + s.id), L = lim[s.id] || {};
+      el.min = String(L.min != null ? Math.max(s.min, L.min) : s.min);
+      el.max = String(L.max != null ? Math.min(s.max, L.max) : s.max);
+    });
+    SPEC[st.cyc].forEach(s => {
+      const v = par[st.cyc][s.id];
+      $('sl_' + s.id).value = v;
+      $(s.id + '_v').textContent = (s.step < 1 ? v.toFixed(1) : v.toFixed(0)) + s.unit;
+    });
+  }
+
+  const TEXT = {
+    1: {
+      lede: 'One mole of helium in a cylinder, taken round a closed loop of four processes. The work the gas does on each leg is the area under that stretch of the path, shaded as it goes; the work it does over a whole cycle is the area the loop encloses, shaded amber. Watch where the heat goes in and where it comes out.',
+      notes: '<p><b>What to try.</b> On Carnot, stretch the expansion ratio. The loop gets much bigger and the engine does far more work per cycle, but the efficiency does not move from 1 − <i>T</i><sub>C</sub>/<i>T</i><sub>H</sub>. Only the two temperatures set it. Now switch to Otto and raise the peak temperature: again the loop grows and the efficiency sits still, because for an Otto engine it depends on nothing but the compression ratio. Brayton is the same story with the pressure ratio.</p>' +
+        '<p>Every named cycle except Carnot falls short of its Carnot limit, the black tick on the efficiency bar. The reason is visible in the table. Carnot takes all its heat in at the hottest temperature and rejects it all at the coldest. The others take heat in over a range of temperatures, starting well below the peak, and every joule taken in cool is a joule used less well.</p>' +
+        '<p>Stirling makes the point sharply. It uses the same two temperatures as Carnot, yet it comes in well under 1 − <i>T</i><sub>C</sub>/<i>T</i><sub>H</sub>, because its constant-volume legs heat and cool the gas across the whole range. A real Stirling engine hides that heat in a regenerator on the way down and hands it back on the way up; with a perfect one, it matches Carnot exactly.</p>' +
+        '<p><b>What this leaves out.</b> Every process is quasi-static, so the gas passes through equilibrium states and each leg is reversible; the speed of the animation means nothing. The gas is ideal and monatomic, so <i>U</i> = <sup>3</sup>&frasl;<sub>2</sub><i>nRT</i> and γ = 5/3. Real engines run on air, closer to 7/5, which is why these efficiencies come out higher than any real engine\'s. <i>W</i> here is the work done <i>by</i> the gas, so the first law reads Δ<i>U</i> = <i>Q</i> − <i>W</i>; some textbooks count the work done <i>on</i> the gas instead and write Δ<i>U</i> = <i>Q</i> + <i>W</i>.</p>'
+    },
+    2: {
+      lede: 'Pick a process and click on the diagram to end the leg there; the leg can only run along its own kind of curve. Chain legs together and bring the gas back to point 1. The dashed curves through point 1 are the ways home: end a leg on one of them, snap included, and one more step closes the cycle.',
+      notes: '<p><b>What to try.</b> Build any closed loop and look at the bottom row of the table. The change in internal energy is exactly zero, however you got round. The total work and the total heat are not zero, and they depend entirely on the route. That is the difference between a state function and a path function, and it is the whole reason <i>W</i> and <i>Q</i> need a diagram while <i>U</i> does not.</p>' +
+        '<p>Build a loop that runs clockwise and you have an engine: net work comes out. Build the same shape anticlockwise and it becomes a refrigerator, with net work going in and heat pumped from the cold part of the loop to the hot. Try to reproduce a Carnot cycle by hand: two isotherms joined by two adiabats. The snap points make the last corner land exactly.</p>' +
+        '<p><b>What this leaves out.</b> The same as the named cycles: one mole of monatomic ideal gas, quasi-static processes, and <i>W</i> counted as work done by the gas. The plot is fixed at 40 L and 900 kPa so that legs cannot run off it.</p>'
+    }
+  };
+
+  function setTab(n) {
+    st.tab = n; st.t = 0;
+    [1, 2].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
+    $('row1').hidden = n !== 1; $('row2').hidden = n !== 2;
+    $('pv').style.touchAction = n === 2 ? 'none' : 'auto';
+    $('pv').style.cursor = n === 2 ? 'crosshair' : 'default';
+    buildSliders(); buildState(); readout(); draw();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#cycles button').forEach(b => b.addEventListener('click', () => {
+    st.cyc = b.dataset.c; st.t = 0;
+    document.querySelectorAll('#cycles button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    buildSliders(); readout(); draw();
+  }));
+  const setPlay = on => {
+    st.playing = on; $('play').textContent = $('play2').textContent = on ? 'Pause' : 'Play';
+    if (on) { last = null; requestAnimationFrame(frame); }
+  };
+  $('play').addEventListener('click', () => setPlay(!st.playing));
+  $('play2').addEventListener('click', () => setPlay(!st.playing));
+
+  // ---- building a cycle by hand ----
+  const end = () => st.b.legs.length ? st.b.legs[st.b.legs.length - 1][2] : st.b.S;
+  function buildState() {
+    const b = st.b, n = b.legs.length, ready = !b.closed && n >= 2 && closingType(end(), b.S, 1e-6);
+    $('close').disabled = !ready;
+    $('undo').disabled = !n; $('clear').disabled = !n;
+    document.querySelectorAll('#types button').forEach(x => { x.setAttribute('aria-pressed', String(x.dataset.t === b.type)); x.disabled = b.closed; });
+    let h;
+    if (b.closed) h = 'Closed. Undo to reopen the last leg, or Clear to start again.';
+    else if (!n) h = 'Drag point 1 to choose where the gas starts. Then pick a process and click to end the first leg.';
+    else if (ready) h = 'This corner sits on a curve through point 1: Close the cycle adds the ' + closingType(end(), b.S, 1e-6) + ' leg home.';
+    else h = 'Next: ' + b.type + ' from point ' + (n + 1) + '. A ring means the end will snap onto a way home.';
+    $('hint').textContent = h;
+    $('play2').disabled = !b.closed;
+  }
+  document.querySelectorAll('#types button').forEach(x => x.addEventListener('click', () => { st.b.type = x.dataset.t; st.b.hover = null; buildState(); draw(); }));
+
+  // turn a pointer position into the end of the leg under construction, following its constraint
+  function project(ev) {
+    const r = $('pv').getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+    const E = end(), t = st.b.type;
+    let p;
+    if (t === 'isochoric') p = legTo(t, E, Math.max(range.P * 0.02, Math.min(range.P * 0.98, unY(my))));
+    else {
+      let V = Math.max(range.V * 0.02, Math.min(range.V * 0.98, unX(mx)));
+      p = legTo(t, E, V);
+      if (p.P > range.P * 0.98) {                      // steep compression: stop where it leaves the top of the plot
+        const Pm = range.P * 0.98;
+        V = t === 'isothermal' ? E.P * E.V / Pm : t === 'adiabatic' ? Math.pow(E.P * Math.pow(E.V, G) / Pm, 1 / G) : V;
+        p = legTo(t, E, V);
+      }
+    }
+    // snap to the way home: point 1 itself, or any point one leg away from it
+    const cand = closers(t, E, st.b.S).filter(c => c.V < range.V && c.P < range.P);
+    if (closingType(E, st.b.S, 1e-6) === t && st.b.legs.length >= 2) cand.push({ P: st.b.S.P, V: st.b.S.V, via: 'home' });
+    let best = null, bd = 14;
+    cand.forEach(c => { const d = Math.hypot(X(c.V) - X(p.V), Y(c.P) - Y(p.P)); if (d < bd) { bd = d; best = c; } });
+    if (best) p = { P: best.P, V: best.V };
+    return { p, snap: !!best, home: best && best.via === 'home' };
+  }
+  // Pointer handling. With no legs drawn, point 1 can be dragged to set where the gas starts.
+  // Otherwise the pointer previews the next leg along its own curve and releasing commits it; on a
+  // touch screen that means press, slide along the curve, and lift.
+  const pv = $('pv');
+  let dragS = false, armed = false;
+  const local = ev => { const r = pv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  function commit(h) {
+    const b = st.b, E = end();
+    if (Math.hypot(X(h.p.V) - X(E.V), Y(h.p.P) - Y(E.P)) < 6) return;        // too short to be a leg
+    b.legs.push([b.type, E, h.home ? b.S : h.p]);
+    if (h.home) { b.closed = true; st.t = 0; }
+    b.hover = null; buildState(); readout(); draw();
+  }
+  pv.addEventListener('pointerdown', ev => {
+    if (st.tab !== 2 || st.b.closed) return;
+    const [mx, my] = local(ev);
+    pv.setPointerCapture(ev.pointerId);
+    if (!st.b.legs.length && Math.hypot(mx - X(st.b.S.V), my - Y(st.b.S.P)) < 14) { dragS = true; return; }
+    armed = true; st.b.hover = project(ev); draw();
+  });
+  pv.addEventListener('pointermove', ev => {
+    if (st.tab !== 2 || st.b.closed) return;
+    if (dragS) {
+      const [mx, my] = local(ev);
+      st.b.S = { V: Math.max(range.V * 0.03, Math.min(range.V * 0.97, unX(mx))),
+                 P: Math.max(range.P * 0.03, Math.min(range.P * 0.97, unY(my))) };
+      readout(); draw(); return;
+    }
+    st.b.hover = project(ev); draw();
+  });
+  pv.addEventListener('pointerup', ev => {
+    if (dragS) { dragS = false; buildState(); readout(); draw(); return; }
+    if (!armed || st.tab !== 2 || st.b.closed) return;
+    armed = false; commit(project(ev));
+  });
+  pv.addEventListener('pointerleave', () => { if (!armed && !dragS) { st.b.hover = null; draw(); } });
+  pv.addEventListener('contextmenu', ev => ev.preventDefault());
+  $('close').addEventListener('click', () => {
+    const b = st.b, t = closingType(end(), b.S, 1e-6);
+    if (!t) return;
+    b.legs.push([t, end(), b.S]); b.closed = true; st.t = 0;
+    buildState(); readout(); draw();
+  });
+  $('undo').addEventListener('click', () => { const b = st.b; b.legs.pop(); b.closed = false; buildState(); readout(); draw(); });
+  $('clear').addEventListener('click', () => { const b = st.b; b.legs = []; b.closed = false; buildState(); readout(); draw(); });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  function draw() { drawPV(); drawPiston(); }
+  let last = null, tick = 0;
+  function frame(ts) {
+    if (!st.playing) return;
+    if (document.hidden) { last = null; requestAnimationFrame(frame); return; }
+    const dt = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (cycleReady()) st.t += dt;
+    if (++tick % 3 === 0) readout();                    // the table only needs to follow which leg is live
+    draw();
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) st.playing = false;
+  setTab(1); setPlay(st.playing);
+})();
+</script>
+</body>
+</html>
