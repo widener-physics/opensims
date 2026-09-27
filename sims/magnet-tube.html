@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<!--
+  Magnet falling through a copper tube - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The magnet is an
+  ideal uniformly magnetized cylinder and the tube a stack of conducting rings; the drag follows from
+  the emf in each ring, with no fitted constants. Checks: the elliptic integrals against tabulated
+  values; the loop-to-loop mutual inductance against its far-field expansion; the flux from a tiny
+  magnet against the point-dipole formula; the end-face expression for the rate of change of flux
+  against numerical differentiation; the drag of a shrinking magnet converging on the closed form
+  45 mu0^2 m^2 sigma / 1024 integrated through the wall; the integrator against the exact exponential
+  approach to terminal speed; and energy balance (gravitational = kinetic + heat) to about 1e-11 over
+  a whole fall.
+  Against experiment: Levin, da Silveira and Rizzato, Am. J. Phys. 74, 815 (2006), measured 7.4, 6.4
+  and 7.2 cm/s for one, two and three stacked discs. Using the remanence implied by their own surface
+  field readings, this model gives 6.0, 5.8 and 7.3 cm/s: within about 20 percent, and with the same
+  slowest case (two discs). The point-dipole formula gives 8.9, 4.4 and 3.1 cm/s, the wrong trend.
+  Credit: after the classic Lenz's law lecture demonstration.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magnet falling through a copper tube</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --north: #C8321E; --south: #1D4F73; --drag: #B5306D; --ke: #2E7D32; --heat: #D9651B;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 960px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #race { aspect-ratio: 900 / 600; }
+  .stage { display: grid; grid-template-columns: 1fr 1.15fr; gap: 12px; align-items: start; }
+  #zoom { aspect-ratio: 440 / 560; }
+  #graph { aspect-ratio: 500 / 330; }
+  .energy { margin-top: 12px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; font-family: var(--sans); font-size: 14px; }
+  .energy .k { color: var(--muted); margin-bottom: 6px; }
+  .ebar { position: relative; height: 14px; background: var(--soft); border-radius: 3px; overflow: hidden; }
+  .ebar i { position: absolute; top: 0; bottom: 0; }
+  .ebar .ke { background: var(--ke); } .ebar .heat { background: var(--heat); }
+  .energy .line { margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .energy .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+  .energy .f { color: var(--muted); font-family: var(--serif); font-size: 15px; margin-top: 6px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+
+  table.res { width: 100%; border-collapse: collapse; margin-top: 14px; font-family: var(--sans); font-size: 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  table.res th, table.res td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--soft); font-variant-numeric: tabular-nums; }
+  table.res th { color: var(--muted); font-weight: 500; }
+  table.res th:first-child, table.res td:first-child { text-align: left; }
+  table.res tr:last-child td { border-bottom: 0; }
+  table.res td.wait { color: var(--twin); }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+  .notes a { color: var(--body); }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #race { aspect-ratio: 5 / 6; }
+    .stage { grid-template-columns: 1fr; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+    table.res th, table.res td { padding: 6px 6px; font-size: 13px; }
+    table.res .sig { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Magnet falling through a copper tube</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>The race</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Inside the tube</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <section id="p1">
+    <canvas id="race" aria-label="Four tubes side by side, each with the same magnet falling through it"></canvas>
+    <div class="row2">
+      <button id="drop1">Drop</button>
+      <button id="play1" class="secondary">Pause</button>
+      <div class="seg" id="rate1" role="group" aria-label="Playback speed">
+        <button data-r="0.25" aria-pressed="false">¼× slow</button>
+        <button data-r="1" aria-pressed="true">real time</button>
+        <button data-r="4" aria-pressed="false">4× fast</button>
+      </div>
+    </div>
+    <table class="res" id="results"></table>
+  </section>
+
+  <section id="p2" hidden>
+    <div class="stage">
+      <canvas id="zoom" aria-label="Close-up of the magnet inside the tube wall, with the induced currents and the forces"></canvas>
+      <div>
+        <canvas id="graph" aria-label="Speed of the magnet against time"></canvas>
+        <div class="energy" id="energy"></div>
+      </div>
+    </div>
+    <div class="row2">
+      <button id="drop2">Drop</button>
+      <button id="play2" class="secondary">Pause</button>
+      <div class="seg" id="rate2" role="group" aria-label="Playback speed">
+        <button data-r="0.25" aria-pressed="false">¼× slow</button>
+        <button data-r="1" aria-pressed="true">real time</button>
+        <button data-r="4" aria-pressed="false">4× fast</button>
+      </div>
+    </div>
+    <div class="readout" id="readout"></div>
+    <div class="controls">
+      <div class="grp"><div>Tube</div>
+        <div class="seg" id="metal" role="group" aria-label="Tube material">
+          <button data-m="copper" aria-pressed="true">copper</button>
+          <button data-m="aluminum" aria-pressed="false">aluminum</button>
+          <button data-m="brass" aria-pressed="false">brass</button>
+          <button data-m="stainless" aria-pressed="false">stainless</button>
+          <button data-m="plastic" aria-pressed="false">plastic</button>
+        </div>
+        <div class="row2" style="margin-top:8px"><label><input type="checkbox" id="slot"> slot cut along its whole length</label></div>
+      </div>
+      <div class="grp"><div>Magnet</div>
+        <div class="seg" id="grade" role="group" aria-label="Magnet grade">
+          <button data-g="ferrite" aria-pressed="false">ferrite</button>
+          <button data-g="n35" aria-pressed="false">N35</button>
+          <button data-g="n42" aria-pressed="true">N42</button>
+          <button data-g="n52" aria-pressed="false">N52</button>
+        </div>
+      </div>
+      <label><div class="row"><span>Wall thickness</span><span class="val" id="wall_v"></span></div>
+        <input type="range" id="wall" min="0.5" max="5" step="0.1" value="1.9"></label>
+      <label><div class="row"><span>Tube inside radius</span><span class="val" id="rad_v"></span></div>
+        <input type="range" id="rad" min="6.8" max="20" step="0.05" value="7.85"></label>
+      <label><div class="row"><span>Magnet length</span><span class="val" id="n_v"></span></div>
+        <input type="range" id="n" min="1" max="6" step="1" value="2"></label>
+    </div>
+  </section>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = Math.PI * 2;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own - against tabulated elliptic integrals,
+  //    the point-dipole limits, energy conservation, and published measurements - and is copied in
+  //    unchanged. Everything after it only chooses parameters and looks things up.
+  // ================================================================
+  // ---- physics core: this block is copied verbatim into the sim ----
+  // SI units throughout. The magnet is a uniformly magnetized cylinder (radius b, length L, remanence Br),
+  // which is exactly a solenoid carrying surface current Br/mu0 per meter. The tube is a stack of thin
+  // coaxial rings filling the wall from radius aIn to aOut. At demo speeds the eddy currents are too weak
+  // to disturb the magnet's own field (magnetic Reynolds number well below 1), so each ring is simply a
+  // resistor driven by the emf of the changing flux through it, and the whole drag is F = k(y) v.
+  const MU0 = 4e-7 * Math.PI, GRAV = 9.81;
+  // complete elliptic integrals K(m), E(m) with parameter m = k^2, by the arithmetic-geometric mean
+  function ellipKE(m) {
+    let a = 1, b = Math.sqrt(1 - m), c, sum = m / 2, p = 0.5;
+    for (let i = 0; i < 60; i++) {
+      c = (a - b) / 2; const an = (a + b) / 2; b = Math.sqrt(a * b); a = an; p *= 2; sum += p * c * c;
+      if (Math.abs(c) < 1e-17) break;
+    }
+    const K = Math.PI / (2 * a);
+    return [K, K * (1 - sum)];
+  }
+  // mutual inductance of two coaxial circular loops, radii r1 and r2, a distance s apart
+  function mutual(r1, r2, s) {
+    const m = 4 * r1 * r2 / ((r1 + r2) * (r1 + r2) + s * s), k = Math.sqrt(m);
+    let f;
+    if (m < 1e-3) f = Math.PI * k * m / 16 * (1 + 0.75 * m + 75 / 128 * m * m);   // series: avoids cancellation when far apart
+    else { const [K, E] = ellipKE(m); f = (2 / k - k) * K - (2 / k) * E; }
+    return MU0 * Math.sqrt(r1 * r2) * f;
+  }
+  // rate of change of the flux through a ring of radius r as the magnet's center moves past it, where u is
+  // the ring's position measured from the magnet's center. For a uniform solenoid this is just the
+  // difference of the loop-to-loop mutual inductance at the two end faces - no integral needed.
+  function dPhi(r, mag, u) { return mag.Br / MU0 * (mutual(r, mag.b, u + mag.L / 2) - mutual(r, mag.b, u - mag.L / 2)); }
+  // the flux itself, only needed to check the dipole limit
+  function Phi(r, mag, u, n) {
+    n = n || 400; const h = mag.L / n; let s = 0;
+    for (let i = 0; i <= n; i++) { const w = (i === 0 || i === n) ? 1 : (i % 2 ? 4 : 2); s += w * mutual(r, mag.b, u - mag.L / 2 + i * h); }
+    return mag.Br / MU0 * s * h / 3;
+  }
+  // 6-point Gauss-Legendre nodes and weights on [-1, 1]
+  const GLX = [-0.9324695142, -0.6612093865, -0.2386191861, 0.2386191861, 0.6612093865, 0.9324695142];
+  const GLW = [0.1713244924, 0.3607615730, 0.4679139346, 0.4679139346, 0.3607615730, 0.1713244924];
+  // Drag per unit speed contributed by rings at relative position u, summed through the wall:
+  //   g(u) = sum over shells of sigma / (2 pi r) * (dPhi/du)^2 * dr
+  // and its running integral H(u), tabulated once, so the drag with the magnet at depth y in a tube whose
+  // rings run from depth 0 to depth len is k(y) = H(len - y) - H(-y). That handles the tube's ends exactly.
+  function dragTable(mag, tube) {
+    const { aIn, aOut, sigma } = tube;
+    const U = 14 * Math.max(aOut, mag.L / 2 + aOut), n = 6000, du = 2 * U / n;
+    const u = new Float64Array(n + 1), H = new Float64Array(n + 1);
+    let prev = 0;
+    for (let i = 0; i <= n; i++) {
+      u[i] = -U + i * du;
+      let g = 0;
+      if (sigma > 0) for (let j = 0; j < 6; j++) {
+        const r = (aIn + aOut) / 2 + (aOut - aIn) / 2 * GLX[j], w = (aOut - aIn) / 2 * GLW[j];
+        const d = dPhi(r, mag, u[i]); g += w * sigma / (2 * Math.PI * r) * d * d;
+      }
+      H[i] = i ? H[i - 1] + (prev + g) / 2 * du : 0; prev = g;
+    }
+    return { u, H, U, du, kInf: H[n] };
+  }
+  function Hat(T, x) {
+    if (x <= -T.U) return 0; if (x >= T.U) return T.kInf;
+    const f = (x + T.U) / T.du, i = Math.floor(f), t = f - i;
+    return T.H[i] * (1 - t) + T.H[Math.min(i + 1, T.H.length - 1)] * t;
+  }
+  const dragAt = (T, len, y) => Hat(T, len - y) - Hat(T, -y);
+  // the point-dipole result for comparison, integrated through the wall exactly:
+  //   k = (45/1024) mu0^2 m^2 sigma (1/3)(aIn^-3 - aOut^-3),  m = Br V / mu0
+  function dipoleDrag(mag, tube) {
+    const m = mag.Br * Math.PI * mag.b * mag.b * mag.L / MU0;
+    return 45 / 1024 * MU0 * MU0 * m * m * tube.sigma * (Math.pow(tube.aIn, -3) - Math.pow(tube.aOut, -3)) / 3;
+  }
+  // The fall itself: released from rest with its lower face level with the top of the tube, integrated
+  // by RK4 on M dv/dt = M g - k(y) v, with the heat dissipated in the tube, the integral of k v^2, carried
+  // along so the energy can be checked and displayed. Stops once the magnet is well clear of the bottom.
+  function fall(mag, tube, T, dt, tMax) {
+    dt = dt || 1e-4; tMax = tMax || 120;
+    const len = tube.len, M = mag.mass, slot = !!tube.slot;
+    const acc = (y, v) => GRAV - (slot ? 0 : dragAt(T, len, y)) * v / M;
+    let y = -mag.L / 2, v = 0, heat = 0, t = 0, tExit = null;
+    const every = Math.max(1, Math.round(0.002 / dt));
+    const out = { t: [0], y: [y], v: [0], heat: [0], k: [slot ? 0 : dragAt(T, len, y)] };
+    for (let i = 1; t < tMax; i++) {
+      const k1y = v, k1v = acc(y, v);
+      const k2y = v + dt / 2 * k1v, k2v = acc(y + dt / 2 * k1y, v + dt / 2 * k1v);
+      const k3y = v + dt / 2 * k2v, k3v = acc(y + dt / 2 * k2y, v + dt / 2 * k2v);
+      const k4y = v + dt * k3v, k4v = acc(y + dt * k3y, v + dt * k3v);
+      // heat: Simpson's rule on k v^2 over the step, using the RK stage speeds
+      const q = (yy, vv) => (slot ? 0 : dragAt(T, len, yy)) * vv * vv;
+      heat += dt / 6 * (q(y, v) + 2 * q(y + dt / 2 * k1y, k2y) + 2 * q(y + dt / 2 * k2y, k3y) + q(y + dt * k3y, k4y));
+      y += dt / 6 * (k1y + 2 * k2y + 2 * k3y + k4y);
+      v += dt / 6 * (k1v + 2 * k2v + 2 * k3v + k4v);
+      t = i * dt;
+      if (tExit === null && y - mag.L / 2 > len) tExit = t;
+      if (i % every === 0) { out.t.push(t); out.y.push(y); out.v.push(v); out.heat.push(heat); out.k.push(slot ? 0 : dragAt(T, len, y)); }
+      if (y > len + 0.4) break;
+    }
+    out.tExit = tExit; out.dt = dt * every;
+    return out;
+  }
+  // ---- end of core ----
+
+  const LEN = 0.6;                                    // tube length, m
+  const DISC = { b: 0.00635, h: 0.00635 };            // one disc: 12.7 mm across, 6.35 mm thick
+  const GRADES = {
+    ferrite: { Br: 0.39, rho: 4900, name: 'ferrite (ceramic 8)' },
+    n35: { Br: 1.19, rho: 7500, name: 'NdFeB N35' },
+    n42: { Br: 1.30, rho: 7500, name: 'NdFeB N42' },
+    n52: { Br: 1.45, rho: 7500, name: 'NdFeB N52' },
+  };
+  // room-temperature conductivities, S/m; the aluminum is the 6063 alloy most tubing is drawn from
+  const METALS = {
+    copper:    { sigma: 5.8e7, name: 'copper',          wall: '#B87333', tint: '#E6BC9A' },
+    aluminum:  { sigma: 3.1e7, name: 'aluminum',        wall: '#9AA3AB', tint: '#CDD3D8' },
+    brass:     { sigma: 1.6e7, name: 'brass',           wall: '#B39A3C', tint: '#DCCB8A' },
+    stainless: { sigma: 1.4e6, name: 'stainless steel', wall: '#7F878D', tint: '#BFC4C8' },
+    plastic:   { sigma: 0,     name: 'plastic',         wall: '#C9DCE6', tint: '#EEF4F7' },
+  };
+  function magnetFor(grade, n) {
+    const g = GRADES[grade];
+    return { Br: g.Br, b: DISC.b, L: DISC.h * n, mass: g.rho * Math.PI * DISC.b * DISC.b * DISC.h * n, n, grade };
+  }
+  // a whole fall, ready to look up by time
+  function run(mag, metal, slot, aIn, wall) {
+    const sigma = slot ? 0 : METALS[metal].sigma;
+    const tube = { aIn, aOut: aIn + wall, sigma, len: LEN, slot: slot || sigma === 0 };
+    const T = sigma > 0 ? dragTable(mag, tube) : { kInf: 0, U: 1, du: 1, H: [0, 0] };
+    const F = fall(mag, tube, T, 2e-4, 400);
+    return { mag, tube, T, F, metal, slot, vt: T.kInf > 0 ? mag.mass * GRAV / T.kInf : Infinity };
+  }
+  // the state of a fall at time t, interpolated from the stored path; before release it waits at the top
+  function at(R, t) {
+    const F = R.F, n = F.t.length;
+    if (t <= 0) return { y: F.y[0], v: 0, heat: 0, k: F.k[0], t: 0 };
+    const f = t / F.dt, i = Math.min(n - 2, Math.floor(f)), s = Math.min(1, f - i);
+    const L = (a) => a[i] + (a[i + 1] - a[i]) * s;
+    return { y: L(F.y), v: L(F.v), heat: L(F.heat), k: L(F.k), t: Math.min(t, F.t[n - 1]) };
+  }
+
+  // the race: one magnet, four tubes of one size
+  const RACE_MAG = magnetFor('n42', 2), RACE_AIN = 0.00785, RACE_WALL = 0.0019;
+  const LANES = [
+    { metal: 'copper', slot: false, label: 'copper' },
+    { metal: 'aluminum', slot: false, label: 'aluminum' },
+    { metal: 'brass', slot: false, label: 'brass' },
+    { metal: 'copper', slot: true, label: 'copper, slotted' },
+  ];
+  LANES.forEach(l => { l.R = run(RACE_MAG, l.metal, l.slot, RACE_AIN, RACE_WALL); });
+  const race = { t: 0, running: false, dropped: false };
+  const raceEnd = Math.max(...LANES.map(l => l.R.F.t[l.R.F.t.length - 1]));
+
+  // inside the tube: whatever the controls say
+  const s2 = { metal: 'copper', slot: false, grade: 'n42', n: 2, aIn: 0.00785, wall: 0.0019, t: 0, running: false, dropped: false, dirty: true, R: null };
+  function recompute() {
+    s2.R = run(magnetFor(s2.grade, s2.n), s2.metal, s2.slot, s2.aIn, s2.wall);
+    s2.t = 0; s2.running = false; s2.dropped = false; s2.dirty = false;
+    // the biggest current density the wall will see at terminal speed, to scale the current marks
+    const R = s2.R, rMid = (R.tube.aIn + R.tube.aOut) / 2;
+    let peak = 0;
+    for (let i = 0; i <= 200; i++) { const u = -3 * (R.mag.L / 2 + R.tube.aOut) + i * 6 * (R.mag.L / 2 + R.tube.aOut) / 200; peak = Math.max(peak, Math.abs(dPhi(rMid, R.mag, u))); }
+    s2.dPhiPeak = peak;
+    // stop the close-up once the magnet is just clear of the bottom, with the tube's end still in the
+    // window; the stored path runs on further only so the race can show the magnets dropping out
+    const yStop = LEN + R.mag.L / 2 + 2.5 * R.tube.aOut;
+    let iStop = R.F.y.findIndex(y => y > yStop); if (iStop < 0) iStop = R.F.t.length - 1;
+    s2.tStop = R.F.t[iStop];
+    $('drop2').textContent = 'Drop';
+    readout2();
+  }
+
+  const st = { tab: 1, playing: true, rate: 1 };
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 460 };
+  }
+  function arrow(ctx, x0, y0, x1, y1, color, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(10, L * 0.5);
+    ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = w || 2.6;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.75, y1 - uy * hd * 0.75); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45);
+    ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+  }
+  // a magnet seen side-on, north face down, with the joins between stacked discs marked
+  function drawMagnet(ctx, x, yTop, w, h, n) {
+    ctx.fillStyle = C('--south'); ctx.fillRect(x - w / 2, yTop, w, h / 2);
+    ctx.fillStyle = C('--north'); ctx.fillRect(x - w / 2, yTop + h / 2, w, h / 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
+    for (let i = 1; i < n; i++) { const yy = yTop + h * i / n; ctx.beginPath(); ctx.moveTo(x - w / 2, yy); ctx.lineTo(x + w / 2, yy); ctx.stroke(); }
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1; ctx.strokeRect(x - w / 2, yTop, w, h);
+    if (h > 22 && w > 16) {
+      ctx.fillStyle = '#fff'; ctx.font = '600 11px ' + C('--sans'); ctx.textAlign = 'center';
+      ctx.fillText('S', x, yTop + h / 4 + 4); ctx.fillText('N', x, yTop + 3 * h / 4 + 4);
+    }
+  }
+  const fmtT = t => t < 10 ? t.toFixed(2) + ' s' : t.toFixed(1) + ' s';
+  const place = ['1st', '2nd', '3rd', '4th'];
+
+  function drawRace() {
+    const { ctx, W, H, compact } = fit($('race'));
+    ctx.clearRect(0, 0, W, H);
+    const top = 46, bot = H - 70, S = (bot - top) / (LEN + 0.07);   // pixels per meter, vertically true to scale
+    const yT = top + 0.02 * S, yB = yT + LEN * S;
+    const lw = (W - 50) / LANES.length, tw = Math.min(46, lw * 0.42);
+    ctx.font = '12px ' + C('--sans');
+    // a depth scale down the left
+    ctx.fillStyle = C('--muted'); ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.textAlign = 'right';
+    for (let d = 0; d <= LEN + 1e-9; d += 0.1) {
+      const y = yT + d * S;
+      ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(W - 6, y); ctx.stroke();
+      ctx.fillText((d * 100).toFixed(0) + (d === 0 ? ' cm' : ''), 36, y + 4);
+    }
+    // who has finished, in what order
+    const done = LANES.map(l => l.R.F.tExit !== null && race.t >= l.R.F.tExit);
+    const order = LANES.map((l, i) => i).filter(i => done[i]).sort((a, b) => LANES[a].R.F.tExit - LANES[b].R.F.tExit);
+    LANES.forEach((l, i) => {
+      const cx = 50 + lw * (i + 0.5), m = METALS[l.metal];
+      // the tube, seen as if it were glass so the magnet shows through
+      ctx.fillStyle = m.wall; ctx.globalAlpha = 0.28; ctx.fillRect(cx - tw / 2, yT, tw, yB - yT); ctx.globalAlpha = 1;
+      ctx.fillStyle = m.wall;
+      ctx.fillRect(cx - tw / 2, yT, 5, yB - yT); ctx.fillRect(cx + tw / 2 - 5, yT, 5, yB - yT);
+      ctx.strokeStyle = 'rgba(23,33,40,0.45)'; ctx.lineWidth = 1; ctx.strokeRect(cx - tw / 2, yT, tw, yB - yT);
+      if (l.slot) {                                      // the slit, running the full length of the front
+        ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx + tw * 0.18, yT); ctx.lineTo(cx + tw * 0.18, yB); ctx.stroke();
+      }
+      // label
+      ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.font = '600 13px ' + C('--sans');
+      const lab = compact && l.slot ? 'slotted' : l.label;
+      ctx.fillText(lab, cx, 20);
+      ctx.font = '12px ' + C('--sans'); ctx.fillStyle = C('--muted');
+      if (!compact) ctx.fillText(l.slot ? 'no closed loops' : (m.sigma / 1e7).toFixed(1) + '×10⁷ S/m', cx, 36);
+      // the magnet
+      const p = at(l.R, race.t), mh = Math.max(16, RACE_MAG.L * S), mw = tw - 14;
+      const yc = yT + p.y * S;
+      if (yc - mh / 2 < yB + 0.04 * S) drawMagnet(ctx, cx, yc - mh / 2, mw, mh, RACE_MAG.n);   // shown until just clear of the mouth
+      // its clock
+      const tShow = !race.dropped ? 0 : done[i] ? l.R.F.tExit : race.t;
+      ctx.textAlign = 'center'; ctx.fillStyle = done[i] ? C('--ink') : C('--muted');
+      ctx.font = (done[i] ? '600 ' : '') + '16px ' + C('--sans');
+      ctx.fillText(fmtT(tShow), cx, H - 34);
+      if (done[i]) { ctx.font = '12px ' + C('--sans'); ctx.fillStyle = C('--muted'); ctx.fillText(place[order.indexOf(i)] + ' out', cx, H - 16); }
+    });
+    if (!race.dropped) {
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.font = '13px ' + C('--sans');
+      ctx.fillText('Each magnet is held at the top of its tube. Press Drop.', W / 2 + 20, H - 16);
+    }
+  }
+
+  // close-up: the camera rides with the magnet, true to scale in both directions
+  function drawZoom() {
+    const { ctx, W, H, compact } = fit($('zoom'));
+    ctx.clearRect(0, 0, W, H);
+    const R = s2.R, mag = R.mag, tube = R.tube, m = METALS[s2.metal];
+    const p = at(R, s2.t), half = mag.L / 2 + 3 * tube.aOut;
+    const S = (H - 60) / (2 * half), cx = W * (compact ? 0.42 : 0.44), cy = (H - 30) / 2;
+    const Y = d => cy + (d - p.y) * S;                  // depth below the tube's top edge -> screen
+    ctx.font = '12px ' + C('--sans');
+
+    // a ruler down the left, so the sliding wall is visibly moving
+    ctx.strokeStyle = C('--rule'); ctx.fillStyle = C('--muted'); ctx.lineWidth = 1; ctx.textAlign = 'left';
+    const step = half > 0.06 ? 0.02 : 0.01;
+    for (let d = Math.ceil((p.y - half) / step) * step; d <= p.y + half; d += step) {
+      const y = Y(d); if (y < 4 || y > H - 34) continue;
+      ctx.beginPath(); ctx.moveTo(6, y); ctx.lineTo(16, y); ctx.stroke();
+      if (Math.abs(d / (2 * step) - Math.round(d / (2 * step))) < 1e-6) ctx.fillText((d * 100).toFixed(0) + ' cm', 20, y + 4);
+    }
+    // the tube wall in section, where it exists
+    const d0 = Math.max(0, p.y - half), d1 = Math.min(LEN, p.y + half);
+    const xo = tube.aOut * S, xi = tube.aIn * S;
+    if (d1 > d0) {
+      ctx.fillStyle = m.tint;
+      ctx.fillRect(cx - xo, Y(d0), xo - xi, Y(d1) - Y(d0)); ctx.fillRect(cx + xi, Y(d0), xo - xi, Y(d1) - Y(d0));
+      ctx.strokeStyle = s2.metal === 'plastic' ? '#8FA9B8' : m.wall; ctx.lineWidth = 1.5;
+      ctx.strokeRect(cx - xo, Y(d0), xo - xi, Y(d1) - Y(d0)); ctx.strokeRect(cx + xi, Y(d0), xo - xi, Y(d1) - Y(d0));
+      if (tube.slot && s2.metal !== 'plastic') {
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+        ctx.fillText('slotted:', cx + xo + 6, 18); ctx.fillText('no loop for', cx + xo + 6, 33); ctx.fillText('current', cx + xo + 6, 48);
+      }
+    }
+    // the ends of the tube, when in view
+    // (labeled off to the side, since at release the top edge is exactly where the magnet sits)
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    if (Y(0) > 8 && Y(0) < H - 40) ctx.fillText(compact ? 'top' : 'top of tube', cx + xo + 6, Y(0) + 4);
+    if (Y(LEN) > 8 && Y(LEN) < H - 40) ctx.fillText(compact ? 'bottom' : 'bottom of tube', cx + xo + 6, Y(LEN) + 4);
+
+    // the induced currents: sections through the rings, marked out of the page (dot) or into it (cross).
+    // A ring's emf is (dPhi/du) v, where u is the ring's height above the magnet's center; a positive
+    // emf drives current anticlockwise seen from above, which comes toward you on the left wall.
+    if (!tube.slot && s2.dPhiPeak > 0 && p.v > 0) {
+      const rMid = (tube.aIn + tube.aOut) / 2, vRef = Math.min(R.vt, 5);
+      const gap = 13 / S, rmax = Math.max(3, Math.min(6.5, (xo - xi) / 2 + 2));
+      for (let d = Math.ceil(d0 / gap) * gap; d <= d1; d += gap) {
+        const J = dPhi(rMid, mag, p.y - d) * p.v / (s2.dPhiPeak * vRef);
+        const a = Math.min(1, Math.abs(J)); if (a < 0.05) continue;
+        const r = 1.4 + (rmax - 1.4) * Math.sqrt(a), y = Y(d);
+        [[cx - (xi + xo) / 2, J > 0], [cx + (xi + xo) / 2, J < 0]].forEach(([x, out]) => {
+          ctx.globalAlpha = 0.35 + 0.65 * a; ctx.strokeStyle = ctx.fillStyle = C('--ink'); ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+          if (out) { ctx.beginPath(); ctx.arc(x, y, Math.max(0.9, r * 0.28), 0, TAU); ctx.fill(); }
+          else { const q = r * 0.62; ctx.beginPath(); ctx.moveTo(x - q, y - q); ctx.lineTo(x + q, y + q); ctx.moveTo(x + q, y - q); ctx.lineTo(x - q, y + q); ctx.stroke(); }
+          ctx.globalAlpha = 1;
+        });
+      }
+    }
+    // the magnet
+    drawMagnet(ctx, cx, Y(p.y - mag.L / 2), 2 * mag.b * S, mag.L * S, mag.n);
+
+    // the two forces, on one scale: the weight is always the same length
+    const ax = Math.min(W - 26, cx + xo + (compact ? 28 : 46)), base = 64;
+    const drag = p.k * p.v / (mag.mass * GRAV);
+    arrow(ctx, ax, cy, ax, cy + base, C('--ink'), 2.6);
+    if (drag > 0.02) arrow(ctx, ax, cy, ax, cy - base * Math.min(1.6, drag), C('--drag'), 2.6);
+    ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    const tx = Math.min(ax + 8, W - 64);
+    ctx.fillStyle = C('--ink'); ctx.fillText('weight', tx, cy + base - 2);
+    if (drag > 0.02) { ctx.fillStyle = C('--drag'); ctx.fillText(compact ? 'drag' : 'drag from', tx, cy - base * Math.min(1.6, drag) + 12); if (!compact) ctx.fillText('the currents', tx, cy - base * Math.min(1.6, drag) + 26); }
+
+    // key, and where in the tube this close-up is
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText(compact ? '⊙ toward you  ⊗ away' : '⊙ current toward you    ⊗ current away from you', 10, H - 10);
+    const bx = W - 14, bt = 10, bb = H - 44;
+    ctx.strokeStyle = C('--twin'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx, bt); ctx.lineTo(bx, bb); ctx.stroke();
+    const f = Math.max(0, Math.min(1, p.y / LEN));
+    ctx.fillStyle = C('--north'); ctx.beginPath(); ctx.arc(bx, bt + f * (bb - bt), 4, 0, TAU); ctx.fill();
+  }
+
+  function drawGraph() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    const R = s2.R, F = R.F, free = !isFinite(R.vt);
+    const tEnd = Math.max(s2.tStop, F.tExit !== null ? F.tExit * 1.08 + 0.05 : 0);
+    // The speed overshoots at the start, because at release the magnet is mostly above the tube and only
+    // part of the drag has hold of it; that peak belongs on the chart. The free fall after it leaves the
+    // bottom does not, and runs off the top.
+    let vIn = 0; for (let i = 0; i < F.t.length && (F.tExit === null || F.t[i] < F.tExit); i++) vIn = Math.max(vIn, F.v[i]);
+    const vMax = free ? Math.sqrt(2 * GRAV * (LEN + R.mag.L)) * 1.1 : Math.max(R.vt * 1.4, vIn * 1.12);
+    const cm = vMax < 1.2, unit = cm ? 100 : 1;
+    const ml = 50, mr = 14, mt = 14, mb = 36, pw = W - ml - mr, ph = H - mt - mb;
+    const X = t => ml + t / tEnd * pw, Y = v => mt + ph - Math.min(v, vMax * 1.02) / vMax * ph;
+    ctx.font = '12px ' + C('--sans');
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(ml, mt); ctx.lineTo(ml, mt + ph); ctx.lineTo(ml + pw, mt + ph); ctx.stroke();
+    const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); return [1, 2, 2.5, 5, 10].find(m => m * p >= v) * p; };
+    const dt = nice(tEnd / 5), dv = nice(vMax * unit / 4);
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let t = 0; t <= tEnd + 1e-9; t += dt) ctx.fillText(dt < 1 ? t.toFixed(1) : t.toFixed(0), X(t), mt + ph + 15);
+    ctx.fillText('time since release (s)', ml + pw / 2, H - 4);
+    ctx.textAlign = 'right';
+    for (let v = 0; v <= vMax * unit + 1e-9; v += dv) ctx.fillText(dv < 1 ? v.toFixed(1) : v.toFixed(0), ml - 6, Y(v / unit) + 4);
+    ctx.save(); ctx.translate(12, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
+    ctx.fillText('speed (' + (cm ? 'cm/s' : 'm/s') + ')', 0, 0); ctx.restore();
+    // terminal speed
+    if (!free) {
+      ctx.strokeStyle = C('--drag'); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(ml, Y(R.vt)); ctx.lineTo(ml + pw, Y(R.vt)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--drag'); ctx.textAlign = 'right';
+      ctx.fillText('terminal speed ' + (R.vt * unit).toFixed(cm ? 2 : 2) + (cm ? ' cm/s' : ' m/s'), ml + pw - 4, Y(R.vt) - 6);
+    }
+    // where it leaves the tube
+    if (F.tExit !== null && s2.t >= F.tExit) {
+      ctx.strokeStyle = C('--twin'); ctx.setLineDash([2, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(F.tExit), mt); ctx.lineTo(X(F.tExit), mt + ph); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      if (!compact) ctx.fillText('leaves the tube', X(F.tExit) - 4, mt + ph - 8);
+    }
+    // the speed so far
+    const tNow = Math.min(s2.t, tEnd);
+    ctx.save(); ctx.beginPath(); ctx.rect(ml, mt - 2, pw + 2, ph + 3); ctx.clip();
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i < F.t.length && F.t[i] <= tNow; i++) { const x = X(F.t[i]), y = Y(F.v[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke(); ctx.restore();
+    if (s2.dropped) {
+      const p = at(R, tNow);
+      ctx.fillStyle = C('--north'); ctx.beginPath(); ctx.arc(X(tNow), Y(p.v), 4, 0, TAU); ctx.fill();
+    }
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const speed = v => !isFinite(v) ? '—' : v < 1 ? (100 * v).toFixed(2) + ' cm/s' : v.toFixed(2) + ' m/s';
+  const tFree = Math.sqrt(2 * (LEN + DISC.h * 2) / GRAV);
+
+  // the race table fills in one row at a time, as each magnet comes out of the bottom
+  function results() {
+    let h = '<tr><th>Tube</th><th class="sig">Conductivity</th><th>Terminal speed</th><th>Time through the tube</th></tr>';
+    LANES.forEach(l => {
+      const fin = race.dropped && l.R.F.tExit !== null && race.t >= l.R.F.tExit, m = METALS[l.metal];
+      h += '<tr><td>' + l.label + '</td><td class="sig">' + (l.slot ? '— no closed path' : (m.sigma / 1e7).toFixed(1) + ' × 10⁷ S/m') + '</td>' +
+        (fin ? '<td>' + (l.slot ? 'none: it falls freely' : speed(l.R.vt)) + '</td><td>' + fmtT(l.R.F.tExit) + '</td>'
+             : '<td class="wait">—</td><td class="wait">—</td>') + '</tr>';
+    });
+    $('results').innerHTML = h;
+  }
+
+  function readout2() {
+    const R = s2.R, mag = R.mag, free = !isFinite(R.vt);
+    const kd = free ? 0 : dipoleDrag(mag, R.tube), vd = kd > 0 ? mag.mass * GRAV / kd : Infinity;
+    let h = '';
+    h += card('Terminal speed', free ? 'none' : speed(R.vt),
+      free ? (R.tube.slot && s2.metal !== 'plastic' ? 'the slot leaves the current no loop to flow round' : 'plastic carries no current') + ', so it falls freely'
+           : 'the point-dipole formula would say ' + speed(vd));
+    h += card('Time to fall through', R.F.tExit !== null ? fmtT(R.F.tExit) : 'over 400 s',
+      'free fall would take ' + tFree.toFixed(2) + ' s');
+    h += card('Drag per unit speed, <i>k</i>', free ? '0' : (R.T.kInf < 1 ? R.T.kInf.toFixed(3) : R.T.kInf.toFixed(2)) + ' N per m/s',
+      free ? 'no drag at any speed' : 'reaches terminal speed within <i>τ</i> = <i>M</i>/<i>k</i> = ' + (1000 * mag.mass / R.T.kInf).toFixed(1) + ' ms');
+    $('readout').innerHTML = h;
+    $('wall_v').textContent = (s2.wall * 1000).toFixed(1) + ' mm';
+    $('rad_v').textContent = (s2.aIn * 1000).toFixed(2) + ' mm, ' + ((s2.aIn - DISC.b) * 1000).toFixed(2) + ' mm gap';
+    $('n_v').textContent = s2.n + (s2.n === 1 ? ' disc, ' : ' discs, ') + (mag.L * 1000).toFixed(1) + ' mm, ' + (mag.mass * 1000).toFixed(1) + ' g';
+  }
+  const mJ = x => x < 1e-9 ? '0' : x < 1e-4 ? (x * 1e6).toFixed(1) + ' µJ' : x < 0.1 ? (x * 1000).toFixed(1) + ' mJ' : (x * 1000).toFixed(0) + ' mJ';
+  function energy() {
+    const R = s2.R, mag = R.mag, p = at(R, s2.t);
+    const drop = Math.max(0, p.y - R.F.y[0]), PE = mag.mass * GRAV * drop, KE = 0.5 * mag.mass * p.v * p.v;
+    const full = mag.mass * GRAV * (LEN + mag.L + 0.05);            // the bar's full width: through the tube and a little beyond
+    const pk = Math.min(100, 100 * KE / full), ph = Math.min(100 - pk, 100 * p.heat / full);
+    const inTube = p.y - mag.L / 2 < LEN && p.y + mag.L / 2 > 0;
+    $('energy').innerHTML = '<div class="k">Where the energy has gone since release</div>' +
+      '<div class="ebar"><i class="heat" style="left:0;width:' + ph.toFixed(2) + '%"></i><i class="ke" style="left:' + ph.toFixed(2) + '%;width:' + pk.toFixed(2) + '%"></i></div>' +
+      '<div class="line">gravity released ' + mJ(PE) + ':<span class="sw" style="background:var(--heat)"></span>' + mJ(p.heat) + ' heat in the tube<span class="sw" style="background:var(--ke)"></span>' + mJ(KE) + ' kinetic</div>' +
+      '<div class="f">' + (s2.dropped && inTube && p.k > 0
+        ? 'Right now gravity delivers ' + (1000 * mag.mass * GRAV * p.v).toFixed(2) + ' mW and the tube turns ' + (1000 * p.k * p.v * p.v).toFixed(2) + ' mW into heat.'
+        : !s2.dropped ? 'Nothing yet: the magnet is being held at the top.' : inTube ? 'No current can flow, so every joule goes into speed.' : 'Out of the tube: no more heating, and all of it goes into speed.') + '</div>';
+  }
+
+  const TEXT = {
+    1: {
+      lede: 'The same magnet, dropped down four tubes of exactly the same size. Nothing touches it, and none of these metals is magnetic, yet the copper tube holds it back for seconds. Press Drop.',
+      notes: '<p><b>What to try.</b> Watch the finishing order: copper, then aluminum, then brass, which is the order of how well each metal conducts electricity. It is more than an ordering. The terminal speed is inversely proportional to conductivity, so the terminal speed times the conductivity comes out the same for all three; check it in the table once they finish.</p>' +
+        '<p>The slotted tube is the same copper as the first. Cutting one slit along its length breaks every loop the current would need to flow round, and without current there is nothing to push back. The magnet falls as if the tube were not there.</p>' +
+        '<p>None of this is the metal being attracted to the magnet: copper, aluminum and brass are not magnetic at all. A magnet held still inside the copper tube feels no force. The drag exists only while the magnet moves, because it is the magnet acting on currents that its own motion creates.</p>' +
+        '<p><b>What this leaves out.</b> The magnet drops straight down the middle without tilting or touching the wall, and air resistance is ignored. The conductivities are room-temperature handbook values; ordinary copper plumbing pipe conducts about 15% less than the pure metal. A real slotted tube still slows the magnet a little, because smaller eddies can circulate in the wall on either side of the slit; this model cannot see those, and treats the slotted tube as offering no drag at all. <a href="https://pubs.aip.org/aapt/ajp/article/93/3/223/3335800/Eddy-currents-of-a-magnet-falling-through-a-copper" rel="noopener">A 2025 paper in the American Journal of Physics</a> measures how much they matter. Magnet: two NdFeB N42 discs, 12.7 mm across and 12.7 mm tall together; tubes 60 cm long, 15.7 mm inside diameter, 1.9 mm wall.</p>'
+    },
+    2: {
+      lede: 'The same fall seen up close, with the camera riding along with the magnet. The dots and crosses in the tube wall are cross-sections of the currents circling the tube: the current runs one way round just below the magnet and the other way round just above it, and both push back on the magnet.',
+      notes: '<p><b>What to try.</b> Drop it and watch the two force arrows. At the moment of release the magnet is still mostly above the tube, so only part of the drag has hold of it and it briefly picks up speed, which is the spike at the start of the graph. Once both ends are inside, the drag matches the weight and from then on the speed stays constant. Then watch the energy bar. Once the magnet is at terminal speed its kinetic energy stops growing, and every joule that gravity releases goes into heating the tube: the power from gravity and the power into heat read the same.</p>' +
+        '<p>Now lengthen the magnet one disc at a time, from one to six; each disc is 12.7 mm across and 6.35 mm thick. More magnet should mean more drag, and at first it does, but the speed does not simply fall: it bottoms out at two discs and then climbs. The drag comes from the two ends of the magnet, and once the ends are far apart each one acts on the wall on its own, so the drag stops growing while the weight keeps growing. <a href="https://arxiv.org/abs/physics/0603270" rel="noopener">Levin, da Silveira and Rizzato</a> measured exactly this: 7.4, 6.4 and 7.2 cm/s for one, two and three discs. Using the magnet strength implied by their own field measurements, this model predicts 6.0, 5.8 and 7.3 cm/s, within about 20% and with the same minimum. The point-dipole formula shown on the first card predicts that each extra disc makes the magnet slower, which is the wrong trend.</p>' +
+        '<p>Widen the tube by a few millimeters and watch how fast the drag collapses: for a small magnet it falls off as the fourth power of the radius. Swap to a ferrite magnet, about a third as strong, and the drag, which goes as the square of the magnet\'s strength, drops by nearly ten.</p>' +
+        '<p><b>What this leaves out.</b> The magnet stays centered and upright. It is treated as ideally uniform, which suits sintered NdFeB well. The currents are assumed too weak to disturb the magnet\'s own field, which holds when the magnet is slow compared with how fast the field can diffuse through the wall; that is comfortably true at these speeds. The drag near the ends of the tube is computed properly, so you can see the magnet speed up again as it leaves.</p>'
+    }
+  };
+
+  function setTab(n) {
+    st.tab = n;
+    [1, 2].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
+    $('p1').hidden = n !== 1; $('p2').hidden = n !== 2;
+    if (n === 2 && s2.dirty) recompute();
+    draw();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  const setPlay = on => { st.playing = on; $('play1').textContent = $('play2').textContent = on ? 'Pause' : 'Play'; };
+  $('play1').addEventListener('click', () => setPlay(!st.playing));
+  $('play2').addEventListener('click', () => setPlay(!st.playing));
+  ['rate1', 'rate2'].forEach(id => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => {
+    st.rate = +b.dataset.r;
+    ['rate1', 'rate2'].forEach(j => document.querySelectorAll('#' + j + ' button').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.r === st.rate))));
+  })));
+  $('drop1').addEventListener('click', () => { race.t = 0; race.dropped = true; race.running = true; $('drop1').textContent = 'Drop again'; setPlay(true); results(); });
+  $('drop2').addEventListener('click', () => { s2.t = 0; s2.dropped = true; s2.running = true; $('drop2').textContent = 'Drop again'; setPlay(true); });
+
+  // the controls only change the set-up; nothing falls until Drop is pressed
+  const seg = (id, key, attr) => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => {
+    s2[key] = b.dataset[attr];
+    document.querySelectorAll('#' + id + ' button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    recompute(); draw();
+  }));
+  seg('metal', 'metal', 'm'); seg('grade', 'grade', 'g');
+  $('slot').addEventListener('change', () => { s2.slot = $('slot').checked; recompute(); draw(); });
+  // sliders recompute at most once per frame, however fast they are dragged
+  $('wall').addEventListener('input', () => { s2.wall = +$('wall').value / 1000; s2.dirty = true; });
+  $('rad').addEventListener('input', () => { s2.aIn = +$('rad').value / 1000; s2.dirty = true; });
+  $('n').addEventListener('input', () => { s2.n = +$('n').value; s2.dirty = true; });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  function draw() {
+    if (st.tab === 1) drawRace();
+    else { drawZoom(); drawGraph(); energy(); }
+  }
+  let last = null, lastDone = -1;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (st.tab === 2 && s2.dirty) recompute();
+    if (st.playing && !document.hidden) {
+      if (st.tab === 1 && race.running) { race.t = Math.min(raceEnd, race.t + dt * st.rate); if (race.t >= raceEnd) race.running = false; }
+      if (st.tab === 2 && s2.running) { s2.t = Math.min(s2.tStop, s2.t + dt * st.rate); if (s2.t >= s2.tStop) s2.running = false; }
+    }
+    // the race table only changes when another magnet comes out
+    const nDone = LANES.filter(l => race.dropped && l.R.F.tExit !== null && race.t >= l.R.F.tExit).length;
+    if (nDone !== lastDone) { lastDone = nDone; results(); }
+    draw();
+    requestAnimationFrame(frame);
+  }
+  setTab(1); results();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

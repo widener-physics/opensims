@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<!--
+  Moving clocks and the twin paradox - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Each check avoided
+  the formula it was checking. Light clocks were built in their own rest frames and Lorentz-transformed
+  into the frame where they move; the tick periods, the moment the photon meets the far mirror, and the
+  contracted mirror spacing all matched what is drawn. The period of a sideways clock that did NOT
+  contract was found by chasing the photon numerically, and exceeds the upright clock's by gamma.
+  Reciprocity was checked by transforming the platform clock's ticks into the train's frame. The
+  moving ruler's length was found by locating both ends at one lab time. For the twins, every flash was
+  checked to travel at exactly c, the traveler's age was found by integrating the spacetime interval
+  along the path, and the flash counts satisfy the Doppler counting identity at every speed tested.
+  The traveler's view uses two inertial frames joined at the turnaround. It was checked that he sits at
+  rest with his own clock as the frame's time in each; that Earth's clock, reckoned "now", runs slow by
+  gamma on both legs and jumps by T beta^2 at the turnaround (3.6 to 16.4 years at 0.8c over 8 ly); that
+  every flash moves at c in his frame and reaches him exactly when the Earth-frame calculation says; and
+  that a flash's distance on either side of the switch equals the time until it reaches him in that frame.
+  Credit: fills a gap - PhET has never had a special relativity simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moving clocks and the twin paradox</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --twin: #9AA7AE; --ghost: #B5306D; --ball: #D9651B; --vel: #2E7D32; --hot: #C8321E; --star: #E8A317;
+    --plat: #1D4F73; --platfill: #E3ECF2; --train: #8A4F1F; --trainfill: #F3E6D8; --photon: #C8321E;
+    --earth: #1D4F73; --ship: #C4581A; --sun: #B8860B; --news: #6E7C85;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 960px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #clocks { aspect-ratio: 900 / 540; }
+  #space { aspect-ratio: 900 / 300; }
+  #count { aspect-ratio: 900 / 340; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 12px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .bad { color: var(--hot); }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #clocks { aspect-ratio: 4 / 5; }
+    #space { aspect-ratio: 4 / 3; }
+    #count { aspect-ratio: 4 / 3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Moving clocks and the twin paradox</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Light clocks</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>The twin paradox</button>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <section id="p1">
+    <canvas id="clocks" aria-label="Light clocks on a platform and on a passing train"></canvas>
+    <div class="row2">
+      <button id="play1">Pause</button>
+      <button id="reset1" class="secondary">Restart the clocks</button>
+      <div class="seg" id="frame" role="group" aria-label="Whose point of view">
+        <button data-f="platform" aria-pressed="true">watch from the platform</button>
+        <button data-f="train" aria-pressed="false">ride the train</button>
+      </div>
+      <label><input type="checkbox" id="noshrink"> what if moving things did not shrink?</label>
+    </div>
+    <div class="readout" id="readout1"></div>
+    <div class="controls">
+      <label><div class="row"><span>Speed of the train</span><span class="val" id="b1_v"></span></div>
+        <input type="range" id="b1" min="0" max="0.95" step="0.01" value="0.6"></label>
+    </div>
+  </section>
+
+  <section id="p2" hidden>
+    <canvas id="space" aria-label="The Earth, the traveler's ship and the star, with light flashes crossing between the twins"></canvas>
+    <canvas id="count" aria-label="How many of the other twin's birthday flashes each twin has received, against their own age"></canvas>
+    <div class="row2">
+      <button id="launch">Launch</button>
+      <button id="play2" class="secondary">Pause</button>
+      <div class="seg" id="view2" role="group" aria-label="Whose frame to draw it in">
+        <button data-v="earth" aria-pressed="true">Earth's frame</button>
+        <button data-v="ship" aria-pressed="false">the traveler's frame</button>
+      </div>
+      <div class="seg" id="rate2" role="group" aria-label="Playback speed">
+        <button data-r="0.5" aria-pressed="false">1 year per second</button>
+        <button data-r="1" aria-pressed="true">2 per second</button>
+        <button data-r="3" aria-pressed="false">6 per second</button>
+      </div>
+    </div>
+    <div class="readout" id="readout2"></div>
+    <div class="controls">
+      <label><div class="row"><span>Speed of the ship</span><span class="val" id="b2_v"></span></div>
+        <input type="range" id="b2" min="0.1" max="0.99" step="0.01" value="0.8"></label>
+      <label><div class="row"><span>Distance to the star</span><span class="val" id="D_v"></span></div>
+        <input type="range" id="D" min="1" max="20" step="0.5" value="8"></label>
+    </div>
+  </section>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = Math.PI * 2;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own, with every result checked against a
+  //    Lorentz transformation or a direct calculation that does not use the formula being checked.
+  //    It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: this block is copied verbatim into the sim ----
+  // Special relativity, exactly. Velocities are given as beta = v/c.
+  const gammaOf = b => 1 / Math.sqrt(1 - b * b);
+  // relativistic Doppler factor: a source receding at beta is received stretched by this factor
+  const dopplerK = b => Math.sqrt((1 + b) / (1 - b));
+
+  // ---- light clocks ----
+  // A light clock of rest length L0: two mirrors, one photon, one tick per round trip. It moves at beta
+  // (either sign) in whichever frame is being drawn; c is the speed of light in the drawing's units.
+  // Upright: the photon's path is a zigzag; its speed is c, so its upward speed is c/gamma.
+  // Sideways: the photon chases the far mirror at c - v relative speed and meets the near one at c + v.
+  // `shrink` says whether the sideways clock takes its contracted length L0/gamma, as it must;
+  // switching it off shows what would go wrong if moving things kept their rest length.
+  function clockPeriod(orient, L0, beta, c, shrink) {
+    const g = gammaOf(beta);
+    if (orient === 'up') return 2 * L0 * g / c;
+    const L = shrink ? L0 / g : L0;
+    return L / (c * (1 - beta)) + L / (c * (1 + beta));   // = 2 L gamma^2 / c
+  }
+  // where the photon is at time t (t = 0: leaving the start mirror): distance from the start mirror
+  // along the clock's length, plus the tick count so far
+  function clockPhoton(orient, L0, beta, c, shrink, t) {
+    const P = clockPeriod(orient, L0, beta, c, shrink), n = Math.floor(t / P), s = t - n * P;
+    if (orient === 'up') { const vy = c / gammaOf(beta), h = L0; const d = vy * s; return { along: d <= h ? d : 2 * h - d, ticks: n, len: h, period: P }; }
+    const L = shrink ? L0 / gammaOf(beta) : L0;
+    // the photon starts at the mirror at the back (the trailing end); for beta < 0 that is the right-hand one
+    const b = Math.abs(beta), t1 = L / (c * (1 - b));
+    const along = s < t1 ? c * s * (1 - b) : L - c * (s - t1) * (1 + b);
+    return { along, ticks: n, len: L, period: P };
+  }
+
+  // ---- the twin paradox, in units of years and light-years (c = 1) ----
+  // The traveler leaves at beta, turns round at a star D light-years away, and comes straight back.
+  // Each twin sends a light flash home on every birthday, by their own clock. Everything below is
+  // worked out in the Earth's frame, where the Earth twin is at rest the whole time.
+  function twins(beta, D) {
+    const g = gammaOf(beta), T = 2 * D / beta, tau = T / g;     // Earth's time and the traveler's for the trip
+    const x = t => t <= T / 2 ? beta * t : beta * (T - t);       // where the traveler is, Earth time t
+    const eps = 1e-9;
+    // Earth's n-th flash leaves at t = n, heading out at c, and catches the ship
+    const earthFlashes = [];
+    for (let n = 1; n <= T + eps; n++) {
+      let t = n / (1 - beta);                                     // caught on the way out
+      if (t > T / 2) t = (n + beta * T) / (1 + beta);             // or met on the way back
+      earthFlashes.push({ sent: n, tArr: t, ageArr: t / g });     // the traveler's age when it arrives
+    }
+    // the traveler's m-th flash leaves at proper time m, Earth time gamma m, and heads home at c
+    const shipFlashes = [];
+    for (let m = 1; m <= tau + eps; m++) {
+      const tSent = g * m, xs = x(tSent);
+      shipFlashes.push({ sent: m, tSent, xSent: xs, tArr: tSent + xs, ageArr: tSent + xs });
+    }
+    return { beta, D, g, k: dopplerK(beta), T, tau, x, earthFlashes, shipFlashes,
+      travelerSwitch: tau / 2,                  // the traveler sees Earth's flashes speed up at the turnaround
+      earthSwitch: T / 2 + D };                 // Earth only sees it once the turnaround's light gets home
+  }
+  // ---- the traveler's frame ----
+  // There is no single rest frame for the traveler: he rides one inertial frame out and a different one
+  // back. For a moment of his own time tau, this returns the frame he is in, as a map from Earth-frame
+  // events (t, x) to his coordinates, in which he sits at x = 0 and his clock reads the frame's time.
+  //   out:  t' = gamma (t - beta x),              x' = gamma (x - beta t)
+  //   back: t'' = gamma (t + beta x) + C,         x'' = gamma (x + beta t - 2D)
+  // C is fixed so his clock runs on without a break through the turnaround.
+  function shipFrame(tw, tau) {
+    const b = tw.beta, g = tw.g, D = tw.D, half = tw.tau / 2;
+    let tf, at, earthNow;
+    if (tau <= half) {
+      tf = (t, x) => ({ t: g * (t - b * x), x: g * (x - b * t) });
+      at = X0 => tf(tau / g + b * X0, X0).x;               // where a body at rest at Earth-frame X0 is, now
+      earthNow = tau / g;                                   // what Earth's clock reads, now, in this frame
+    } else {
+      const C = half - g * tw.T * (1 + b * b) / 2;
+      tf = (t, x) => ({ t: g * (t + b * x) + C, x: g * (x + b * t - 2 * D) });
+      at = X0 => tf((tau - C) / g - b * X0, X0).x;
+      earthNow = (tau - C) / g;
+    }
+    return { out: tau <= half, tf, earth: at(0), star: at(D), earthNow };
+  }
+  // every flash in flight "now" for the traveler: emitted on or before his present moment, absorbed after
+  // it, both judged in the frame he is in. Light moves at c in that frame, so each is where its ray says.
+  function flashesNow(tw, tau) {
+    const F = shipFrame(tw, tau), list = [];
+    tw.earthFlashes.forEach(f => {
+      const e = F.tf(f.sent, 0), a = F.tf(f.tArr, tw.x(f.tArr));
+      if (e.t <= tau && a.t > tau) list.push({ from: 'earth', n: f.sent, x: e.x + (tau - e.t) });
+    });
+    tw.shipFlashes.forEach(f => {
+      const e = F.tf(f.tSent, f.xSent), a = F.tf(f.tArr, 0);
+      if (e.t <= tau && a.t > tau) list.push({ from: 'ship', n: f.sent, x: e.x - (tau - e.t) });
+    });
+    return { F, list };
+  }
+  // ---- end of core ----
+
+  // light clocks: mirrors 1.5 m apart, so a clock at rest ticks every 10.0 ns
+  const CL = 0.299792458;               // speed of light, m/ns
+  const L0 = 1.5;                       // m
+  const NS_PER_S = 7;                   // nanoseconds of the clocks' time per second of animation
+  const s1 = { beta: 0.6, frame: 'platform', noshrink: false, t: 0 };
+
+  // the twins
+  const YR_PER_S = 2;                   // years of Earth time per second of animation, at 1x
+  const s2 = { beta: 0.8, D: 8, t: 0, launched: false, rate: 1, tw: null, view: 'earth', hold: 0, held: false };
+  function retwin() { s2.tw = twins(s2.beta, s2.D); s2.t = 0; s2.launched = false; s2.hold = 0; s2.held = false; $('launch').textContent = 'Launch'; }
+  retwin();
+
+  const st = { tab: 1, playing: true };
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+
+  // The two sets of clocks - the platform's and the train's - are identical. Whichever frame is being
+  // watched, one set is at rest and the other moves at beta the opposite way. Everything a set shows
+  // (its length, its tick rate) follows from its speed in the frame being drawn, so the two views are
+  // mirror images of each other, which is the whole point.
+  function drawClocks() {
+    const { ctx, W, H, compact } = fit($('clocks'));
+    ctx.clearRect(0, 0, W, H);
+    const Wm = compact ? 6.6 : 8.2;                     // meters across the view
+    const S = W / Wm;                                   // pixels per meter, the same both ways
+    const bandH = H / 2;
+    const sets = [
+      { name: 'platform', col: C('--plat'), fill: C('--platfill'), u: s1.frame === 'platform' ? 0 : -s1.beta, floor: bandH - 26 },
+      { name: 'train', col: C('--train'), fill: C('--trainfill'), u: s1.frame === 'train' ? 0 : s1.beta, floor: H - 26 },
+    ];
+    ctx.font = '12px ' + C('--sans');
+    const t = s1.t, results = {};
+    // Each set repeats every 3.5 m of its own length - a row of clock stations along the platform, a
+    // string of identical cars on the train - so a complete pair of clocks is always in view, even
+    // uncontracted on a phone. Within one repeat: the upright clock, then the sideways clock / ruler.
+    const REP = 3.5, UPX = 0.45, SIDEX = 1.1;
+    sets.forEach(set => {
+      const g = gammaOf(set.u), moving = set.u !== 0;
+      const shrink = !(moving && s1.noshrink);
+      const f = shrink ? 1 / g : 1;                     // how much this set's lengths along the motion are squeezed
+      const rep = REP * f, drift = set.u * CL * t;
+      const first = ((0.35 + drift) % rep + rep) % rep - rep;
+      const yF = set.floor, top = yF - L0 * S;
+      const pu = clockPhoton('up', L0, set.u, CL, true, t), sl = clockPhoton('side', L0, set.u, CL, shrink, t);
+      results[set.name] = { up: pu.ticks, side: sl.ticks, lenM: sl.len };
+
+      // the platform's paving, with half-meter marks that move and shrink with it
+      if (set.name === 'platform') {
+        ctx.fillStyle = set.fill; ctx.fillRect(0, yF, W, 12);
+        ctx.strokeStyle = set.col; ctx.lineWidth = 1;
+        const step = 0.5 * f, off = ((drift % step) + step) % step;
+        for (let x = off; x < Wm; x += step) { ctx.beginPath(); ctx.moveTo(x * S, yF); ctx.lineTo(x * S, yF + 6); ctx.stroke(); }
+      }
+      for (let xa = first; xa < Wm + 0.5; xa += rep) {
+        if (set.name === 'train') {                     // one car
+          const cx0 = (xa - 0.15 * f) * S, cw = (REP - 0.6) * f * S;
+          ctx.fillStyle = set.fill; ctx.fillRect(cx0, top - 18, cw, L0 * S + 30);
+          ctx.strokeStyle = set.col; ctx.lineWidth = 1.2; ctx.strokeRect(cx0, top - 18, cw, L0 * S + 30);
+          ctx.fillStyle = set.col; [0.35, REP - 1.1].forEach(w => { ctx.beginPath(); ctx.arc((xa + w * f) * S, yF + 12, 6, 0, TAU); ctx.fill(); });
+        }
+        // the upright clock: mirrors top and bottom, the photon bouncing between them
+        const cx = (xa + UPX * f) * S, mw = 0.36 * S;
+        ctx.fillStyle = set.col; ctx.fillRect(cx - mw / 2, top - 3, mw, 4); ctx.fillRect(cx - mw / 2, yF - 1, mw, 4);
+        // its path over the last tick: a zigzag if it moves, a straight line if not
+        ctx.strokeStyle = C('--photon'); ctx.globalAlpha = 0.45; ctx.lineWidth = 1.4; ctx.beginPath();
+        for (let i = 0; i <= 60; i++) {
+          const tt = Math.max(0, t - pu.period * i / 60), q = clockPhoton('up', L0, set.u, CL, true, tt);
+          const x = cx - set.u * CL * (t - tt) * S, y = yF - q.along * S;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.stroke(); ctx.globalAlpha = 1;
+        ctx.fillStyle = C('--photon'); ctx.beginPath(); ctx.arc(cx, yF - pu.along * S, 4, 0, TAU); ctx.fill();
+
+        // the sideways clock, which doubles as a ruler 1.5 m long at rest
+        const sx = (xa + SIDEX * f) * S, len = sl.len * S, ry = top + L0 * S * 0.45;
+        ctx.fillStyle = set.fill; ctx.fillRect(sx, ry - 9, len, 18);
+        ctx.strokeStyle = set.col; ctx.lineWidth = 1; ctx.strokeRect(sx, ry - 9, len, 18);
+        for (let k = 1; k < 6; k++) { const xk = sx + len * k / 6; ctx.beginPath(); ctx.moveTo(xk, ry + 9); ctx.lineTo(xk, ry + (k === 3 ? 1 : 4)); ctx.stroke(); }
+        ctx.fillStyle = set.col; ctx.fillRect(sx - 3, ry - 13, 4, 26); ctx.fillRect(sx + len - 1, ry - 13, 4, 26);
+        // the photon starts at the trailing mirror: the left one if this set moves right
+        const back = set.u >= 0 ? sx : sx + len, dir = set.u >= 0 ? 1 : -1;
+        ctx.fillStyle = C('--photon'); ctx.beginPath(); ctx.arc(back + dir * sl.along * S, ry, 4, 0, TAU); ctx.fill();
+
+        // every clock carries its own count; all the clocks in one set read alike, having been
+        // started together in the frame being watched
+        ctx.textAlign = 'center'; ctx.font = '600 13px ' + C('--sans'); ctx.fillStyle = set.col;
+        ctx.fillText(String(pu.ticks), cx, top - (set.name === 'train' ? 24 : 10));
+        ctx.fillStyle = sl.ticks !== pu.ticks ? C('--hot') : set.col;
+        ctx.fillText(String(sl.ticks), sx + len / 2, ry - 16);
+        ctx.font = '12px ' + C('--sans');
+      }
+      // which set this is, and how it moves in this view, on a clear patch
+      const lx = W - (compact ? 150 : 200), ly = set.name === 'platform' ? 8 : bandH + 8;
+      ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillRect(lx - 6, ly, compact ? 146 : 196, 34);
+      ctx.textAlign = 'left'; ctx.fillStyle = set.col; ctx.font = '600 13px ' + C('--sans');
+      ctx.fillText(set.name === 'platform' ? 'Platform' : 'Train', lx, ly + 13);
+      ctx.font = '12px ' + C('--sans'); ctx.fillStyle = C('--muted');
+      ctx.fillText(!moving ? 'at rest in this view' : 'moving ' + (set.u > 0 ? 'right' : 'left') + ' at ' + Math.abs(set.u).toFixed(2) + 'c', lx, ly + 28);
+    });
+    // the dividing line between the two bands, and the time in the frame being watched
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, bandH + 2); ctx.lineTo(W, bandH + 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.88)'; ctx.fillRect(4, 4, 150, 20);
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText((s1.frame === 'platform' ? 'platform' : 'train') + ' time ' + s1.t.toFixed(1) + ' ns', 10, 18);
+    ctx.fillText('numbers are tick counts', 10, bandH + 20);
+    return results;
+  }
+
+  // the twins, drawn in the Earth's frame, where the Earth twin never moves
+  function drawSpaceEarth() {
+    const { ctx, W, H, compact } = fit($('space'));
+    ctx.clearRect(0, 0, W, H);
+    const tw = s2.tw, t = s2.t;
+    const ml = compact ? 40 : 60, mr = compact ? 40 : 60, yL = H * 0.58;
+    const X = x => ml + x / tw.D * (W - ml - mr);
+    ctx.font = '12px ' + C('--sans');
+    // the line of travel with a light-year scale
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(0), yL); ctx.lineTo(X(tw.D), yL); ctx.stroke();
+    const step = tw.D > 10 ? 2 : 1;
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let d = 0; d <= tw.D + 1e-9; d += step) { ctx.beginPath(); ctx.moveTo(X(d), yL - 4); ctx.lineTo(X(d), yL + 4); ctx.stroke(); if (!compact || d % (2 * step) === 0) ctx.fillText(d + (d === 0 ? '' : ' ly'), X(d), yL + 18); }
+    // news of the turnaround, heading home at c: the traveler turned round at T/2, and Earth cannot
+    // know it until this reaches her
+    if (t > tw.T / 2 && t < tw.earthSwitch) {
+      const xn = tw.D - (t - tw.T / 2);
+      ctx.strokeStyle = C('--news'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X(xn), yL - 56); ctx.lineTo(X(xn), yL + 26); ctx.stroke(); ctx.setLineDash([]);
+      // on a narrow screen the label goes under the line, clear of the traveler's age
+      ctx.fillStyle = C('--news'); ctx.textAlign = 'center';
+      ctx.fillText(compact ? 'turnaround news' : 'light from the turnaround', Math.max(ml + 60, Math.min(W - mr - 60, X(xn))), compact ? yL + 42 : yL - 62);
+    }
+    // flashes in flight
+    tw.earthFlashes.forEach(f => { if (t >= f.sent && t < f.tArr) { ctx.fillStyle = C('--earth'); ctx.beginPath(); ctx.arc(X(t - f.sent), yL - 12, 3.5, 0, TAU); ctx.fill(); } });
+    tw.shipFlashes.forEach(f => { if (t >= f.tSent && t < f.tArr) { ctx.fillStyle = C('--ship'); ctx.beginPath(); ctx.arc(X(f.xSent - (t - f.tSent)), yL + 12, 3.5, 0, TAU); ctx.fill(); } });
+    // Earth, the star, the ship
+    ctx.fillStyle = C('--earth'); ctx.beginPath(); ctx.arc(X(0), yL, 10, 0, TAU); ctx.fill();
+    ctx.fillStyle = C('--sun'); ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 5 : 11; ctx.lineTo(X(tw.D) + r * Math.cos(a), yL + r * Math.sin(a)); }
+    ctx.closePath(); ctx.fill();
+    const xs = s2.launched ? tw.x(Math.min(t, tw.T)) : 0, out = !s2.launched || t < tw.T / 2;
+    const sx = X(xs), sy = yL - (xs < 0.02 * tw.D && s2.launched === false ? 22 : 0);
+    ctx.fillStyle = C('--ship'); ctx.beginPath();
+    const d = out ? 1 : -1; ctx.moveTo(sx + 12 * d, sy); ctx.lineTo(sx - 8 * d, sy - 7); ctx.lineTo(sx - 8 * d, sy + 7); ctx.closePath(); ctx.fill();
+    // each twin's own age, above them
+    const tauNow = Math.min(t, tw.T) / tw.g;
+    ctx.textAlign = 'center'; ctx.font = '600 14px ' + C('--sans');
+    ctx.fillStyle = C('--earth'); ctx.fillText('Earth twin', X(0) + (compact ? 22 : 30), 22);
+    ctx.fillStyle = C('--ship'); ctx.fillText('traveler', Math.max(ml + 30, Math.min(W - mr - 30, sx)), 60);
+    ctx.font = '13px ' + C('--sans');
+    ctx.fillStyle = C('--earth'); ctx.fillText('aged ' + Math.min(t, tw.T).toFixed(1) + ' yr', X(0) + (compact ? 22 : 30), 40);
+    ctx.fillStyle = C('--ship'); ctx.fillText('aged ' + tauNow.toFixed(1) + ' yr', Math.max(ml + 30, Math.min(W - mr - 30, sx)), 78);
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.font = '12px ' + C('--sans');
+    if (!compact) ctx.fillText('drawn in the Earth\'s frame', W - 10, H - 8);
+  }
+
+  // flashes received against the receiver's own age: the whole paradox in two lines
+  function drawCountEarth() {
+    const { ctx, W, H, compact } = fit($('count'));
+    ctx.clearRect(0, 0, W, H);
+    const tw = s2.tw, t = Math.min(s2.t, tw.T), tauNow = t / tw.g;
+    const ml = 48, mr = 16, mt = 16, mb = 40, pw = W - ml - mr, ph = H - mt - mb;
+    const xMax = tw.T * 1.02, yMax = Math.max(tw.earthFlashes.length, tw.shipFlashes.length) * 1.08 + 0.5;
+    const X = a => ml + a / xMax * pw, Y = n => mt + ph - n / yMax * ph;
+    ctx.font = '12px ' + C('--sans');
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(ml, mt); ctx.lineTo(ml, mt + ph); ctx.lineTo(ml + pw, mt + ph); ctx.stroke();
+    const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); return [1, 2, 5, 10].find(m => m * p >= v) * p; };
+    const dx = nice(xMax / 6), dy = nice(yMax / 5);
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let a = 0; a <= xMax; a += dx) ctx.fillText(a.toFixed(0), X(a), mt + ph + 15);
+    ctx.fillText('each twin\'s own age since launch (years)', ml + pw / 2, H - 6);
+    ctx.textAlign = 'right';
+    for (let n = 0; n <= yMax; n += dy) ctx.fillText(n.toFixed(0), ml - 6, Y(n) + 4);
+    ctx.save(); ctx.translate(12, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
+    ctx.fillText(compact ? 'flashes received' : 'birthday flashes received', 0, 0); ctx.restore();
+    // a staircase for each twin, drawn up to where they are now
+    const stair = (arr, ageNow, col, lw) => {
+      const got = arr.filter(f => f.ageArr <= ageNow + 1e-9);
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+      got.forEach((f, i) => { ctx.lineTo(X(f.ageArr), Y(i)); ctx.lineTo(X(f.ageArr), Y(i + 1)); });
+      ctx.lineTo(X(ageNow), Y(got.length)); ctx.stroke();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(ageNow), Y(got.length), 4, 0, TAU); ctx.fill();
+      return got.length;
+    };
+    if (s2.launched) {
+      // Until the traveler turns round the two staircases are identical - the situation is perfectly
+      // symmetric while they fly apart - so Earth's is drawn wide underneath and the traveler's runs
+      // through the middle of it, and both stay visible where they coincide.
+      stair(tw.shipFlashes, t, C('--earth'), 5);           // what Earth has received, against Earth's age
+      stair(tw.earthFlashes, tauNow, C('--ship'), 1.8);    // what the traveler has received, against the traveler's age
+      if (!compact && tauNow > tw.travelerSwitch * 0.6) {
+        ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.font = '12px ' + C('--sans');
+        ctx.fillText('identical until the traveler turns', X(tw.travelerSwitch / 2), Y(tw.travelerSwitch / tw.k) - 14);
+      }
+      // where each one sees the flashes speed up
+      ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+      if (tauNow >= tw.travelerSwitch) { ctx.strokeStyle = C('--ship'); ctx.beginPath(); ctx.moveTo(X(tw.travelerSwitch), mt); ctx.lineTo(X(tw.travelerSwitch), mt + ph); ctx.stroke(); }
+      if (t >= tw.earthSwitch) { ctx.strokeStyle = C('--earth'); ctx.beginPath(); ctx.moveTo(X(tw.earthSwitch), mt); ctx.lineTo(X(tw.earthSwitch), mt + ph); ctx.stroke(); }
+      ctx.setLineDash([]);
+    }
+    // key
+    ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillStyle = C('--ship'); ctx.fillText('traveler, counting Earth\'s flashes', ml + 10, mt + 14);
+    ctx.fillStyle = C('--earth'); ctx.fillText('Earth twin, counting the traveler\'s', ml + 10, mt + 30);
+  }
+
+  // ---- the same trip in the traveler's frame ----
+  // He sits still at the center. Earth and the star move. Everything on screen is where it is "now" in
+  // the inertial frame he is in at this moment, which is a different frame on the way back.
+  function drawSpaceShip() {
+    const { ctx, W, H, compact } = fit($('space'));
+    ctx.clearRect(0, 0, W, H);
+    const tw = s2.tw, t = s2.launched ? Math.min(s2.t, tw.T) : 0, tau = t / tw.g, half = tw.tau / 2;
+    const { F, list } = flashesNow(tw, tau);
+    const R = tw.D / tw.g * 1.08 + 0.2, ml = compact ? 28 : 50, mr = compact ? 28 : 50, yL = H * 0.5;
+    const X = x => ml + (x + R) / (2 * R) * (W - ml - mr);
+    ctx.font = '12px ' + C('--sans');
+    // a ruler measured from the ship, in his frame
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(-R), yL); ctx.lineTo(X(R), yL); ctx.stroke();
+    const step = R > 8 ? 2 : 1;
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let d = -Math.floor(R / step) * step; d <= R; d += step) {
+      ctx.beginPath(); ctx.moveTo(X(d), yL - 4); ctx.lineTo(X(d), yL + 4); ctx.stroke();
+      if (d !== 0 && (!compact || d % (2 * step) === 0)) ctx.fillText(Math.abs(d) + ' ly', X(d), yL + 18);
+    }
+    // the flashes in flight on his present "now"
+    list.forEach(f => {
+      ctx.fillStyle = f.from === 'earth' ? C('--earth') : C('--ship');
+      ctx.beginPath(); ctx.arc(X(f.x), yL + (f.from === 'earth' ? -12 : 12), 3.5, 0, TAU); ctx.fill();
+    });
+    // Earth and the star, and which way they are going
+    const xe = X(F.earth), xst = X(F.star), dir = F.out ? -1 : 1;
+    ctx.fillStyle = C('--earth'); ctx.beginPath(); ctx.arc(xe, yL, 10, 0, TAU); ctx.fill();
+    ctx.fillStyle = C('--sun'); ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 5 : 11; ctx.lineTo(xst + r * Math.cos(a), yL + r * Math.sin(a)); }
+    ctx.closePath(); ctx.fill();
+    if (s2.launched && t < tw.T) [xe, xst].forEach(x => { ctx.strokeStyle = C('--muted'); ctx.fillStyle = C('--muted'); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - 12 * dir, yL + 30); ctx.lineTo(x + 12 * dir, yL + 30); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + 15 * dir, yL + 30); ctx.lineTo(x + 9 * dir, yL + 26); ctx.lineTo(x + 9 * dir, yL + 34); ctx.closePath(); ctx.fill(); });
+    // the traveler, still, facing the way he is going
+    const sx = X(0), sy = yL - (!s2.launched ? 22 : 0), d = F.out || !s2.launched ? 1 : -1;
+    ctx.fillStyle = C('--ship'); ctx.beginPath(); ctx.moveTo(sx + 12 * d, sy); ctx.lineTo(sx - 8 * d, sy - 7); ctx.lineTo(sx - 8 * d, sy + 7); ctx.closePath(); ctx.fill();
+    // labels: Earth's in the corner, his above himself
+    const seen = tw.earthFlashes.filter(f => f.ageArr <= tau + 1e-9).length;
+    const now = Math.min(F.earthNow, tw.T);
+    ctx.textAlign = 'left'; ctx.font = '600 14px ' + C('--sans'); ctx.fillStyle = C('--earth');
+    ctx.fillText('Earth twin', 10, 20);
+    ctx.font = '13px ' + C('--sans');
+    ctx.fillText('reckoned now: ' + now.toFixed(1) + ' yr', 10, 38);
+    ctx.fillText('latest flash seen: ' + seen + ' yr', 10, 55);
+    ctx.textAlign = 'center'; ctx.font = '600 14px ' + C('--sans'); ctx.fillStyle = C('--ship');
+    ctx.fillText('traveler', sx, compact ? 78 : 20); ctx.font = '13px ' + C('--sans');
+    ctx.fillText('aged ' + tau.toFixed(1) + ' yr, at rest', sx, compact ? 95 : 38);
+    ctx.textAlign = 'right'; ctx.fillStyle = C('--muted'); ctx.font = '12px ' + C('--sans');
+    if (!compact) ctx.fillText('drawn in the traveler\'s frame: ' + (F.out ? 'the one going out' : 'the one coming back'), W - 10, H - 8);
+    // what just happened, for a little while after the turnaround
+    if (s2.launched && tau >= half && (s2.hold > 0 || tau - half < 0.12 * tw.tau)) {
+      const before = half / tw.g, after = shipFrame(tw, half * (1 + 1e-9)).earthNow;
+      const lines = compact
+        ? ['New frame: Earth\'s clock now reads ' + after.toFixed(1) + ', not ' + before.toFixed(1) + '.', 'Flashes she sent in between are already on their way.']
+        : ['He has turned round and changed frame. In the new one, Earth\'s clock reads ' + after.toFixed(1) + ' years, not ' + before.toFixed(1) + '.',
+           'The flashes she sent in between are already on their way, and nearer: he is now flying into them.'];
+      ctx.font = '13px ' + C('--sans');
+      const bw = Math.min(W - 20, Math.max(...lines.map(l => ctx.measureText(l).width)) + 24), bh = 18 * lines.length + 14;
+      const bx = (W - bw) / 2, by = yL + 44;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, bh);
+      ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+      lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 20 + 18 * i));
+    }
+  }
+  // Earth's age according to the traveler: what his telescope shows, and what he reckons is true now
+  function drawCountShip() {
+    const { ctx, W, H, compact } = fit($('count'));
+    ctx.clearRect(0, 0, W, H);
+    const tw = s2.tw, t = s2.launched ? Math.min(s2.t, tw.T) : 0, tau = t / tw.g, half = tw.tau / 2;
+    const ml = 48, mr = 16, mt = 16, mb = 40, pw = W - ml - mr, ph = H - mt - mb;
+    const xMax = tw.tau * 1.02, yMax = tw.T * 1.08;
+    const X = a => ml + a / xMax * pw, Y = n => mt + ph - n / yMax * ph;
+    ctx.font = '12px ' + C('--sans');
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(ml, mt); ctx.lineTo(ml, mt + ph); ctx.lineTo(ml + pw, mt + ph); ctx.stroke();
+    const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); return [1, 2, 5, 10].find(m => m * p >= v) * p; };
+    const dx = nice(xMax / 6), dy = nice(yMax / 5);
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let a = 0; a <= xMax; a += dx) ctx.fillText(a.toFixed(0), X(a), mt + ph + 15);
+    ctx.fillText('the traveler\'s own age (years)', ml + pw / 2, H - 6);
+    ctx.textAlign = 'right';
+    for (let n = 0; n <= yMax; n += dy) ctx.fillText(n.toFixed(0), ml - 6, Y(n) + 4);
+    ctx.save(); ctx.translate(12, mt + ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center';
+    ctx.fillText('Earth twin\'s age, to him', 0, 0); ctx.restore();
+    if (s2.launched) {
+      // as he sees her: the age she was when she sent the latest flash to reach him
+      const got = tw.earthFlashes.filter(f => f.ageArr <= tau + 1e-9);
+      ctx.strokeStyle = C('--earth'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+      got.forEach((f, i) => { ctx.lineTo(X(f.ageArr), Y(i)); ctx.lineTo(X(f.ageArr), Y(i + 1)); });
+      ctx.lineTo(X(tau), Y(got.length)); ctx.stroke();
+      // as he reckons her now: slow by gamma on each leg, with the jump at the turnaround
+      const now = a => shipFrame(tw, a).earthNow;
+      ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+      ctx.lineTo(X(Math.min(tau, half)), Y(Math.min(tau, half) / tw.g)); ctx.stroke();
+      if (tau > half) {
+        const a = half / tw.g, b = now(half * (1 + 1e-9));
+        ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(X(half), Y(a)); ctx.lineTo(X(half), Y(b)); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(X(half), Y(b)); ctx.lineTo(X(tau), Y(Math.min(now(tau), tw.T))); ctx.stroke();
+        ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+        ctx.fillText('jumps ' + (b - a).toFixed(1) + ' yr', X(half) + 6, Y((a + b) / 2) + 4);
+      }
+      ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(X(tau), Y(Math.min(now(tau), tw.T)), 4, 0, TAU); ctx.fill();
+      ctx.fillStyle = C('--earth'); ctx.beginPath(); ctx.arc(X(tau), Y(got.length), 4, 0, TAU); ctx.fill();
+    }
+    ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
+    ctx.fillStyle = C('--ink'); ctx.fillText(compact ? 'what he reckons, now' : 'what he reckons her age is, right now', ml + 10, mt + 14);
+    ctx.fillStyle = C('--earth'); ctx.fillText(compact ? 'what he sees (latest flash)' : 'what he sees: her age in the latest flash to reach him', ml + 10, mt + 30);
+  }
+  function readout2Ship() {
+    const tw = s2.tw, t = s2.launched ? Math.min(s2.t, tw.T) : 0, tau = t / tw.g, half = tw.tau / 2, done = s2.launched && s2.t >= tw.T;
+    const F = shipFrame(tw, tau), seen = tw.earthFlashes.filter(f => f.ageArr <= tau + 1e-9).length;
+    const jump = tw.T * tw.beta * tw.beta;
+    let h = '';
+    h += card('Me, the traveler', done ? tw.tau.toFixed(1) + ' years older' : 'aged ' + tau.toFixed(1) + ' yr',
+      'In my frame the star is only <i>D</i>/γ = ' + (tw.D / tw.g).toFixed(1) + ' ly away, so the trip out takes ' + half.toFixed(1) + ' of my years. Earth and the star are the ones moving.');
+    h += card('Earth twin, as I see her', seen + ' yr old', 'her age in the latest birthday flash to reach me. What I see only ever changes smoothly: slowly going out, fast coming back.');
+    h += card('Earth twin, as I reckon her now', Math.min(F.earthNow, tw.T).toFixed(1) + ' yr',
+      tau < half ? 'her clock runs slow by γ in my frame, just as the platform\'s did from the train'
+                 : 'her clock runs slow by γ in my frame, but when I turned round my "now" on Earth jumped forward ' + jump.toFixed(1) + ' years');
+    $('readout2').innerHTML = h;
+    $('b2_v').textContent = tw.beta.toFixed(2) + 'c,  γ = ' + tw.g.toFixed(3);
+    $('D_v').textContent = tw.D.toFixed(1) + ' light-years (Earth\'s frame)';
+  }
+  const drawSpace = () => s2.view === 'ship' ? drawSpaceShip() : drawSpaceEarth();
+  const drawCount = () => s2.view === 'ship' ? drawCountShip() : drawCountEarth();
+  const readout2 = () => s2.view === 'ship' ? readout2Ship() : readout2Earth();
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f, cls) => '<div><div class="k">' + k + '</div><div class="v ' + (cls || '') + '">' + v + '</div><div class="f">' + f + '</div></div>';
+  function readout1(res) {
+    const b = s1.beta, g = gammaOf(b), rest = 2 * L0 / CL, mover = s1.frame === 'platform' ? 'train' : 'platform';
+    const m = res && res[mover];
+    let h = '';
+    h += card('How much the effects scale by', 'γ = ' + g.toFixed(3), 'γ = 1/√(1 − <i>v</i>²/<i>c</i>²) at <i>v</i> = ' + b.toFixed(2) + '<i>c</i>');
+    h += card('Moving clocks run slow', (rest * g).toFixed(1) + ' ns per tick',
+      'a clock at rest ticks every ' + rest.toFixed(1) + ' ns; the moving ones take γ times as long, timed in this frame');
+    if (s1.noshrink && b > 0) {
+      const same = m && m.up === m.side;
+      h += card('The ' + mover + '\'s two clocks', m ? m.up + ' vs ' + m.side + ' ticks' : '—',
+        same ? 'they agree so far; give them time' : 'they disagree, and anyone standing beside them, riding along, would see it happen. Impossible: so moving things must shrink.', same ? '' : 'bad');
+    } else {
+      h += card('Moving rulers are short', (L0 / g).toFixed(2) + ' m', 'the sideways clock is ' + L0.toFixed(2) + ' m long at rest; measured in this frame as it moves, 1/γ of that');
+    }
+    $('readout1').innerHTML = h;
+    $('b1_v').textContent = b.toFixed(2) + 'c  (' + (b * CL * 1e9 / 1000).toFixed(0) + ' km/s)';
+  }
+  function readout2Earth() {
+    const tw = s2.tw, t = Math.min(s2.t, tw.T), tau = t / tw.g, done = s2.launched && s2.t >= tw.T;
+    const gotE = tw.shipFlashes.filter(f => f.tArr <= t + 1e-9).length, gotT = tw.earthFlashes.filter(f => f.tArr <= t + 1e-9).length;
+    const every = (slow) => 'one every ' + (slow ? tw.k : 1 / tw.k).toFixed(2) + ' of my years';
+    let h = '';
+    h += card('Earth twin', done ? tw.T.toFixed(1) + ' years older' : 'aged ' + t.toFixed(1) + ' yr',
+      !s2.launched ? 'waiting for the launch' : 'has received ' + gotE + ' of the traveler\'s birthday flashes; ' + (done ? 'that is the traveler\'s whole trip' : 'seeing them arrive ' + every(t < tw.earthSwitch)));
+    h += card('Traveler', done ? tw.tau.toFixed(1) + ' years older' : 'aged ' + tau.toFixed(1) + ' yr',
+      !s2.launched ? 'waiting for the launch' : 'has received ' + gotT + ' of Earth\'s birthday flashes; ' + (done ? 'that is every year Earth lived through' : 'seeing them arrive ' + every(t < tw.T / 2)));
+    h += card('Why they disagree', done ? 'reunited' : 'k = ' + tw.k.toFixed(2),
+      'both see the other\'s flashes slowed by <i>k</i> = √((1+β)/(1−β)) while apart and sped up by <i>k</i> while closing. The traveler switches at the turnaround; the Earth twin not until ' + tw.earthSwitch.toFixed(1) + ' years in, when the light from it gets home.');
+    $('readout2').innerHTML = h;
+    $('b2_v').textContent = tw.beta.toFixed(2) + 'c,  γ = ' + tw.g.toFixed(3);
+    $('D_v').textContent = tw.D.toFixed(1) + ' light-years (Earth\'s frame)';
+  }
+
+  const TEXT = {
+    1: {
+      lede: 'A light clock is two mirrors with a flash of light bouncing between them; each round trip is one tick. The platform and the train carry identical pairs of them, one standing up and one lying on its side. Light travels at the same speed for everyone, so a clock whose light has farther to go must tick more slowly.',
+      notes: '<p><b>What to try.</b> Watch the upright clock on the moving train. Its light cannot go straight up and down, because the mirrors move while the light is in flight, so it follows the zigzag, a longer path at the same speed. Each tick takes longer by γ. Pythagoras on one leg of the zigzag gives the whole result: (<i>c</i>Δ<i>t</i>/2)² = <i>L</i>² + (<i>v</i>Δ<i>t</i>/2)², so Δ<i>t</i> = γ · 2<i>L</i>/<i>c</i>.</p>' +
+        '<p>Now press <i>ride the train</i>. The train\'s clocks are at rest and tick every 10 ns, and it is the platform\'s clocks that zigzag, tick slowly and look short. Neither view is the right one. Each observer measures the other\'s clocks running slow, and there is no contradiction, because two clocks moving apart can never be brought back side by side to settle it without one of them turning round. That is the twin paradox, on the next screen.</p>' +
+        '<p>Then tick <i>what if moving things did not shrink?</i> The sideways clock on the moving train keeps its full length, its light has to chase the far mirror, and it falls behind the upright clock beside it. But a passenger standing next to those two clocks sees them at rest, side by side, and they must tick together. The only way out is for the sideways clock, and the train, and everything else moving, to be shorter by γ. Length contraction is not a separate rule; it is what keeps light clocks honest whichever way they point.</p>' +
+        '<p><b>What this leaves out.</b> The clocks in view are started together as seen in whichever frame you are watching from. Observers in the other frame would say they were not started together at all, because events that are simultaneous in one frame are not in another. That is the third effect of relativity; you can watch it at work in the traveler\'s view of the twin paradox, on the next screen. The animation is slowed by about a hundred million times: a real light clock this size ticks a hundred million times a second.</p>'
+    },
+    2: {
+      lede: 'One twin stays on Earth; the other flies to a star and comes straight back. On every birthday, by their own clock, each twin sends the other a flash of light. Counting the flashes lets each twin watch the other age, and at the reunion they disagree about how much time has passed.',
+      notes: '<p><b>What to try.</b> Launch with the defaults, 0.8c to a star 8 light-years away, and watch the staircases. While the twins fly apart, each sees the other\'s flashes arriving three times too slowly; while they close, three times too fast. The two situations are perfectly symmetric except for one thing: <i>when</i> each twin sees the switch. The traveler turns round at the midpoint of his own trip and immediately starts flying into Earth\'s flashes. The Earth twin cannot know he has turned until the light from the turnaround reaches her, and by then most of the trip is over. So she spends 18 of her 20 years watching his flashes arrive slowly, and he spends only half his 12. That accounts for the whole difference.</p>' +
+        '<p>At the reunion the count is exact. The traveler has received 20 flashes, one for each year Earth lived through; Earth has received 12, one for each of his. Both agree on both numbers: there is no paradox, only an asymmetry. The traveler turned round, and she did not.</p>' +
+        '<p>Try it faster and farther. The Doppler factor <i>k</i> = √((1+β)/(1−β)) sets both rates, and the counting identity <i>τ</i>/2·(<i>k</i> + 1/<i>k</i>) = <i>T</i> shows why the traveler ages <i>T</i>/γ.</p>' +
+        '<p><b>What this leaves out.</b> The traveler turns round instantly and cruises at a single speed each way. A real ship would take time to accelerate, but that changes the numbers only slightly and the explanation not at all: whoever does the turning is the one who comes home younger. To see the same trip through his eyes, switch to <i>the traveler\'s frame</i>.</p>'
+    },
+    ship: {
+      lede: 'The same trip, drawn from the traveler\'s point of view. He is at rest; Earth and the star are the ones moving. But he rides one inertial frame on the way out and a different one on the way back, and when he switches, his idea of what is happening on Earth "now" changes with it.',
+      notes: '<p><b>What to try.</b> Launch and watch Earth\'s clock as he reckons it: the dark line on the graph and the third card. On the way out Earth recedes at 0.8c, and exactly as with the platform\'s clocks seen from the train, her clock runs slow by γ. He reckons she ages only 3.6 years while he ages 6. On the way back, the same again: another 3.6. That leaves 12.8 of her 20 years unaccounted for, and they appear all at once, at the turnaround.</p>' +
+        '<p>At the turnaround he swaps one inertial frame for another, and in the new frame, "now" on distant Earth is 12.8 years later. Watch the blue flashes at that moment. The ones she sent during those years suddenly count as already sent, and the ones already on their way jump closer, because he is now flying into them instead of away. None of this is anything he sees. The flashes that actually reach him, the blue staircase, just start arriving every four months instead of every three years. Only his reckoning of what is happening far away, right now, jumps. His own orange flashes change too: in the new frame it is already 16.4 years into Earth\'s trip, so most of them have already reached her.</p>' +
+        '<p>This is the relativity of simultaneity, and it is exactly why the situation is not symmetric. The Earth twin stays in one frame for the whole trip, so her "now" never jumps. The traveler changes frames, and that moves his "now" on Earth forward by <i>T</i>β². Add the two slow legs, <i>T</i>/γ² between them, and it comes to exactly <i>T</i>: both twins end up agreeing she is 20 and he is 12.</p>' +
+        '<p><b>What this leaves out.</b> The turnaround is instantaneous, so the jump is too. A real ship taking months to turn round would sweep his "now" on Earth forward smoothly over those months instead. The page pauses briefly at the turnaround to let you see what changed. Distances are measured in whichever frame he is in at the moment, which is why the star starts only ' + (8 / (5 / 3)).toFixed(1) + ' light-years away at the default speed.</p>'
+    }
+  };
+
+  const textFor = n => n === 2 && s2.view === 'ship' ? TEXT.ship : TEXT[n];
+  function setTab(n) {
+    st.tab = n;
+    [1, 2].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = textFor(n).lede; $('notes').innerHTML = textFor(n).notes;
+    $('p1').hidden = n !== 1; $('p2').hidden = n !== 2;
+    draw();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  const setPlay = on => { st.playing = on; $('play1').textContent = $('play2').textContent = on ? 'Pause' : 'Play'; };
+  $('play1').addEventListener('click', () => setPlay(!st.playing));
+  $('play2').addEventListener('click', () => setPlay(!st.playing));
+  // changing anything restarts the clocks, so every comparison starts from zero together
+  $('reset1').addEventListener('click', () => { s1.t = 0; draw(); });
+  $('b1').addEventListener('input', () => { s1.beta = +$('b1').value; s1.t = 0; draw(); });
+  document.querySelectorAll('#frame button').forEach(b => b.addEventListener('click', () => {
+    s1.frame = b.dataset.f; s1.t = 0;
+    document.querySelectorAll('#frame button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    draw();
+  }));
+  $('noshrink').addEventListener('change', () => { s1.noshrink = $('noshrink').checked; s1.t = 0; draw(); });
+
+  $('launch').addEventListener('click', () => { s2.t = 0; s2.launched = true; s2.hold = 0; s2.held = false; $('launch').textContent = 'Launch again'; setPlay(true); });
+  $('b2').addEventListener('input', () => { s2.beta = +$('b2').value; retwin(); draw(); });
+  $('D').addEventListener('input', () => { s2.D = +$('D').value; retwin(); draw(); });
+  document.querySelectorAll('#view2 button').forEach(b => b.addEventListener('click', () => {
+    s2.view = b.dataset.v;
+    document.querySelectorAll('#view2 button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    $('lede').innerHTML = textFor(2).lede; $('notes').innerHTML = textFor(2).notes;
+    draw();
+  }));
+  document.querySelectorAll('#rate2 button').forEach(b => b.addEventListener('click', () => {
+    s2.rate = +b.dataset.r;
+    document.querySelectorAll('#rate2 button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  function draw() {
+    if (st.tab === 1) readout1(drawClocks());
+    else { drawSpace(); drawCount(); readout2(); }
+  }
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (st.playing && !document.hidden) {
+      if (st.tab === 1) s1.t += dt * NS_PER_S;
+      if (st.tab === 2 && s2.launched && s2.t < s2.tw.T) {
+        if (s2.hold > 0) s2.hold -= dt;
+        else {
+          // the traveler's view runs at the chosen rate on HIS clock; Earth's view on hers
+          const rate = YR_PER_S * s2.rate * (s2.view === 'ship' ? s2.tw.g : 1);
+          let next = Math.min(s2.tw.T, s2.t + dt * rate);
+          // stop just after the turnaround, in the new frame, long enough to see what changed
+          if (s2.view === 'ship' && !s2.held && s2.t < s2.tw.T / 2 && next >= s2.tw.T / 2) { next = s2.tw.T / 2 * (1 + 1e-9); s2.held = true; s2.hold = 2.5; }
+          s2.t = next;
+        }
+      }
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setPlay(false);
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

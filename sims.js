@@ -16,6 +16,26 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'relativity',
+    title: 'Moving clocks and the twin paradox',
+    topic: 'modern',
+    tags: ['special relativity', 'time dilation', 'length contraction', 'simultaneity', 'light clock', 'twin paradox', 'Doppler'],
+    blurb: "Light clocks on a platform and a passing train, with a switch to ride either one: each observer finds the other's clocks slow and short. A toggle shows why length contraction is forced. Then the twin paradox, told with birthday flashes, from Earth's frame and then the traveler's: when he turns round, his 'now' on Earth jumps forward 12.8 years.",
+    level: 'intro',
+    added: '2026-09-27',
+    status: 'ready'
+  },
+  {
+    slug: 'magnet-tube',
+    title: 'Magnet falling through a copper tube',
+    topic: 'em',
+    tags: ["Lenz's law", 'eddy currents', 'induction', 'terminal velocity', 'conductivity', 'energy'],
+    blurb: 'Race one magnet down copper, aluminum, brass and slotted copper tubes, then ride along inside the wall to see the induced currents circling above and below it. The drag model has no fitted constants and reproduces a published measurement: two stacked discs fall more slowly than one or three.',
+    level: 'intro',
+    added: '2026-09-26',
+    status: 'ready'
+  },
+  {
     slug: 'heat-engines',
     title: 'Heat engines on a PV diagram',
     topic: 'thermo',
