@@ -78,19 +78,85 @@
   .home a { color: var(--muted); text-decoration: none; }
   .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
   .home a::before { content: "\2190\00a0"; }
+
+  /* ---- wide screens: the simulation fills the window, like an app ------------------------------
+     The stage (canvases, and the buttons directly under them) sits on the left and the panel
+     (readouts and sliders) on the right, both sized to the window, so everything needed to run the
+     simulation is on screen at once. The explanation follows underneath. Phones and narrow windows
+     keep the stacked layout above, unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px calc(100vh - 58px) auto auto;
+      grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
+    .topbar { grid-area: bar; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .workspace > canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto !important; }
+    .sidebar { grid-area: panel; min-height: 0; overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 28px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto; }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+  /* this sim */
+  @media (min-width: 1200px) and (min-height: 620px) {
+    .workspace > canvas { height: auto; }
+    #circuit { min-height: 290px; max-height: 330px; }
+    .regions .group { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .regions .group.right { align-items: flex-end; }
+    .regions .group span { margin: 0; font-size: 13px; }
+    .sidebar .lower { grid-template-columns: 1fr; gap: 14px; }
+    .sidebar .lower .readout { order: 0; }
+  }
 </style>
 </head>
 <body>
-<main>
+<main class="app">
+  <div class="topbar">
   <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>p-n junction diode</h1>
-  <p class="lede">
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+  <p class="lede" id="lede">
     Dope each half of the bar and connect a battery. Electrons and holes drift, diffuse and recombine,
     while the band diagram below shows what the same carriers are doing in energy. Everything here is
     schematic: a handful of carriers stand in for 10<sup>17</sup> per cm<sup>3</sup>, and the current
     follows an ideal diode law with a little series resistance.
   </p>
 
+  <div class="workspace">
   <canvas id="circuit"></canvas>
 
   <div class="regions">
@@ -113,7 +179,9 @@
   </div>
 
   <canvas id="bands"></canvas>
+  </div>
 
+  <div class="sidebar">
   <div class="lower">
     <div class="readout">
       <h2 id="stateTitle"></h2>
@@ -123,6 +191,7 @@
         &nbsp; <span style="color:var(--light)">&#9679;</span> light from recombination</p>
     </div>
     <canvas id="iv"></canvas>
+  </div>
   </div>
 </main>
 

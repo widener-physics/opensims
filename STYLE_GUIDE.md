@@ -24,6 +24,8 @@ Top to bottom, every simulation page has:
 
 Sections 7 to 9 are what turn a toy into a lesson. Don't skip them.
 
+The elements above are grouped by three wrapper divs, which do nothing on a phone and arrange the page as an app on a wide screen (section 7): `div.topbar` around the home link, title and tabs; `div.workspace` around the canvases and the buttons that sit directly under them; `div.sidebar` around the readouts, sliders and toggles. The lede and notes stay outside all three. Keep this order in the markup, because the phone layout is simply the markup order; the template shows it.
+
 ## 3. Visual system
 
 Use the CSS custom properties exactly as named in `style.json`; every sim shares them, so the pages read as one set.
@@ -59,9 +61,17 @@ Use the CSS custom properties exactly as named in `style.json`; every sim shares
 - Pause the animation loop when the tab is hidden (`document.hidden`).
 - Don't rely on color alone to distinguish two things: vary line style (solid/dashed) or shape as well.
 
-## 7. Desktop first, phone functional
+## 7. Wide screens like an app, phones stacked
 
-The canvas is designed for a ~900px-wide desktop column, but must be usable at 390px:
+On a screen at least 1200px wide and 620px tall, the page works like a PhET sim: everything needed to run the simulation is visible without scrolling. The shared block at the end of the template's `<style>` does this, and should be copied unchanged:
+
+- A 58px bar across the top holds the home link, the title, the tabs, and a "How to use it" link that jumps down to the lede.
+- The workspace fills the rest of the window height on the left (the whole page is capped at 1200px wide and centered). Canvases share its height through `flex-grow`, so set the ratios in the sim's own block (`#plot { flex-grow: 0.6; }`); canvas drawing must therefore adapt to any aspect ratio, which it will if layout is computed from the canvas's actual size each frame.
+- The sidebar is a fixed 340px column on the right: sliders first, then toggles, then readout cards, which scroll inside the column if they don't fit. Sliders and buttons must never be off screen.
+- The lede and notes move below the fold. Check at 1920x950, 1536x730 and 1366x650 (a 1080p monitor, a 1080p laptop at 125%, a 1366x768 laptop).
+- A canvas whose drawing only works at one shape can keep it with `aspect-ratio: ... !important; flex: none` in the sim's block; the space under it then goes to the others.
+
+Below those sizes the page is the stacked column described next, identical to the phone layout's logic. The canvas is designed for a ~900px-wide column, but must be usable at 390px:
 
 - Draw canvas text in CSS pixels, not scaled design units, so labels stay 12–13px everywhere.
 - Below ~640px give the canvas a taller aspect ratio (4:3 is a good default) and let the scene fit the extra height. If the scene is inherently wide, as in a multi-lane race, keep it wide instead; the point is to use the space, not to hit a particular ratio.
@@ -92,6 +102,7 @@ The canvas is designed for a ~900px-wide desktop column, but must be usable at 3
 - [ ] The physics functions are at the top and reproduce the textbook limiting case.
 - [ ] Assumptions, units, and any time acceleration or exaggeration are stated on the page.
 - [ ] Works at 390px wide with readable labels and usable sliders.
+- [ ] At 1920x950, 1536x730 and 1366x650, every slider and button is on screen without scrolling, and no canvas label overlaps another.
 - [ ] Reduced-motion respected; loop pauses when hidden.
 - [ ] Home link, license header, "What to try", readouts with formulas.
 - [ ] Entry added to `sims.js` with a real `added` date.

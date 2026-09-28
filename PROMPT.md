@@ -40,8 +40,9 @@ Requirements:
    slider that starts at the real value.
 3. Readouts in HTML, each with its governing formula beside the number.
 4. A "What to try" paragraph with two or three specific things to do and what to look for.
-5. Works from a local file with no network, at 900px wide on desktop and at 390px wide on
-   a phone, with canvas text at 12-13px in screen pixels.
+5. Works from a local file with no network, at 390px wide on a phone and at 900px wide, with
+   canvas text at 12-13px in screen pixels. On wide screens (1200px and up) it uses the
+   template's app layout: every slider and button visible at 1366x650 without scrolling.
 6. Keep the GPL header from the template and fill in the title, year, author, provenance
    ("Code drafted with an AI model under the author's direction; physics verified by the
    author."), and credit lines.
@@ -79,7 +80,8 @@ The model's output is a draft. Before it goes in `sims/`:
 1. Open the file from your desktop with no network. It must run with no console errors.
 2. Check the physics yourself. Change a parameter to a value where you know the answer and compare with the readout. The model's own list of limiting cases is a starting point, not a substitute.
 3. Read the text on the page as a student would. Cut anything that sounds like marketing.
-4. Try it at phone width (resize the browser to about 390px).
+4. Try it at phone width (resize the browser to about 390px), and on a laptop-sized window
+   (about 1366x650): every slider and button should be visible without scrolling.
 5. Ask for revisions in the same conversation: "the pericenter label overlaps the ball; move it", "the plot should show both bodies". Small, specific requests work better than restating the whole task.
 6. Fill in the header (author, year), add the `sims.js` entry, and run the checklist at the end of `STYLE_GUIDE.md`.
 

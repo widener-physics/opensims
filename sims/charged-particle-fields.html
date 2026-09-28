@@ -85,10 +85,63 @@
     .readout { grid-template-columns: 1fr; }
     .controls { grid-template-columns: 1fr; padding: 14px 16px; }
   }
+
+  /* ---- wide screens: the simulation fills the window, like an app ------------------------------
+     The stage (canvases, and the buttons directly under them) sits on the left and the panel
+     (readouts and sliders) on the right, both sized to the window, so everything needed to run the
+     simulation is on screen at once. The explanation follows underneath. Phones and narrow windows
+     keep the stacked layout above, unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px calc(100vh - 58px) auto auto;
+      grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
+    .topbar { grid-area: bar; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .workspace > canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto !important; }
+    .sidebar { grid-area: panel; min-height: 0; overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 28px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto; }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
 </style>
 </head>
 <body>
-<main>
+<main class="app">
+  <div class="topbar">
   <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>Charged particle in electric and magnetic fields</h1>
 
@@ -98,9 +151,12 @@
     <button role="tab" id="tab3" aria-selected="false"><span>3</span>Mass spectrometer</button>
     <button role="tab" id="tab4" aria-selected="false"><span>4</span>Cyclotron</button>
   </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
 
   <p class="lede" id="lede"></p>
 
+  <div class="workspace">
   <canvas id="c"></canvas>
 
   <div class="transport">
@@ -109,7 +165,9 @@
     <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
     <span class="time"><span id="tval">0.00</span> µs</span>
   </div>
+  </div>
 
+  <div class="sidebar">
   <div class="readout" id="readout"></div>
 
   <div class="controls">
@@ -146,6 +204,7 @@
     <label id="lab_three"><input type="checkbox" id="three"> launch three speeds at once</label>
     <label id="lab_vecs"><input type="checkbox" id="vecs" checked> show velocity and force</label>
     <label id="lab_res"><button id="resonate" class="secondary" style="min-width:0;padding:5px 12px">match <i>f</i><sub>c</sub></button></label>
+  </div>
   </div>
 
   <div class="notes" id="notes"></div>
@@ -394,13 +453,10 @@
       ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     }
 
-    // trajectories: dashed for the whole path, solid up to now
+    // trajectories: only the part already flown is drawn, so nothing gives away where an ion will go
     M.parts.forEach(p => {
       const col = C(p.color), i = idxAt(p, t), tr = p.tr;
-      ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.globalAlpha = 0.45; ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      for (let k = 0; k <= tr.n; k += Math.max(1, Math.floor(tr.n / 400))) k === 0 ? ctx.moveTo(X(tr.x[k]), Y(tr.y[k])) : ctx.lineTo(X(tr.x[k]), Y(tr.y[k]));
-      ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.strokeStyle = col;
       if (i > 0) { ctx.lineWidth = 2.2; ctx.beginPath();
         for (let k = 0; k <= i; k++) k === 0 ? ctx.moveTo(X(tr.x[k]), Y(tr.y[k])) : ctx.lineTo(X(tr.x[k]), Y(tr.y[k]));
         ctx.stroke(); }
@@ -423,8 +479,8 @@
           if (fmag > 0) { ctx.fillStyle = C('--ghost'); ctx.fillText('F', px + fx / fmag * vlen * 0.8 + 5, py - fy / fmag * vlen * 0.8 + 4); }
         }
       }
-      // labels
-      if (!compact && (d.kind === 'spectrometer' || (d.kind === 'selector' && M.parts.length > 1))) {
+      // labels, at the end of each path once the ion has got there
+      if (!compact && i >= tr.n && (d.kind === 'spectrometer' || (d.kind === 'selector' && M.parts.length > 1))) {
         const j = M.parts.indexOf(p), endI = tr.n;
         ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
         const dy = d.kind === 'spectrometer' ? -10 - j * 15 : 4 + (j - (M.parts.length - 1) / 2) * 2;
@@ -437,12 +493,14 @@
     ctx.fillText('B = ' + st.B.toFixed(2) + ' T out of the page' + (d.kind === 'circle' && d.period ? ',  one lap ' + (d.period * 1e9).toFixed(0) + ' ns' : ''), 12, 18);
     ctx.textAlign = 'right';
     let status = '';
-    if (d.kind === 'selector') { const thr = M.parts.filter(p => p.through).length; status = thr + ' of ' + M.parts.length + ' get through'; }
+    if (d.kind === 'selector') { const fin = M.parts.filter(p => finished(p, t)), thr = fin.filter(p => p.through).length;
+      status = fin.length < M.parts.length ? (t > 0 ? thr + ' through so far' : 'ready: press Play') : thr + ' of ' + M.parts.length + ' get through'; }
     else if (d.kind === 'spectrometer') status = M.parts.length + ' isotopes';
     else if (d.kind === 'cyclotron') { const p = M.parts[0], i = idxAt(p, t); status = 'turn ' + Math.floor(i / p.tr.n * turns()) + ' of ' + turns(); }
     else status = st.three ? 'three speeds, one period' : 'one lap';
     ctx.fillText(status, W - 12, 18);
   }
+  const finished = (p, t) => idxAt(p, t) >= p.tr.n;
   function turns() { const p = M.parts[0]; if (!p || M.deco.kind !== 'cyclotron') return 0;
     let n = 0, prev = p.tr.y[0] >= 0; for (let k = 1; k <= p.tr.n; k++) { const s = p.tr.y[k] >= 0; if (s !== prev && p.tr.x[k] > 0) n++; prev = s; } return Math.max(1, n); }
 
@@ -466,18 +524,20 @@
     }
     if (d.kind === 'selector') {
       html += card('Speed that gets through', (d.vsel / 1e5).toFixed(3) + ' ×10⁵ m/s', '<i>v</i> = <i>E</i>/<i>B</i>, independent of <i>m</i> and <i>q</i>');
-      const thr = M.parts.filter(p => p.through);
-      html += card('Ions leaving the far slit', thr.length + ' of ' + M.parts.length,
-        M.parts.map(p => '<span style="color:' + C(p.color) + '">' + p.label + '</span>: ' + p.fate).join('<br>'), thr.length ? 'ok' : 'no');
+      const fin = M.parts.filter(p => finished(p, t)), thr = fin.filter(p => p.through), all = fin.length === M.parts.length;
+      html += card('Ions leaving the far slit', all ? thr.length + ' of ' + M.parts.length : t > 0 ? thr.length + ' so far' : '—',
+        M.parts.map(p => '<span style="color:' + C(p.color) + '">' + p.label + '</span>: ' + (finished(p, t) ? p.fate : t > 0 ? 'on its way' : 'waiting')).join('<br>'), all ? (thr.length ? 'ok' : 'no') : '');
       html += card('Forces on the matched ion', (Math.abs(M.q) * M.E * 1e15).toFixed(2) + ' fN each way', '<i>qE</i> up, <i>qvB</i> down, net zero');
     }
     if (d.kind === 'spectrometer') {
-      const rows = M.parts.map(p => p.label + ': ' + (p.land * 100).toFixed(2) + ' cm').join('<br>');
+      // each landing distance appears when that ion reaches the detector, not before
+      const rows = M.parts.map(p => '<span style="color:' + C(p.color) + '">' + p.label + '</span>: ' + (finished(p, t) ? (p.land * 100).toFixed(2) + ' cm' : t > 0 ? 'in flight' : '—')).join('<br>');
+      const all = M.parts.every(p => finished(p, t));
       const sep = M.parts.length > 1 ? (M.parts[M.parts.length - 1].land - M.parts[0].land) * 100 : 0;
       const frac = M.parts.length > 1 ? 100 * (M.parts[M.parts.length - 1].mu - M.parts[0].mu) / M.parts[0].mu : 0;
       html += card('Landing distance from the slit', rows, 'distance = 2<i>r</i> = 2<i>mv</i>/(<i>qB</i>)');
-      html += card('Spread across the detector', sep.toFixed(2) + ' cm', 'for a ' + frac.toFixed(1) + '% spread in mass');
-      html += card('Radius of the lightest ion', (M.parts[0].r * 100).toFixed(2) + ' cm', '<i>r</i> = <i>mv</i>/(<i>qB</i>)');
+      html += card('Spread across the detector', all ? sep.toFixed(2) + ' cm' : '—', all ? 'for a ' + frac.toFixed(1) + '% spread in mass' : 'once every ion has landed');
+      html += card('Radius of the lightest ion', finished(M.parts[0], t) ? (M.parts[0].r * 100).toFixed(2) + ' cm' : '—', '<i>r</i> = <i>mv</i>/(<i>qB</i>), half its landing distance');
     }
     if (d.kind === 'cyclotron') {
       const p = M.parts[0], i = idxAt(p, t), sp = speedAt(p, i);
@@ -485,8 +545,9 @@
       html += card('Cyclotron frequency', (d.fc / 1e6).toFixed(2) + ' MHz', '<i>f</i><sub>c</sub> = <i>qB</i>/(2π<i>m</i>); drive is at ' + (d.f / 1e6).toFixed(2) + ' MHz');
       html += card('Energy now', ke.toFixed(1) + ' keV', 'gains about <i>qV</i> = ' + (Math.abs(st.q) * st.V / 1000).toFixed(1) + ' keV per gap crossing');
       const final = 0.5 * p.m * Math.pow(speedAt(p, p.tr.n), 2) / KEV, best = d.KEmax / KEV;
-      html += card('Energy on leaving', final.toFixed(1) + ' keV of a possible ' + best.toFixed(1),
-        '(<i>qBR</i>)²/2<i>m</i> if it stays in step', final > 0.85 * best ? 'ok' : 'no');
+      const out = finished(p, t);
+      html += card('Energy on leaving', out ? final.toFixed(1) + ' keV of a possible ' + best.toFixed(1) : '— of a possible ' + best.toFixed(1) + ' keV',
+        '(<i>qBR</i>)²/2<i>m</i> if it stays in step', out ? (final > 0.85 * best ? 'ok' : 'no') : '');
     }
     $('readout').innerHTML = html;
     $('B_v').textContent = st.B.toFixed(2) + ' T';

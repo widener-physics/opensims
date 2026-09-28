@@ -82,16 +82,79 @@
     table.results th, table.results td { padding: 8px 8px; }
     table.results .hidesm { display: none; }
   }
+
+  /* ---- wide screens: the simulation fills the window, like an app ------------------------------
+     The stage (canvases, and the buttons directly under them) sits on the left and the panel
+     (readouts and sliders) on the right, both sized to the window, so everything needed to run the
+     simulation is on screen at once. The explanation follows underneath. Phones and narrow windows
+     keep the stacked layout above, unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px calc(100vh - 58px) auto auto;
+      grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
+    .topbar { grid-area: bar; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .workspace > canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto !important; }
+    .sidebar { grid-area: panel; min-height: 0; overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 28px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto; }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+  /* this sim */
+  @media (min-width: 1200px) and (min-height: 620px) {
+    #ramp { flex-grow: 1.7; }
+    #bars { min-height: 170px; }
+    .sidebar table.results th, .sidebar table.results td { padding: 6px 8px; font-size: 13px; }
+    .sidebar table.results .hidesm { display: none; }
+  }
 </style>
 </head>
 <body>
-<main>
+<main class="app">
+  <div class="topbar">
   <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>Rolling race</h1>
-  <p class="lede">Release a hoop, a solid disc, a solid sphere, a hollow sphere and a frictionless sliding block from the same height.
-    They all arrive with the same total kinetic energy, but the rollers have to put some of it into spinning, so they arrive slower.
-    Which one wins depends only on how its mass is spread out from the axis, not on how heavy it is or how big.</p>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+  <p class="lede" id="lede">Release a hoop, a solid disc, a solid sphere, a hollow sphere and a frictionless sliding block from the same height.
+    Which one reaches the bottom first, and which comes last? Does it matter how heavy they are, or how big?
+    Make your prediction, then press Play.</p>
 
+  <div class="workspace">
   <canvas id="ramp"></canvas>
 
   <div class="entrants" id="entrants"></div>
@@ -104,7 +167,9 @@
   </div>
 
   <canvas id="bars"></canvas>
+  </div>
 
+  <div class="sidebar">
   <table class="results" id="results">
     <caption id="cap"></caption>
   </table>
@@ -125,8 +190,11 @@
     <label><input type="checkbox" id="spin" checked> mark the rim so you can see the spin</label>
     <label><input type="checkbox" id="ghost"> keep a marker at each finish position</label>
   </div>
+  </div>
 
   <div class="notes">
+    <p><b>Why.</b> They all arrive with the same total kinetic energy, but the rollers have to put some of it into spinning, so they arrive slower.
+      Which one wins depends only on how its mass is spread out from the axis, not on how heavy it is or how big.</p>
     <p><b>What to try.</b> Change the mass, then the radius: the order never changes, and neither do the finish times. That is the surprise, and it is
       worth predicting before you drag the slider. Then look at the energy bars: the hoop puts half its energy into rotation, the sphere only two sevenths,
       and the sliding block none at all, which is exactly the order they finish in. Finally raise the ramp angle past the point where the friction needed
@@ -294,7 +362,7 @@
     ctx.clearRect(0, 0, W, H);
     ctx.font = '12px ' + C('--sans');
     const t = st.t, n = M.list.length;
-    const ml = compact ? 74 : 132, mr = compact ? 12 : 150, mt = 26, mb = 26;
+    const ml = compact ? 74 : 132, mr = compact ? 12 : 184, mt = 26, mb = 26;
     const pw = W - ml - mr, ph = H - mt - mb;
     const rowH = ph / n, barH = Math.min(22, rowH * 0.62);
     const total = M.PE;                                    // every object converts the same mgh
@@ -341,24 +409,28 @@
       sh.on = cb.checked; rebuild();
     }));
   }
+  // The table fills in as the race is run: an object gets its place and its numbers when it
+  // crosses the finish line. Until then it waits at the bottom, in the lane order, with nothing
+  // that would hint at the result (its acceleration, shape factor or spin share would give it away).
   function results() {
     const t = st.t;
     const order = M.list.slice().sort((a, b) => a.T - b.T);
     const slips = order.filter(o => o.muMin > 0.6);
-    const rows = order.map((o, i) => {
-      const done = t >= o.T;
-      const slip = o.muMin > 0.6;
-      return '<tr class="' + (done ? '' : 'out') + '" style="--c:' + C(o.color) + '">' +
-        '<td class="name"><span class="swatch' + (o.ring ? ' ring' : '') + '"></span>' + o.name + (slip ? ' <span style="color:var(--hot)">would slip</span>' : '') + '</td>' +
+    const done = order.filter(o => t >= o.T), waiting = M.list.filter(o => t < o.T);
+    const dash = '<td class="hidesm">—</td><td>—</td><td>' + (t > 0 ? 'rolling' : '—') + '</td><td>—</td><td class="hidesm">—</td><td class="hidesm">—</td>';
+    const name = (o, place) => '<td class="name"><span class="swatch' + (o.ring ? ' ring' : '') + '"></span>' + (place ? place + '. ' : '') + o.name +
+      (o.muMin > 0.6 ? ' <span style="color:var(--hot)">would slip</span>' : '') + '</td>';
+    const rows = done.map((o, i) =>
+      '<tr style="--c:' + C(o.color) + '">' + name(o, i + 1) +
         '<td class="hidesm">' + o.kTex + '</td>' +
         '<td>' + o.a.toFixed(2) + '</td>' +
         '<td>' + o.T.toFixed(2) + '</td>' +
         '<td>' + o.v.toFixed(2) + '</td>' +
         '<td class="hidesm">' + (100 * o.keRot / o.KE).toFixed(0) + '%</td>' +
-        '<td class="hidesm">' + o.muMin.toFixed(2) + '</td></tr>';
-    }).join('');
+        '<td class="hidesm">' + o.muMin.toFixed(2) + '</td></tr>').join('') +
+      waiting.map(o => '<tr class="out" style="--c:' + C(o.color) + '">' + name(o, 0) + dash + '</tr>').join('');
     $('results').innerHTML = '<caption id="cap"></caption><thead><tr><th>Finish order</th><th class="hidesm">k in I = kmR²</th><th>a (m/s²)</th><th>Time (s)</th><th>Speed at bottom (m/s)</th><th class="hidesm">Energy in spin</th><th class="hidesm">Friction needed (μ)</th></tr></thead><tbody>' + rows + '</tbody>';
-    $('cap').textContent = 'Every object releases the same ' + M.PE.toFixed(1) + ' J. Times and speeds do not depend on the mass or the radius.'
+    $('cap').textContent = 'Every object releases the same ' + M.PE.toFixed(1) + ' J.' + (waiting.length ? ' Each row fills in as that object crosses the finish line.' : ' Times and speeds do not depend on the mass or the radius.')
       + (slips.length ? ' A μ above about 0.6 is more than most dry surfaces provide, so ' + (slips.length === 1 ? 'that object' : 'those objects') + ' would slip rather than roll.' : '');
   }
   function readout() {

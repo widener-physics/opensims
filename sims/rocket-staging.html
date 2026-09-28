@@ -76,16 +76,84 @@
     .readout { grid-template-columns: 1fr; }
     .controls { grid-template-columns: 1fr; padding: 14px 16px; }
   }
+
+  /* ---- wide screens: the simulation fills the window, like an app ------------------------------
+     The stage (canvases, and the buttons directly under them) sits on the left and the panel
+     (readouts and sliders) on the right, both sized to the window, so everything needed to run the
+     simulation is on screen at once. The explanation follows underneath. Phones and narrow windows
+     keep the stacked layout above, unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px calc(100vh - 58px) auto auto;
+      grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
+    .topbar { grid-area: bar; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .workspace > canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto !important; }
+    .sidebar { grid-area: panel; min-height: 0; overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 28px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto; }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+  /* this sim */
+  @media (min-width: 1200px) and (min-height: 620px) {
+    .workspace > .panes { flex: 1 1 0; min-height: 0; align-items: stretch; }
+    .workspace > .panes > canvas { height: 100%; min-height: 0; aspect-ratio: auto; }
+    .workspace .readout { gap: 10px; }
+    .workspace .readout > div { padding: 8px 12px; }
+    .workspace .readout .v { font-size: 17px; }
+    .workspace .readout .f { font-size: 14px; line-height: 1.35; }
+  }
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    .sidebar .controls { gap: 0 20px; }
+  }
 </style>
 </head>
 <body>
-<main>
+<main class="app">
+  <div class="topbar">
   <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>Rocket staging</h1>
-  <p class="lede">Every rocket spends most of its effort accelerating its own empty tanks. Throwing away a tank once it is empty means the
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+  <p class="lede" id="lede">Every rocket spends most of its effort accelerating its own empty tanks. Throwing away a tank once it is empty means the
     rest of the flight no longer has to carry it, and that is what makes orbit reachable. Build the same 500 metric ton rocket as one stage or two
     and compare what it can do.</p>
 
+  <div class="workspace">
   <div class="setup">
     <span class="lbl">Build it as</span>
     <span class="seg" id="stageseg" role="group" aria-label="Number of stages">
@@ -101,7 +169,9 @@
   </div>
 
   <div class="readout" id="readout"></div>
+  </div>
 
+  <div class="sidebar">
   <div class="controls">
     <label><div class="row"><span>Payload</span><span class="val" id="pay_v"></span></div>
       <input type="range" id="pay" min="0.2" max="8" step="0.1" value="1.5"></label>
@@ -119,6 +189,7 @@
       <input type="range" id="g1" min="0" max="90" step="1" value="75"></label>
     <label id="lab_g2"><div class="row"><span>Average climb angle, second stage</span><span class="val" id="g2_v"></span></div>
       <input type="range" id="g2" min="0" max="90" step="1" value="10"></label>
+  </div>
   </div>
 
   <div class="notes">

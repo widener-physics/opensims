@@ -53,13 +53,82 @@
   .home a { color: var(--muted); text-decoration: none; }
   .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
   .home a::before { content: "\2190\00a0"; }
+
+  /* ---- wide screens: the simulation fills the window, like an app ------------------------------
+     The stage (canvases, and the buttons directly under them) sits on the left and the panel
+     (readouts and sliders) on the right, both sized to the window, so everything needed to run the
+     simulation is on screen at once. The explanation follows underneath. Phones and narrow windows
+     keep the stacked layout above, unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px calc(100vh - 58px) auto auto;
+      grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
+    .topbar { grid-area: bar; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .workspace > canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto !important; }
+    .sidebar { grid-area: panel; min-height: 0; overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 28px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto; }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+  /* this sim */
+  @media (min-width: 1200px) and (min-height: 620px) {
+    main.app { grid-template-rows: 58px calc(100vh - 58px) auto auto auto; grid-template-areas: "bar bar" "stage panel" "lede lede" "lede2 lede2" "notes notes"; }
+    main.app > .tabs { grid-area: bar; justify-self: end; align-self: center; margin: 0 150px 0 0; border-bottom: 0; }
+    section > p.lede { grid-area: lede2; margin-top: 0; }
+    #c1, #c3 { flex-grow: 2.4; }
+    /* the orbit view on screen 2 is drawn to a 900 x 560 design and needs that shape; on short screens the plots under it scroll */
+    #s2 > .workspace { overflow-y: auto; }
+    #orbit { flex: none !important; aspect-ratio: 900 / 560 !important; }
+    #plotE, #plotPhi { min-height: 110px; }
+  }
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto auto; }
+  }
 </style>
 </head>
 <body>
-<main>
+<main class="app">
+  <div class="topbar">
   <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>Orbital resonance</h1>
-  <p class="lede">
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+  <p class="lede" id="lede">
     Two bodies are in a mean-motion resonance when their orbital periods form a simple ratio. Three views of the same idea:
     where the repeated conjunctions happen, what those repeated kicks do to an orbit, and what they do to a whole population.
   </p>
@@ -75,6 +144,7 @@
     <p class="lede">A planet on a circular orbit and a smaller body on a Keplerian orbit with a chosen period ratio. Every time
       they line up on the same side of the star, a marker is dropped where the body was. Whether the markers pile up or smear
       around the orbit is the whole difference between a resonance and no resonance.</p>
+    <div class="workspace">
     <canvas id="c1"></canvas>
     <div class="transport">
       <button id="play1">Pause</button>
@@ -90,6 +160,8 @@
       <span class="grow"></span>
       <label class="check"><input type="checkbox" id="rot1"> frame rotating with the planet</label>
     </div>
+    </div>
+    <div class="sidebar">
     <div class="controls">
       <label><div class="row"><span>Period ratio, body : planet</span><span class="val" id="r1_v"></span></div>
         <input type="range" id="r1" min="-2" max="2" step="0.005" value="-1"></label>
@@ -99,6 +171,7 @@
         <input type="range" id="c1s" min="0" max="360" step="5" value="180"></label>
       <label><div class="row"><span>Simulation speed</span><span class="val" id="spd1_v"></span></div>
         <input type="range" id="spd1" min="0.2" max="4" step="0.1" value="0.8"></label>
+    </div>
     </div>
     <div class="notes">
       <p><b>What to try.</b> With a simple ratio the markers land on the same few spots forever; nudge the slider off the ratio and they
@@ -115,6 +188,7 @@
       Watch what the repeated conjunctions do: the semi-major axis stays locked while the eccentricity grows. The magenta outline is
       the ellipse the body is on right now; the plots track its eccentricity and the resonant angle
       <span class="math">&phi; = q&lambda; &minus; p&lambda;<sub>p</sub> + (p&minus;q)&varpi;</span>.</p>
+    <div class="workspace">
     <canvas id="orbit"></canvas>
     <div class="transport">
       <button id="play2">Pause</button>
@@ -128,6 +202,8 @@
     </div>
     <canvas id="plotE" class="stack"></canvas>
     <canvas id="plotPhi" class="stack"></canvas>
+    </div>
+    <div class="sidebar">
     <div class="controls">
       <label><div class="row"><span>Planet mass (Jupiter masses)</span><span class="val" id="m_v"></span></div>
         <input type="range" id="m" min="0" max="1" step="0.01" value="0"></label>
@@ -137,6 +213,7 @@
         <input type="range" id="off" min="-6" max="6" step="0.25" value="0"></label>
       <label><div class="row"><span>Simulation speed</span><span class="val" id="spd_v"></span></div>
         <input type="range" id="spd" min="1" max="30" step="1" value="6"></label>
+    </div>
     </div>
     <div class="notes">
       <p><b>What to try.</b> Let the 2:1 case run until the ellipse is obvious, then restart at 3:1 with the same near-circular start
@@ -155,6 +232,7 @@
     <p class="lede">A few hundred test bodies spread across semi-major axis inside a massive planet's orbit, each on a nearly circular
       orbit. Bodies near a resonance have their eccentricities pumped until they cross the planet's orbit (or an inner planet's) and are
       removed. The histogram beneath shows the gaps carving themselves out where the resonances sit, as in the asteroid belt's Kirkwood gaps.</p>
+    <div class="workspace">
     <canvas id="c3"></canvas>
     <canvas id="h3" class="stack"></canvas>
     <div class="transport">
@@ -163,6 +241,8 @@
       <span class="grow"></span>
       <label class="check"><input type="checkbox" id="col3" checked> color bodies by eccentricity</label>
     </div>
+    </div>
+    <div class="sidebar">
     <div class="controls">
       <label><div class="row"><span>Planet mass (Jupiter masses)</span><span class="val" id="m3_v"></span></div>
         <input type="range" id="m3" min="0" max="1" step="0.01" value="0.59"></label>
@@ -172,6 +252,7 @@
         <input type="range" id="in3" min="0" max="0.3" step="0.01" value="0.22"></label>
       <label><div class="row"><span>Simulation speed</span><span class="val" id="spd3_v"></span></div>
         <input type="range" id="spd3" min="1" max="60" step="1" value="30"></label>
+    </div>
     </div>
     <div class="notes">
       <p><b>Honesty about time.</b> Real Kirkwood gaps take millions of years to open, which at one Jupiter mass would mean an hour or
@@ -550,7 +631,8 @@
       ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.fillStyle = C('--muted');
       opts.ticks(ylo, yhi).forEach(v => { ctx.beginPath(); ctx.moveTo(ml, Y(v) + 0.5); ctx.lineTo(W - mr, Y(v) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(opts.fmt(v), ml - 6, Y(v) + 4); });
       const ts = niceStep(Tmax / 6); ctx.textAlign = 'center';
-      for (let T = 0; T <= Tmax; T += ts) { ctx.beginPath(); ctx.moveTo(X(T) + 0.5, mt); ctx.lineTo(X(T) + 0.5, mt + ph); ctx.stroke(); ctx.fillText(T.toFixed(0), X(T), H - 8); }
+      const tLab = W - mr - ctx.measureText('time (planet orbits)').width - 16;   // tick numbers stop short of the axis label
+      for (let T = 0; T <= Tmax; T += ts) { ctx.beginPath(); ctx.moveTo(X(T) + 0.5, mt); ctx.lineTo(X(T) + 0.5, mt + ph); ctx.stroke(); if (X(T) < tLab) ctx.fillText(T.toFixed(0), X(T), H - 8); }
       ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText(opts.title, ml, 14);
       ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText('time (planet orbits)', W - mr, H - 8);
       (st.twin ? [[twin, C('--twin')], [body, C('--body')]] : [[body, C('--body')]]).forEach(([b, col]) => {

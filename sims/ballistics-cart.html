@@ -70,10 +70,63 @@
   .home a { color: var(--muted); text-decoration: none; }
   .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
   .home a::before { content: "\2190\00a0"; }
+
+  /* ---- wide screens: the simulation fills the window, like an app ------------------------------
+     The stage (canvases, and the buttons directly under them) sits on the left and the panel
+     (readouts and sliders) on the right, both sized to the window, so everything needed to run the
+     simulation is on screen at once. The explanation follows underneath. Phones and narrow windows
+     keep the stacked layout above, unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px calc(100vh - 58px) auto auto;
+      grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
+    .topbar { grid-area: bar; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .workspace > canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto !important; }
+    .sidebar { grid-area: panel; min-height: 0; overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 28px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto; }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
 </style>
 </head>
 <body>
-<main>
+<main class="app">
+  <div class="topbar">
   <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
   <h1>Ballistics cart</h1>
 
@@ -82,9 +135,12 @@
     <button role="tab" id="tab2" aria-selected="false"><span>2</span>Accelerating cart</button>
     <button role="tab" id="tab3" aria-selected="false"><span>3</span>Rolling down a ramp</button>
   </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
 
   <p class="lede" id="lede"></p>
 
+  <div class="workspace">
   <canvas id="c"></canvas>
 
   <div class="transport">
@@ -93,7 +149,9 @@
     <input type="range" id="scrub" min="0" max="1000" step="1" value="0" aria-label="Time">
     <span class="time"><span id="tval">0.00</span> s</span>
   </div>
+  </div>
 
+  <div class="sidebar">
   <div class="readout">
     <div><div class="k">Time in the air</div><div class="v" id="r_T"></div><div class="f" id="f_T"></div></div>
     <div><div class="k">Where the ball comes down relative to the cart</div><div class="v" id="r_gap"></div><div class="f" id="f_gap"></div></div>
@@ -117,6 +175,7 @@
     <label><input type="checkbox" id="vecs" checked> show velocity components</label>
     <label id="lab_inertia" hidden><input type="checkbox" id="inertia"> wheels have rotational inertia (cart accelerates at 5&frasl;7 <i>g</i> sin&thinsp;&theta;)</label>
   </div>
+  </div>
 
   <div class="notes" id="notes"></div>
 </main>
@@ -133,12 +192,12 @@
   const st = { mode: 1, u: 5, v0: 1.5, a: 2, th: 20, rate: 0.4, follow: false, vecs: true, inertia: false, t: 0, playing: false };
 
   const TEXT = {
-    1: { lede: 'The cart rolls at constant speed and fires a ball straight up, as seen from the cart. The ball keeps the cart\'s horizontal velocity for the whole flight, so it comes back down into the launcher. The dashed line is the ball\'s path as seen from the ground.',
-         notes: '<p><b>What to try.</b> Tick "view from the cart" and the parabola becomes a straight vertical line: in the cart\'s frame nothing horizontal is happening at all. Change the cart speed and notice that the flight time does not change; only the parabola\'s width does.</p>' },
-    2: { lede: 'Now the cart is being accelerated along the track. At the instant of launch the ball has the cart\'s velocity, but from then on nothing pushes it sideways, while the cart keeps speeding up. The ball lands behind the launcher by the extra distance the cart covered.',
-         notes: '<p><b>What to try.</b> The gap is ½<i>aT</i><sup>2</sup>: double the acceleration and it doubles; double the launch speed and, because <i>T</i> doubles, it quadruples. With a small enough acceleration the gap is less than half the cart\'s length and the ball still lands on the cart. From the cart\'s frame the ball appears to curve backwards, as if a horizontal force were pulling it, which is what a fictitious force in an accelerating frame looks like.</p>' },
-    3: { lede: 'The cart rolls freely down a ramp and fires the ball perpendicular to the ramp surface. Both cart and ball are accelerated down-slope by the same component of gravity, <i>g</i> sin&thinsp;&theta;, so they stay together along the ramp and the ball comes back down into the launcher.',
-         notes: '<p><b>What to try.</b> Split gravity into a component along the ramp and one into it. The along-ramp part acts on the cart and the ball alike; only the into-the-ramp part, <i>g</i> cos&thinsp;&theta;, turns the ball around. Steepen the ramp and the flight lengthens because that component shrinks. Then tick the rotational-inertia box: a real cart with solid wheels accelerates a little less than <i>g</i> sin&thinsp;&theta;, so the ball, which has no wheels, pulls ahead and lands down-slope of it.</p>' }
+    1: { lede: 'The cart rolls at constant speed and fires a ball straight up, as seen from the cart. Where will the ball come down: ahead of the launcher, behind it, or back in it? Make your prediction, then press Play.',
+         notes: '<p><b>Why.</b> The ball keeps the cart\'s horizontal velocity for the whole flight, so it stays directly above the launcher and comes back down into it.</p><p><b>What to try.</b> Tick "view from the cart" and the parabola becomes a straight vertical line: in the cart\'s frame nothing horizontal is happening at all. Change the cart speed and notice that the flight time does not change; only the parabola\'s width does.</p>' },
+    2: { lede: 'Now the cart is being accelerated along the track while it fires the ball straight up. Does the ball still come back down into the launcher? Make your prediction, then press Play.',
+         notes: '<p><b>Why.</b> At the instant of launch the ball has the cart\'s velocity, but from then on nothing pushes it sideways, while the cart keeps speeding up. The ball lands behind the launcher by the extra distance the cart covered.</p><p><b>What to try.</b> The gap is ½<i>aT</i><sup>2</sup>: double the acceleration and it doubles; double the launch speed and, because <i>T</i> doubles, it quadruples. With a small enough acceleration the gap is less than half the cart\'s length and the ball still lands on the cart. From the cart\'s frame the ball appears to curve backwards, as if a horizontal force were pulling it, which is what a fictitious force in an accelerating frame looks like.</p>' },
+    3: { lede: 'The cart rolls freely down a ramp and fires the ball perpendicular to the ramp surface. While the ball is in the air the cart keeps speeding up down the slope. Where will the ball come down relative to the launcher? Make your prediction, then press Play.',
+         notes: '<p><b>Why.</b> Both cart and ball are accelerated down-slope by the same component of gravity, <i>g</i> sin&thinsp;&theta;, so they stay together along the ramp and the ball comes back down into the launcher.</p><p><b>What to try.</b> Split gravity into a component along the ramp and one into it. The along-ramp part acts on the cart and the ball alike; only the into-the-ramp part, <i>g</i> cos&thinsp;&theta;, turns the ball around. Steepen the ramp and the flight lengthens because that component shrinks. Then tick the rotational-inertia box: a real cart with solid wheels accelerates a little less than <i>g</i> sin&thinsp;&theta;, so the ball, which has no wheels, pulls ahead and lands down-slope of it.</p>' }
   };
 
   // ---------- Physics in track coordinates (s along the track, n normal to it) ----------
@@ -231,7 +290,7 @@
     { const [mx, my] = P(0, 0); ctx.strokeStyle = C('--rule'); ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(...P(0, -0.3)); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('launch', ...(M.th === 0 ? [mx, my + 36] : P(0, -0.45))); }
 
-    // predicted path (dashed) and trail (solid)
+    // the trail, solid, only as far as the ball has actually flown: nothing shows where it will go
     const pathTo = (tmax, dash, color, width) => {
       ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash);
       ctx.beginPath();
@@ -239,11 +298,10 @@
       for (let k = 0; k <= N; k++) { const tt = tmax * k / N; const b = M.ball(tt); const [s, n] = rel(b.s, b.n, tt); const [px, py] = P(s, n); k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); }
       ctx.stroke(); ctx.setLineDash([]);
     };
-    pathTo(M.onCart ? M.T : M.Tg, [6, 5], C('--path'), 1.4);
     if (t > 0) pathTo(Math.min(t, M.onCart ? M.T : M.Tg), [], C('--ball'), 2.2);
 
-    // landing marker on the track when the ball misses
-    if (!M.onCart) {
+    // landing marker on the track when the ball misses, once it has landed there
+    if (!M.onCart && t >= M.Tg) {
       const b = M.ball(M.Tg); const [s, n] = rel(b.s, 0, M.Tg); const [lx, ly] = P(s, 0);
       ctx.fillStyle = C('--gap'); ctx.beginPath(); ctx.moveTo(lx, ly - 2); ctx.lineTo(lx - 5, ly - 12); ctx.lineTo(lx + 5, ly - 12); ctx.closePath(); ctx.fill();
     }
@@ -318,15 +376,24 @@
     ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.font = '12px ' + C('--sans');
     ctx.fillText(st.follow ? (compact ? 'cart view' : 'view: moving with the cart') : (compact ? 'ground view' : 'view: from the ground'), 12, 18);
     ctx.textAlign = 'right';
-    ctx.fillText(t < M.T ? 'ball in flight' : M.onCart ? 'ball back on the cart' : t < M.Tg ? 'ball missed the cart' : 'ball on the track', W - 12, 18);
+    ctx.fillText(t === 0 ? 'ready: press Play' : t < M.T ? 'ball in flight' : M.onCart ? 'ball back on the cart' : t < M.Tg ? 'ball missed the cart' : 'ball on the track', W - 12, 18);
   }
 
   // ---------- Readouts ----------
   function readout() {
     const m = M;
     const T = m.T;
-    $('r_T').textContent = T.toFixed(2) + ' s';
-    $('f_T').innerHTML = st.mode === 3 ? '<i>T</i> = 2<i>u</i> / (<i>g</i> cos θ)' : '<i>T</i> = 2<i>u</i> / <i>g</i>';
+    // Nothing here gives away the result before it happens: until the ball is back down at the
+    // cart's height these cards show the flight so far, and the verdict appears when it lands.
+    const done = st.t >= T, tt = Math.min(st.t, T);
+    $('r_T').textContent = st.t === 0 ? '—' : done ? T.toFixed(2) + ' s' : tt.toFixed(2) + ' s so far';
+    $('f_T').innerHTML = !done ? (st.t === 0 ? 'press Play to launch' : 'in the air') : st.mode === 3 ? '<i>T</i> = 2<i>u</i> / (<i>g</i> cos θ)' : '<i>T</i> = 2<i>u</i> / <i>g</i>';
+    if (!done) {
+      $('r_gap').textContent = '?'; $('r_gap').className = 'v';
+      $('f_gap').innerHTML = st.t === 0 ? 'predict it, then press Play' : 'watch where it comes down';
+      $('r_res').textContent = st.t === 0 ? '—' : 'ball ' + (st.v0 * tt + 0.5 * m.gs * tt * tt).toFixed(2) + ' m, cart ' + m.cart(tt).toFixed(2) + ' m so far';
+      $('f_res').innerHTML = st.t === 0 ? 'along the ' + (st.mode === 3 ? 'ramp' : 'track') + ', from the launch point' : 'along the ' + (st.mode === 3 ? 'ramp' : 'track') + ', from the launch point';
+    } else {
     const gapTxt = Math.abs(m.gap) < 0.005 ? 'no offset' : Math.abs(m.gap).toFixed(2) + ' m ' + (m.gap < 0 ? 'behind' : 'ahead');
     $('r_gap').textContent = gapTxt + (m.onCart ? ' — lands on the cart' : ' — misses the cart');
     $('r_gap').className = 'v ' + (m.onCart ? 'hit' : 'miss');
@@ -338,6 +405,7 @@
     $('f_res').innerHTML = st.mode === 1 ? 'same velocity, no horizontal force on either' :
       st.mode === 2 ? 'the ball coasts at <i>v</i><sub>0</sub>; the cart keeps accelerating' :
       'both accelerate down-slope at ' + (m.gs).toFixed(2) + ' m/s² (ball)' + (m.ac === m.gs ? '' : ' vs ' + m.ac.toFixed(2) + ' m/s² (cart)');
+    }
     $('u_v').textContent = st.u.toFixed(1) + ' m/s';
     $('v0_v').textContent = st.v0.toFixed(1) + ' m/s';
     $('a_v').textContent = st.a.toFixed(1) + ' m/s²';
