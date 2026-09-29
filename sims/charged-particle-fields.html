@@ -86,29 +86,30 @@
     .controls { grid-template-columns: 1fr; padding: 14px 16px; }
   }
 
-  /* ---- wide screens: the simulation fills the window, like an app ------------------------------
-     The stage (canvases, and the buttons directly under them) sits on the left and the panel
-     (readouts and sliders) on the right, both sized to the window, so everything needed to run the
-     simulation is on screen at once. The explanation follows underneath. Phones and narrow windows
-     keep the stacked layout above, unchanged: this block only rearranges the same elements. */
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
   .about { display: none; }
   @media (min-width: 1200px) and (min-height: 620px) {
     body { padding: 0 24px 48px; }
     main.app { max-width: 1200px; display: grid; column-gap: 20px;
       grid-template-columns: minmax(0, 1fr) 340px;
-      grid-template-rows: 58px calc(100vh - 58px) auto auto;
+      grid-template-rows: 58px auto auto auto; align-items: start;
       grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
-    .topbar { grid-area: bar; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
     .topbar .home { margin: 0; white-space: nowrap; }
     .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
       display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
     .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
     .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
     .topbar .tabs + .about { margin-left: 0; }
-    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; padding-bottom: 16px; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
     .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
-    .workspace > canvas { flex: 1 1 0; min-height: 0; aspect-ratio: auto !important; }
-    .sidebar { grid-area: panel; min-height: 0; overflow-y: auto; padding-bottom: 16px;
+    .sidebar { grid-area: panel; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
       display: flex; flex-direction: column; gap: 12px; }
     .sidebar > * { flex: none; margin-top: 0 !important; }
     .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
@@ -126,9 +127,9 @@
   }
   /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
   @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
-    main.app { grid-template-rows: 50px calc(100vh - 50px) auto auto; }
+    main.app { grid-template-rows: 50px auto auto auto; }
     .workspace { gap: 8px; padding-bottom: 10px; }
-    .sidebar { padding-bottom: 10px; gap: 8px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
     .sidebar .readout { gap: 8px; }
     .sidebar .readout > div { padding: 7px 12px; }
     .sidebar .readout .k { margin-bottom: 1px; }
@@ -615,6 +616,47 @@
     if (st.playing) requestAnimationFrame(frame);
   }
   setTab(1);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
 })();
 </script>
 </body>

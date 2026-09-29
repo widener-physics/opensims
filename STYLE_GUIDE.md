@@ -63,13 +63,13 @@ Use the CSS custom properties exactly as named in `style.json`; every sim shares
 
 ## 7. Wide screens like an app, phones stacked
 
-On a screen at least 1200px wide and 620px tall, the page works like a PhET sim: everything needed to run the simulation is visible without scrolling. The shared block at the end of the template's `<style>` does this, and should be copied unchanged:
+On a screen at least 1200px wide and 620px tall, the page works like a PhET sim: everything needed to run the simulation is visible without scrolling. The shared block at the end of the template's `<style>`, and the short script just before `</body>`, do this and should be copied unchanged:
 
 - A 58px bar across the top holds the home link, the title, the tabs, and a "How to use it" link that jumps down to the lede.
-- The workspace fills the rest of the window height on the left (the whole page is capped at 1200px wide and centered). Canvases share its height through `flex-grow`, so set the ratios in the sim's own block (`#plot { flex-grow: 0.6; }`); canvas drawing must therefore adapt to any aspect ratio, which it will if layout is computed from the canvas's actual size each frame.
+- The workspace sits on the left (the whole page is capped at 1200px wide and centered). Canvases keep their natural desktop shape, set with `aspect-ratio` as usual; they are never stretched to fill the window. If their natural height would push the workspace past the bottom of the window, the script shrinks them together, keeping their shape, until the buttons under them are back on screen. A canvas sized in fixed pixels won't shrink, so give it an `aspect-ratio` instead.
 - The sidebar is a fixed 340px column on the right: sliders first, then toggles, then readout cards, which scroll inside the column if they don't fit. Sliders and buttons must never be off screen.
 - The lede and notes move below the fold. Check at 1920x950, 1536x730 and 1366x650 (a 1080p monitor, a 1080p laptop at 125%, a 1366x768 laptop).
-- A canvas whose drawing only works at one shape can keep it with `aspect-ratio: ... !important; flex: none` in the sim's block; the space under it then goes to the others.
+- If a canvas's drawing becomes unreadable below some size (text drawn in scaled design units, say), set `--min-fit: 0.8` on its workspace in the sim's own block; on short windows whatever is under it then goes below the fold instead of shrinking further.
 
 Below those sizes the page is the stacked column described next, identical to the phone layout's logic. The canvas is designed for a ~900px-wide column, but must be usable at 390px:
 
