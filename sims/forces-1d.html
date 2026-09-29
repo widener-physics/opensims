@@ -100,8 +100,8 @@
     body { padding: 0 24px 48px; }
     main.app { max-width: 1200px; display: grid; column-gap: 20px;
       grid-template-columns: minmax(0, 1fr) 340px;
-      grid-template-rows: 58px auto auto auto; align-items: start;
-      grid-template-areas: "bar bar" "stage panel" "lede lede" "notes notes"; }
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
     .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
     .topbar .home { margin: 0; white-space: nowrap; }
     .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
@@ -111,7 +111,7 @@
     .topbar .tabs + .about { margin-left: 0; }
     .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
     .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
-    .sidebar { grid-area: panel; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
       display: flex; flex-direction: column; gap: 12px; }
     .sidebar > * { flex: none; margin-top: 0 !important; }
     .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
@@ -124,12 +124,12 @@
     .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
     .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
     main.app > section:not([hidden]) { display: contents; }
-    p.lede { grid-area: lede; margin: 28px 0 10px; min-height: 0; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
     .notes { grid-area: notes; margin-top: 0; }
   }
   /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
   @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
-    main.app { grid-template-rows: 50px auto auto auto; }
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
     .workspace { gap: 8px; padding-bottom: 10px; }
     .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
     .sidebar .readout { gap: 8px; }

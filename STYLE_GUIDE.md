@@ -68,7 +68,7 @@ On a screen at least 1200px wide and 620px tall, the page works like a PhET sim:
 - A 58px bar across the top holds the home link, the title, the tabs, and a "How to use it" link that jumps down to the lede.
 - The workspace sits on the left (the whole page is capped at 1200px wide and centered). Canvases keep their natural desktop shape, set with `aspect-ratio` as usual; they are never stretched to fill the window. If their natural height would push the workspace past the bottom of the window, the script shrinks them together, keeping their shape, until the buttons under them are back on screen. A canvas sized in fixed pixels won't shrink, so give it an `aspect-ratio` instead.
 - The sidebar is a fixed 340px column on the right: sliders first, then toggles, then readout cards, which scroll inside the column if they don't fit. Sliders and buttons must never be off screen.
-- The lede and notes move below the fold. Check at 1920x950, 1536x730 and 1366x650 (a 1080p monitor, a 1080p laptop at 125%, a 1366x768 laptop).
+- The lede and notes run on directly under the canvases, in the left column; the sidebar stays beside them and sticks to the top of the window as the page scrolls. Check at 1920x950, 1536x730 and 1366x650 (a 1080p monitor, a 1080p laptop at 125%, a 1366x768 laptop).
 - If a canvas's drawing becomes unreadable below some size (text drawn in scaled design units, say), set `--min-fit: 0.8` on its workspace in the sim's own block; on short windows whatever is under it then goes below the fold instead of shrinking further.
 
 Below those sizes the page is the stacked column described next, identical to the phone layout's logic. The canvas is designed for a ~900px-wide column, but must be usable at 390px:
