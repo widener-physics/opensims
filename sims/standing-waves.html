@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<!--
+  Standing waves on a string and in a pipe - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The string and both
+  pipes are sums of normal modes, each a damped, driven oscillator whose motion is written down exactly
+  rather than integrated. The steady states were checked against closed-form solutions of the damped
+  wave equation (a sine ratio for the string with a moving end, point-source solutions for the pipes)
+  that do not use the mode sum, agreeing to parts per million; the exact time stepping was checked
+  against a brute-force Runge-Kutta integration through a change of frequency (one part in a billion).
+  Scanning the frequency finds the string's resonances at n v / 2L, the open pipe's at n v / 2L and the
+  closed pipe's at odd multiples of v / 4L, to within the scan step. The boundary conditions hold in the
+  running model: the pulley end of the string never moves, a closed pipe end never moves, and the
+  pressure at an open far end stays zero.
+  Credit: in the spirit of PhET's "Wave on a String", with a different aim: the resonances of a string
+  and of open and closed pipes are hunted for and measured rather than shown.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Standing waves</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --band: #BFD4E3; --hot: #C8321E; --cool: #1D4F73; --vel: #2E7D32; --press: #B5306D;
+    --metal: #4A5A63; --weight: #7A4B22; --tube: #8C9AA3; --pred: #8A6A1F;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 16px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #str { aspect-ratio: 900 / 290; touch-action: pan-y; }
+  #pipe { aspect-ratio: 900 / 400; touch-action: pan-y; }
+  #resp1, #resp2 { aspect-ratio: 900 / 250; margin-top: 12px; }
+
+  .freq { display: grid; grid-template-columns: auto auto auto minmax(120px, 1fr) auto auto auto; gap: 8px; align-items: center;
+    margin-top: 12px; padding: 8px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; font-family: var(--sans); font-size: 14px; }
+  .freq .lbl { color: var(--muted); margin-right: 4px; }
+  .freq input[type=range] { width: 100%; }
+  .freq .val { font-size: 17px; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+  .freq button { padding: 4px 8px; min-width: 46px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 12px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .toggles { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; align-items: center; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #str { aspect-ratio: 4 / 3; }
+    #pipe { aspect-ratio: 3 / 4; }
+    #resp1, #resp2 { aspect-ratio: 4 / 3; }
+    .freq { grid-template-columns: repeat(4, 1fr); padding: 8px 12px; }
+    .freq .lbl { grid-row: 1; grid-column: 1 / 3; }
+    .freq .val { grid-row: 1; grid-column: 3 / 5; }
+    .freq input[type=range] { grid-row: 2; grid-column: 1 / 5; }
+    .freq button:nth-of-type(1) { grid-row: 3; grid-column: 1; }
+    .freq button:nth-of-type(2) { grid-row: 3; grid-column: 2; }
+    .freq button:nth-of-type(3) { grid-row: 3; grid-column: 3; }
+    .freq button:nth-of-type(4) { grid-row: 3; grid-column: 4; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 10px; font-size: 14px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+  /* this sim */
+  @media (min-width: 1200px) and (min-height: 620px) {
+    .sidebar .toggles > label:has(> input[type=checkbox]) { line-height: 1.4; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Standing waves</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>A vibrating string</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Air in a pipe</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <section id="p1">
+    <div class="workspace">
+    <canvas id="str" aria-label="A string running from a vibrator at the left, over a pulley at the right, to a hanging weight"></canvas>
+    <div class="freq">
+      <span class="lbl">Driving frequency</span>
+      <button class="secondary" data-d="-1" aria-label="Down 1 hertz">−1</button>
+      <button class="secondary" data-d="-0.1" aria-label="Down 0.1 hertz">−0.1</button>
+      <input type="range" id="f1" min="5" max="150" step="0.1" value="12" aria-label="Driving frequency">
+      <button class="secondary" data-d="0.1" aria-label="Up 0.1 hertz">+0.1</button>
+      <button class="secondary" data-d="1" aria-label="Up 1 hertz">+1</button>
+      <span class="val"><span id="f1_v"></span> Hz</span>
+    </div>
+    <div class="row2">
+      <button id="play1">Pause</button>
+      <div class="seg" id="speed1" role="group" aria-label="Playback">
+        <button data-s="real" aria-pressed="true">real time</button>
+        <button data-s="slow" aria-pressed="false">slow motion</button>
+      </div>
+      <button id="skip1" class="secondary">skip ahead to steady</button>
+      <button id="clear1" class="secondary">clear the graph</button>
+    </div>
+    <canvas id="resp1" aria-label="How big the swing is at each frequency you have tried"></canvas>
+    </div>
+    <div class="sidebar">
+    <div class="readout" id="readout1"></div>
+    <div class="controls">
+      <label><div class="row"><span>Hanging mass (sets the tension)</span><span class="val" id="m_v"></span></div>
+        <input type="range" id="m" min="20" max="500" step="5" value="200"></label>
+      <label><div class="row"><span>String's mass per meter</span><span class="val" id="mu_v"></span></div>
+        <input type="range" id="mu" min="0.3" max="3" step="0.1" value="1"></label>
+      <label><div class="row"><span>Length, vibrator to pulley</span><span class="val" id="L1_v"></span></div>
+        <input type="range" id="L1" min="0.5" max="2" step="0.05" value="1.2"></label>
+      <label><div class="row"><span>Damping: quality factor <i>Q</i> of the lowest harmonic</span><span class="val" id="Q_v"></span></div>
+        <input type="range" id="Q" min="10" max="60" step="1" value="30"></label>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="pred1"> show where the theory puts the resonances</label>
+    </div>
+    </div>
+  </section>
+
+  <section id="p2" hidden>
+    <div class="workspace">
+    <canvas id="pipe" aria-label="A pipe with a loudspeaker at its open left end; lines in the pipe show slices of air moving back and forth"></canvas>
+    <div class="freq">
+      <span class="lbl">Driving frequency</span>
+      <button class="secondary" data-d="-10" aria-label="Down 10 hertz">−10</button>
+      <button class="secondary" data-d="-1" aria-label="Down 1 hertz">−1</button>
+      <input type="range" id="f2" min="50" max="2000" step="1" value="100" aria-label="Driving frequency">
+      <button class="secondary" data-d="1" aria-label="Up 1 hertz">+1</button>
+      <button class="secondary" data-d="10" aria-label="Up 10 hertz">+10</button>
+      <span class="val"><span id="f2_v"></span> Hz</span>
+    </div>
+    <div class="row2">
+      <button id="play2">Pause</button>
+      <div class="seg" id="speed2" role="group" aria-label="Playback">
+        <button data-s="real" aria-pressed="true">real time</button>
+        <button data-s="slow" aria-pressed="false">slow motion</button>
+      </div>
+      <button id="skip2" class="secondary">skip ahead to steady</button>
+      <button id="clear2" class="secondary">clear the graph</button>
+    </div>
+    <canvas id="resp2" aria-label="How loud the pipe gets at each frequency you have tried"></canvas>
+    </div>
+    <div class="sidebar">
+    <div class="readout" id="readout2"></div>
+    <div class="controls">
+      <div class="grp"><div>Far end of the pipe</div>
+        <div class="seg" id="ends" role="group" aria-label="Far end of the pipe">
+          <button data-e="oo" aria-pressed="true">open</button>
+          <button data-e="oc" aria-pressed="false">closed</button>
+        </div>
+      </div>
+      <label><div class="row"><span>Length of the pipe</span><span class="val" id="L2_v"></span></div>
+        <input type="range" id="L2" min="0.2" max="1.5" step="0.01" value="1"></label>
+      <label><div class="row"><span>Air temperature</span><span class="val" id="T_v"></span></div>
+        <input type="range" id="T" min="0" max="40" step="1" value="20"></label>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="endc"> end correction: an open end acts 0.6 × radius beyond the pipe</label>
+      <label><input type="checkbox" id="pred2"> show where the theory puts the resonances</label>
+    </div>
+    </div>
+  </section>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against closed-form solutions of the damped
+  //    wave equation and a brute-force integration. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: standing waves on a driven string and in air columns ----
+  // Both systems are a 1-D wave equation with light viscous damping,
+  //     y_tt + gamma*y_t = v^2 y_xx + (drive),
+  // written as a sum of normal modes. Each mode is a damped, driven oscillator
+  //     q_n'' + gamma q_n' + w_n^2 q_n = Re[G_n e^{i phi}],   phi' = w (the drive's phase)
+  // whose motion is known exactly: a steady part Re[C_n e^{i phi}] with C_n = G_n / (w_n^2 - w^2 + i gamma w),
+  // plus a transient that rings at the mode's own frequency and dies away as e^{-gamma t / 2}. Nothing is
+  // integrated numerically, so there is no step-size error; changing the drive frequency re-splits the
+  // present motion into a new steady part plus a new transient, which is what makes a resonance build up.
+  //
+  // STRING (fixed at the pulley, x = L; driven at x = 0 by a vibrator moving A cos(phi)).
+  //   y = A cos(phi) (1 - x/L) + sum q_n sin(n pi x / L),  w_n = n pi v / L,  v = sqrt(T / mu)
+  //   G_n = (2 / (n pi)) A (w^2 - i gamma w)      (from moving the end; exact, no approximation)
+  // PIPE (open end at x = 0 with a loudspeaker just outside it; the far end x = L open or closed).
+  //   s = sum q_n phi_n(x)  with phi_n = cos(n pi x / L) (open-open, n >= 1)
+  //                          or phi_n = cos((2n-1) pi x / (2L)) (open-closed)
+  //   the speaker is a point source of fixed strength K at x = 0:  G_n = (2 / L) K phi_n(0). That makes every
+  //   resonance equally loud (the pressure antinodes all reach 2 K rho v / (gamma L)); the air moves less at the
+  //   higher harmonics, as it must for the same loudness at a shorter wavelength.
+  //   gauge pressure p = -rho v^2 ds/dx
+  //   Left out on purpose: in an open-open pipe the whole column can also slide back and forth together (a mode
+  //   with zero frequency). It has no resonance and no pressure, so it would only add a small, uniform drift.
+  const TAU = 2 * Math.PI;
+
+  // complex numbers as [re, im]
+  const cadd = (a, b) => [a[0] + b[0], a[1] + b[1]];
+  const cmul = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+  const cdiv = (a, b) => { const d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; };
+  const cabs = a => Math.hypot(a[0], a[1]);
+
+  function makeString(o) {           // o: { L, T, mu, gamma, A, N }
+    const v = Math.sqrt(o.T / o.mu), N = o.N || 80, modes = [];
+    for (let n = 1; n <= N; n++) {
+      const k = n * Math.PI / o.L;
+      modes.push({ n, w: k * v, shape: x => Math.sin(k * x), slope: x => k * Math.cos(k * x) });
+    }
+    return { kind: 'string', L: o.L, v, gamma: o.gamma, A: o.A, modes,
+      force: (m, w) => [2 / (m.n * Math.PI) * o.A * w * w, -2 / (m.n * Math.PI) * o.A * o.gamma * w],
+      lift: x => o.A * (1 - x / o.L),
+      f1: v / (2 * o.L) };
+  }
+  function makePipe(o) {             // o: { L, v, ends: 'oo' | 'oc', gamma, K, rho, N }
+    const N = o.N || 60, modes = [];
+    for (let n = 1; n <= N; n++) {
+      const k = o.ends === 'oo' ? n * Math.PI / o.L : (2 * n - 1) * Math.PI / (2 * o.L);
+      modes.push({ n, w: k * o.v, shape: x => Math.cos(k * x), slope: x => -k * Math.sin(k * x),
+        sigma: Math.sin(Math.PI * n / (N + 1)) / (Math.PI * n / (N + 1)) });   // Lanczos factor, used for the pressure only
+    }
+    return { kind: 'pipe', L: o.L, v: o.v, gamma: o.gamma, K: o.K, rho: o.rho, ends: o.ends, modes,
+      force: (m, w) => [2 / o.L * o.K * m.shape(0), 0],
+      lift: () => 0,
+      f1: o.ends === 'oo' ? o.v / (2 * o.L) : o.v / (4 * o.L) };
+  }
+
+  // steady-state complex coefficient of every mode at drive frequency w (rad/s)
+  function steadyCoeffs(sys, w) {
+    return sys.modes.map(m => cdiv(sys.force(m, w), [m.w * m.w - w * w, sys.gamma * w]));
+  }
+  // complex amplitude of the steady displacement at x
+  function steadyAt(sys, w, x, C) {
+    C = C || steadyCoeffs(sys, w);
+    let z = [sys.lift(x), 0];
+    sys.modes.forEach((m, i) => { const s = m.shape(x); z = cadd(z, [C[i][0] * s, C[i][1] * s]); });
+    return z;
+  }
+
+  // A running system: the drive phase, the steady coefficients for the present frequency, and each mode's
+  // transient (displacement h and velocity hd).
+  function start(sys, w) {
+    const n = sys.modes.length;
+    // phi = -pi/2 puts the driver at its centre, so a string at rest starts exactly flat
+    const st = { sys, w, phi: -Math.PI / 2, t: 0, C: steadyCoeffs(sys, w), h: new Float64Array(n), hd: new Float64Array(n) };
+    // at rest: q = 0 and q' = 0, so the transient must cancel the steady part
+    for (let i = 0; i < n; i++) { const P = steadyPart(st, i); st.h[i] = -P.q; st.hd[i] = -P.qd; }
+    return st;
+  }
+  function steadyPart(st, i) {
+    const c = Math.cos(st.phi), s = Math.sin(st.phi), C = st.C[i];
+    return { q: C[0] * c - C[1] * s, qd: -st.w * (C[0] * s + C[1] * c) };
+  }
+  function modeQ(st, i) { return steadyPart(st, i).q + st.h[i]; }
+  function advance(st, dt) {
+    const g = st.sys.gamma, a = g / 2, e = Math.exp(-a * dt);
+    st.sys.modes.forEach((m, i) => {
+      const wd = Math.sqrt(m.w * m.w - a * a), c = Math.cos(wd * dt), s = Math.sin(wd * dt);
+      const h = st.h[i], hd = st.hd[i];
+      st.h[i] = e * (h * c + (hd + a * h) / wd * s);
+      st.hd[i] = e * (hd * c - (a * hd + m.w * m.w * h) / wd * s);
+    });
+    st.phi += st.w * dt; st.t += dt;
+  }
+  // change the drive frequency without any jump in the string's position or velocity
+  function retune(st, w) {
+    const n = st.sys.modes.length, q = new Float64Array(n), qd = new Float64Array(n);
+    for (let i = 0; i < n; i++) { const P = steadyPart(st, i); q[i] = P.q + st.h[i]; qd[i] = P.qd + st.hd[i]; }
+    st.w = w; st.C = steadyCoeffs(st.sys, w);
+    for (let i = 0; i < n; i++) { const P = steadyPart(st, i); st.h[i] = q[i] - P.q; st.hd[i] = qd[i] - P.qd; }
+  }
+  // Carry the motion over to a changed system (new tension or string, new temperature, new damping) whose
+  // mode shapes are the same: every mode keeps its present displacement and velocity and only its natural
+  // frequency changes. If the shapes differ (new length, other end conditions), start again from rest.
+  function carry(st, sys) {
+    const old = st.sys, same = old.kind === sys.kind && old.L === sys.L && old.modes.length === sys.modes.length && old.ends === sys.ends;
+    if (!same) { const ns = start(sys, st.w); ns.phi = st.phi; ns.t = st.t; restAt(ns); return ns; }
+    const n = sys.modes.length, q = new Float64Array(n), qd = new Float64Array(n);
+    for (let i = 0; i < n; i++) { const P = steadyPart(st, i); q[i] = P.q + st.h[i]; qd[i] = P.qd + st.hd[i]; }
+    const ns = { sys, w: st.w, phi: st.phi, t: st.t, C: steadyCoeffs(sys, st.w), h: new Float64Array(n), hd: new Float64Array(n) };
+    for (let i = 0; i < n; i++) { const P = steadyPart(ns, i); ns.h[i] = q[i] - P.q; ns.hd[i] = qd[i] - P.qd; }
+    return ns;
+  }
+  // make every mode start from rest at the present drive phase
+  function restAt(st) { for (let i = 0; i < st.sys.modes.length; i++) { const P = steadyPart(st, i); st.h[i] = -P.q; st.hd[i] = -P.qd; } }
+  // how far the transient still is from dying out, as a fraction of the steady motion's size
+  function unsettled(st) {
+    let tr = 0, ss = 0;
+    st.sys.modes.forEach((m, i) => { tr += st.h[i] * st.h[i] + st.hd[i] * st.hd[i] / (m.w * m.w); ss += st.C[i][0] * st.C[i][0] + st.C[i][1] * st.C[i][1]; });
+    return Math.sqrt(tr / Math.max(ss, 1e-300));
+  }
+  function settle(st) { st.h.fill(0); st.hd.fill(0); }      // skip the transient: jump straight to the steady state
+
+  // displacement at x right now
+  function displacement(st, x) {
+    let y = st.sys.lift(x) * Math.cos(st.phi);
+    st.sys.modes.forEach((m, i) => { y += modeQ(st, i) * m.shape(x); });
+    return y;
+  }
+  // pipe only: gauge pressure at x right now
+  function pressure(st, x) {
+    const s = st.sys; let d = 0;
+    s.modes.forEach((m, i) => { d += modeQ(st, i) * m.slope(x) * m.sigma; });
+    return -s.rho * s.v * s.v * d;
+  }
+  // resonant frequencies (Hz) the model predicts, for the "show predicted" option and for tests
+  function harmonics(sys, fmax) {
+    return sys.modes.map(m => ({ n: sys.kind === 'pipe' && sys.ends === 'oc' ? 2 * m.n - 1 : m.n, f: m.w / TAU })).filter(h => h.f <= fmax);
+  }
+  // air: speed of sound and density at temperature tc (deg C), sea-level pressure
+  const soundSpeed = tc => 331.3 * Math.sqrt(1 + tc / 273.15);
+  const airDensity = tc => 101325 / (287.05 * (tc + 273.15));
+  // ---- end of core ----
+
+  const G = 9.8;
+  const VIB = 0.001;              // the vibrator moves the end of the string +/- 1 mm
+  const PIPE_R = 0.02;            // pipe radius, m (only used for the end correction)
+  const PIPE_Q = 25;              // quality factor of a closed pipe's lowest resonance (an open pipe's is 50)
+  const PIPE_K = 0.0524;          // speaker strength: every resonance reaches about 2 Pa
+  const SLOW_CPS = 2;             // slow motion: drive cycles per second of screen time
+  const XS1 = 181, XS2 = 161;     // points along the string / pipe used for drawing
+
+  // state for each screen: settings, the running model, precomputed mode shapes, the envelope, the graph
+  const s1 = { f: 12, m: 200, mu: 1.0, L: 1.2, Q: 30, speed: 'real', pred: false, pts: new Map() };
+  const s2 = { f: 100, ends: 'oo', L: 1.0, T: 20, endc: false, speed: 'real', pred: false, pts: new Map() };
+  const st = { tab: 1, playing: true };
+
+  function buildString(keep) {
+    const T = s1.m / 1000 * G, mu = s1.mu / 1000, v = Math.sqrt(T / mu);
+    const sys = makeString({ L: s1.L, T, mu, gamma: (Math.PI * v / s1.L) / s1.Q, A: VIB, N: 80 });
+    s1.run = keep && s1.run ? carry(s1.run, sys) : start(sys, TAU * s1.f);
+    s1.sys = sys; s1.T = T; s1.v = v;
+    s1.xs = Array.from({ length: XS1 }, (_, j) => s1.L * j / (XS1 - 1));
+    s1.tab = sys.modes.map(md => Float64Array.from(s1.xs, x => md.shape(x)));
+    s1.lift = Float64Array.from(s1.xs, x => sys.lift(x));
+    resetEnvelope(s1, XS1);
+  }
+  function pipeGeom() {
+    const open = s2.ends === 'oo' ? 2 : 1, dL = s2.endc ? 0.61 * PIPE_R : 0;
+    return { dL, Leff: s2.L + open * dL };     // the model's x = 0 sits dL outside the pipe's mouth
+  }
+  function buildPipe(keep) {
+    const v = soundSpeed(s2.T), g = pipeGeom();
+    const w1 = Math.PI / 2 * v / g.Leff;       // losses pinned to the closed pipe's lowest resonance, for either pipe
+    const sys = makePipe({ L: g.Leff, v, ends: s2.ends, gamma: w1 / PIPE_Q, K: PIPE_K, rho: airDensity(s2.T), N: 60 });
+    s2.run = keep && s2.run ? carry(s2.run, sys) : start(sys, TAU * s2.f);
+    s2.sys = sys; s2.v = v; s2.g = g;
+    s2.xs = Array.from({ length: XS2 }, (_, j) => g.dL + s2.L * j / (XS2 - 1));    // sample the pipe itself
+    s2.tab = sys.modes.map(md => Float64Array.from(s2.xs, x => md.shape(x)));
+    s2.ptab = sys.modes.map(md => Float64Array.from(s2.xs, x => -sys.rho * v * v * md.slope(x) * md.sigma));
+    resetEnvelope(s2, XS2);
+  }
+  function resetEnvelope(s, n) { s.env = new Float64Array(n); s.penv = new Float64Array(n); s.hist = []; s.y = new Float64Array(n); s.p = new Float64Array(n); }
+
+  // the present shape (and, for the pipe, pressure) at every drawing point
+  function sample(s, withP) {
+    const run = s.run, n = s.xs.length, q = run.sys.modes.map((m, i) => modeQ(run, i)), c = Math.cos(run.phi);
+    for (let j = 0; j < n; j++) {
+      let y = s.lift ? s.lift[j] * c : 0, p = 0;
+      for (let i = 0; i < q.length; i++) { y += q[i] * s.tab[i][j]; if (withP) p += q[i] * s.ptab[i][j]; }
+      s.y[j] = y; if (withP) s.p[j] = p;
+    }
+  }
+  // steady-state size: biggest swing along the string (m), or biggest pressure swing in the pipe (Pa)
+  function steadySize(s, pipe) {
+    const Cc = s.run.C; let best = 0;
+    for (let j = 0; j < s.xs.length; j++) {
+      let re = pipe ? 0 : s.lift[j], im = 0;
+      const tb = pipe ? s.ptab : s.tab;
+      for (let i = 0; i < Cc.length; i++) { re += Cc[i][0] * tb[i][j]; im += Cc[i][1] * tb[i][j]; }
+      best = Math.max(best, Math.hypot(re, im));
+    }
+    return best;
+  }
+
+  // advance the running model by dt of real (simulated) time, sampling it often enough to find the
+  // envelope: the widest the string (or air) swings over the most recent drive cycle
+  function run(s, dt, pipe) {
+    const f = s.run.w / TAU, nsub = Math.max(1, Math.min(60, Math.ceil(dt * f * 24)));
+    const fm = new Float64Array(s.xs.length), fp = new Float64Array(s.xs.length);
+    for (let k = 0; k < nsub; k++) {
+      advance(s.run, dt / nsub); sample(s, pipe);
+      for (let j = 0; j < fm.length; j++) { fm[j] = Math.max(fm[j], Math.abs(s.y[j])); if (pipe) fp[j] = Math.max(fp[j], Math.abs(s.p[j])); }
+    }
+    s.hist.push({ t: s.run.t, fm, fp });
+    const win = 1.02 / f;
+    while (s.hist.length > 1 && s.run.t - s.hist[1].t >= win) s.hist.shift();
+    s.env.fill(0); s.penv.fill(0);
+    s.hist.forEach(h => { for (let j = 0; j < fm.length; j++) { s.env[j] = Math.max(s.env[j], h.fm[j]); if (pipe) s.penv[j] = Math.max(s.penv[j], h.fp[j]); } });
+    record(s, pipe);
+  }
+  // once the start-up wobble has died away, the size at this frequency goes on the graph
+  function record(s, pipe) {
+    if (unsettled(s.run) > 0.03) return;
+    const key = pipe ? Math.round(s.f) : Math.round(s.f * 10) / 10;
+    if (!s.pts.has(key)) s.pts.set(key, steadySize(s, pipe));
+  }
+  function liveSize(s, pipe) { return Math.max(...(pipe ? s.penv : s.env)); }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+
+  // --- the string ---
+  const STR_RANGE = 2.1;          // meters shown across the canvas, whatever the length, so lengths compare
+  const STR_VEX = 6;              // vertical exaggeration
+  function drawString() {
+    const { ctx, W, H, compact } = fit($('str'));
+    ctx.clearRect(0, 0, W, H); font(ctx, 12);
+    const left = compact ? 44 : 70, sx = (W - left - (compact ? 30 : 60)) / STR_RANGE, sy = sx * STR_VEX;
+    const y0 = compact ? H * 0.36 : H * 0.42, X = x => left + x * sx, Y = y => y0 - y * sy;
+    const xp = X(s1.L), pr = compact ? 10 : 13;
+    // vibrator
+    const vib = VIB * Math.cos(s1.run.phi);
+    ctx.fillStyle = C('--metal'); ctx.fillRect(left - (compact ? 34 : 52), y0 - 26, compact ? 28 : 44, 52);
+    ctx.fillStyle = C('--panel'); font(ctx, 11); ctx.textAlign = 'center';
+    if (!compact) ctx.fillText('vibrator', left - 30, y0 + 4);
+    ctx.fillStyle = C('--metal'); ctx.fillRect(left - 8, Y(vib) - 3, 8, 6);
+    // pulley, the string's run down to the weight, and the weight
+    const bench = y0 + 26;                      // the vibrator and the pulley both sit on the bench
+    ctx.fillStyle = C('--rule'); ctx.fillRect(left - (compact ? 40 : 60), bench, xp - left + (compact ? 40 : 60), compact ? 6 : 8);
+    ctx.strokeStyle = C('--metal'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(xp, y0 + pr); ctx.lineTo(xp - pr * 0.6, bench); ctx.stroke();      // bracket to the bench edge
+    ctx.fillStyle = C('--panel'); ctx.beginPath(); ctx.arc(xp, y0 + pr, pr, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C('--metal'); ctx.beginPath(); ctx.arc(xp, y0 + pr, 2.5, 0, TAU); ctx.fill();
+    const side = (compact ? 16 : 20) * Math.cbrt(s1.m / 200), wy = H - (compact ? 16 : 22) - side;
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(xp + pr, y0 + pr); ctx.lineTo(xp + pr, wy); ctx.stroke();
+    ctx.fillStyle = C('--weight'); ctx.fillRect(xp + pr - side / 2, wy, side, side);
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText(s1.m + ' g', xp + pr + side / 2 + 6, wy + side / 2 + 4);
+    // length marker
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+    const ly = H - (compact ? 10 : 12);
+    ctx.beginPath(); ctx.moveTo(left, ly - 5); ctx.lineTo(left, ly + 1); ctx.moveTo(left, ly - 2); ctx.lineTo(xp, ly - 2); ctx.moveTo(xp, ly - 5); ctx.lineTo(xp, ly + 1); ctx.stroke();
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    ctx.fillText(s1.L.toFixed(2) + ' m', (left + xp) / 2, ly - 6);
+    // the blur the eye sees: widest swing over the last cycle
+    ctx.fillStyle = C('--band');
+    ctx.beginPath();
+    s1.xs.forEach((x, j) => j ? ctx.lineTo(X(x), Y(s1.env[j])) : ctx.moveTo(X(x), Y(s1.env[j])));
+    for (let j = s1.xs.length - 1; j >= 0; j--) ctx.lineTo(X(s1.xs[j]), Y(-s1.env[j]));
+    ctx.closePath(); ctx.fill();
+    // the string itself: sharp in slow motion; in real time it is too fast to see, so only the blur shows
+    if (s1.speed === 'slow' || !st.playing) {
+      ctx.strokeStyle = C('--body'); ctx.lineWidth = 2.2;
+      ctx.beginPath(); s1.xs.forEach((x, j) => j ? ctx.lineTo(X(x), Y(s1.y[j])) : ctx.moveTo(X(x), Y(s1.y[j]))); ctx.stroke();
+    } else {
+      ctx.strokeStyle = C('--body'); ctx.lineWidth = 1;
+      ctx.beginPath(); s1.xs.forEach((x, j) => j ? ctx.lineTo(X(x), Y(s1.env[j])) : ctx.moveTo(X(x), Y(s1.env[j]))); ctx.stroke();
+      ctx.beginPath(); s1.xs.forEach((x, j) => j ? ctx.lineTo(X(x), Y(-s1.env[j])) : ctx.moveTo(X(x), Y(-s1.env[j]))); ctx.stroke();
+    }
+    // captions
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; font(ctx, 12);
+    const slowCap = 'slow motion: one cycle every ' + (1 / SLOW_CPS).toFixed(1) + ' s';
+    ctx.fillText(s1.speed === 'slow' ? slowCap : compact ? 'real time: you see the blur' : 'real time: too fast to follow, so you see the blur', 12, 18);
+    if (compact) ctx.fillText('vibrator at the left; up and down motion ×' + STR_VEX, 12, 34);
+    else { ctx.textAlign = 'right'; ctx.fillText('up and down motion ×' + STR_VEX, W - 12, 18); }
+  }
+
+  // --- the pipe ---
+  const PIPE_RANGE = 1.55;         // meters shown across the canvas, whatever the length, so lengths compare
+  const PIPE_VEX = 4000;           // how much the air's back-and-forth motion is magnified
+  const S_AX = 8e-6, P_AX = 2.5;   // fixed plot scales: displacement (m) and pressure (Pa)
+  function drawPipe() {
+    const { ctx, W, H, compact } = fit($('pipe'));
+    ctx.clearRect(0, 0, W, H); font(ctx, 12);
+    const left = compact ? 46 : 80, sx = (W - left - (compact ? 16 : 40)) / PIPE_RANGE;
+    const X = x => left + x * sx;          // model coordinate x (m) to pixels; the speaker sits at x = 0
+    const g = s2.g, x0 = X(g.dL), x1 = X(g.dL + s2.L);
+    const tubeTop = compact ? 34 : 38, tubeH = compact ? 70 : 84, tubeBot = tubeTop + tubeH;
+    const slow = s2.speed === 'slow' || !st.playing;
+    // pressure inside the pipe as shading: warm where the air is squeezed, cool where it is thinned
+    // (in real time, grey where the pressure swings most)
+    const n = s2.xs.length;
+    for (let j = 0; j < n - 1; j++) {
+      const xa = X(s2.xs[j]), xb = X(s2.xs[j + 1]);
+      if (slow) {
+        const p = (s2.p[j] + s2.p[j + 1]) / 2, a = Math.min(1, Math.abs(p) / P_AX);
+        ctx.fillStyle = p > 0 ? 'rgba(200,50,30,' + (0.55 * a).toFixed(3) + ')' : 'rgba(29,79,115,' + (0.55 * a).toFixed(3) + ')';
+      } else {
+        const a = Math.min(1, (s2.penv[j] + s2.penv[j + 1]) / 2 / P_AX);
+        ctx.fillStyle = 'rgba(92,107,115,' + (0.6 * a).toFixed(3) + ')';
+      }
+      ctx.fillRect(xa, tubeTop, xb - xa + 0.6, tubeH);
+    }
+    // slices of air, one every centimeter, moved by the (magnified) displacement
+    const step = Math.max(1, Math.round((n - 1) / (s2.L / 0.01)));
+    ctx.lineWidth = 1;
+    for (let j = 0; j < n; j += step) {
+      const xe = X(s2.xs[j]);
+      if (slow) {
+        const xd = xe + s2.y[j] * PIPE_VEX * sx;
+        ctx.strokeStyle = C('--ink'); ctx.globalAlpha = 0.7;
+        ctx.beginPath(); ctx.moveTo(xd, tubeTop + 6); ctx.lineTo(xd, tubeBot - 6); ctx.stroke(); ctx.globalAlpha = 1;
+      } else {
+        const a = s2.env[j] * PIPE_VEX * sx;
+        ctx.fillStyle = 'rgba(23,33,40,0.18)'; ctx.fillRect(xe - a - 0.5, tubeTop + 6, 2 * a + 1, tubeH - 12);
+        ctx.strokeStyle = 'rgba(23,33,40,0.55)'; ctx.beginPath(); ctx.moveTo(xe, tubeTop + 6); ctx.lineTo(xe, tubeBot - 6); ctx.stroke();
+      }
+    }
+    // walls, the closed cap, the speaker
+    ctx.strokeStyle = C('--tube'); ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x0, tubeTop); ctx.lineTo(x1, tubeTop); ctx.moveTo(x0, tubeBot); ctx.lineTo(x1, tubeBot); ctx.stroke();
+    if (s2.ends === 'oc') { ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(x1 + 1, tubeTop - 2); ctx.lineTo(x1 + 1, tubeBot + 2); ctx.stroke(); }
+    const spx = X(0) - 6, cone = s2.run.phi;
+    ctx.fillStyle = C('--metal');
+    ctx.fillRect(spx - (compact ? 22 : 30), tubeTop + tubeH * 0.28, compact ? 10 : 14, tubeH * 0.44);
+    ctx.beginPath(); ctx.moveTo(spx - (compact ? 12 : 16), tubeTop + tubeH * 0.3); ctx.lineTo(spx + (slow ? 2 * Math.cos(cone) : 0), tubeTop + 4);
+    ctx.lineTo(spx + (slow ? 2 * Math.cos(cone) : 0), tubeBot - 4); ctx.lineTo(spx - (compact ? 12 : 16), tubeBot - tubeH * 0.3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; font(ctx, 11);
+    ctx.fillText('speaker', spx - (compact ? 12 : 16), tubeBot + 16);
+    ctx.fillText(s2.ends === 'oc' ? 'closed' : 'open', x1, tubeBot + 16);
+    ctx.fillText(s2.L.toFixed(2) + ' m', (x0 + x1) / 2, tubeBot + 16);
+
+    // profile: displacement and pressure along the pipe, on fixed scales
+    const pt = tubeBot + (compact ? 30 : 34), ph = H - pt - (compact ? 40 : 24), mid = pt + ph / 2;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+    ctx.strokeRect(x0, pt, x1 - x0, ph);
+    ctx.beginPath(); ctx.moveTo(x0, mid); ctx.lineTo(x1, mid); ctx.stroke();
+    const Ys = v => mid - v / S_AX * ph / 2, Yp = v => mid - v / P_AX * ph / 2;
+    const band = (arr, Yf, col) => {
+      ctx.fillStyle = col; ctx.beginPath();
+      s2.xs.forEach((x, j) => j ? ctx.lineTo(X(x), Yf(arr[j])) : ctx.moveTo(X(x), Yf(arr[j])));
+      for (let j = n - 1; j >= 0; j--) ctx.lineTo(X(s2.xs[j]), Yf(-arr[j]));
+      ctx.closePath(); ctx.fill();
+    };
+    const line = (arr, Yf, col, w, dash) => {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []);
+      ctx.beginPath(); s2.xs.forEach((x, j) => { const yy = Math.max(pt, Math.min(pt + ph, Yf(arr[j]))); j ? ctx.lineTo(X(x), yy) : ctx.moveTo(X(x), yy); }); ctx.stroke(); ctx.setLineDash([]);
+    };
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, pt, x1 - x0, ph); ctx.clip();
+    band(s2.env, Ys, 'rgba(29,79,115,0.16)'); band(s2.penv, Yp, 'rgba(181,48,109,0.13)');
+    if (slow) { line(s2.y, Ys, C('--body'), 2); line(s2.p, Yp, C('--press'), 2, [6, 4]); }
+    else {
+      line(s2.env, Ys, C('--body'), 1.4); line(s2.env.map(v => -v), Ys, C('--body'), 1.4);
+      line(s2.penv, Yp, C('--press'), 1.4, [6, 4]); line(s2.penv.map(v => -v), Yp, C('--press'), 1.4, [6, 4]);
+    }
+    ctx.restore();
+    ctx.textAlign = 'left'; font(ctx, 12);
+    ctx.fillStyle = C('--body'); ctx.fillText('— how far the air moves (full height ±8 µm)', 12, H - 8 - (compact ? 16 : 0));
+    ctx.fillStyle = C('--press'); ctx.fillText('- - pressure (full height ±2.5 Pa)', compact ? 12 : 300, H - 8);
+    // captions
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText(slow ? 'slow motion: one cycle every ' + (1 / SLOW_CPS).toFixed(1) + ' s' : compact ? 'real time: the blur shows the motion' : 'real time: the air moves too fast to follow, so you see the blur', 12, 18);
+    ctx.textAlign = 'right';
+    ctx.fillText(compact ? 'motion ×' + PIPE_VEX : 'air motion magnified ×' + PIPE_VEX, W - 12, 18);
+  }
+
+  // --- the response graph: what the student has measured, plus (on request) the theory's predictions ---
+  function drawResp(id, s, pipe) {
+    const { ctx, W, H, compact } = fit($(id));
+    ctx.clearRect(0, 0, W, H); font(ctx, 12);
+    const fmax = pipe ? 2000 : 150, ymax = pipe ? 2.5 : 0.04;
+    const ml = compact ? 44 : 58, mr = 14, mt = 26, mb = 34, pw = W - ml - mr, ph = H - mt - mb;
+    const X = f => ml + f / fmax * pw, Y = a => mt + ph - Math.min(a, ymax) / ymax * ph;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.fillStyle = C('--muted');
+    const fstep = pipe ? (compact ? 500 : 250) : (compact ? 50 : 25);
+    ctx.textAlign = 'center';
+    for (let f = 0; f <= fmax; f += fstep) { ctx.beginPath(); ctx.moveTo(X(f) + 0.5, mt); ctx.lineTo(X(f) + 0.5, mt + ph); ctx.stroke(); ctx.fillText(String(f), X(f), mt + ph + 16); }
+    ctx.fillText('driving frequency (Hz)', ml + pw / 2, H - 4);
+    const yt = pipe ? [0, 0.5, 1, 1.5, 2, 2.5] : [0, 0.01, 0.02, 0.03, 0.04];
+    ctx.textAlign = 'right';
+    yt.forEach(a => { ctx.beginPath(); ctx.moveTo(ml, Y(a) + 0.5); ctx.lineTo(ml + pw, Y(a) + 0.5); ctx.stroke(); ctx.fillText(pipe ? a.toFixed(1) : (a * 1000).toFixed(0), ml - 6, Y(a) + 4); });
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--ink');
+    ctx.fillText(pipe ? 'loudest pressure swing in the pipe (Pa), once it has settled' : 'widest swing of the string (mm), once it has settled', ml, 16);
+    // predictions, only if asked for
+    if (s.pred) {
+      ctx.strokeStyle = C('--pred'); ctx.fillStyle = C('--pred'); ctx.setLineDash([4, 4]); ctx.textAlign = 'center'; font(ctx, 11);
+      harmonics(s.sys, fmax).forEach(h => { ctx.beginPath(); ctx.moveTo(X(h.f) + 0.5, mt); ctx.lineTo(X(h.f) + 0.5, mt + ph); ctx.stroke();
+        if (!compact || h.n < 10) { ctx.textAlign = 'left'; ctx.fillText(String(h.n), X(h.f) + 3, mt + 11); } });
+      ctx.setLineDash([]);
+    }
+    // the measurements
+    ctx.fillStyle = C('--body');
+    s.pts.forEach((a, f) => { ctx.beginPath(); ctx.arc(X(f), Y(a), 3, 0, TAU); ctx.fill(); });
+    // where you are now
+    ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(X(s.f) + 0.5, mt); ctx.lineTo(X(s.f) + 0.5, mt + ph); ctx.stroke();
+    ctx.beginPath(); ctx.arc(X(s.f), Y(liveSize(s, pipe)), 5, 0, TAU); ctx.stroke();
+  }
+
+  function draw() {
+    if (st.tab === 1) { drawString(); drawResp('resp1', s1, false); }
+    else { drawPipe(); drawResp('resp2', s2, true); }
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  function status(s) { return unsettled(s.run) > 0.03 ? 'still settling' : 'steady'; }
+  function readout() {
+    if (st.tab === 1) {
+      const lam = s1.v / s1.f;
+      $('readout1').innerHTML =
+        card('Wave speed on the string', s1.v.toFixed(1) + ' m/s', '<i>v</i> = √(<i>T</i>/<i>μ</i>), with tension <i>T</i> = <i>mg</i> = ' + s1.T.toFixed(2) + ' N') +
+        card('Wavelength at ' + s1.f.toFixed(1) + ' Hz', lam.toFixed(3) + ' m', '<i>λ</i> = <i>v</i>/<i>f</i>; the string is ' + s1.L.toFixed(2) + ' m long') +
+        card('Widest swing of the string', (liveSize(s1) * 1000).toFixed(1) + ' mm', status(s1) + '; the vibrator itself moves only ±' + (VIB * 1000).toFixed(1) + ' mm');
+      $('f1_v').textContent = s1.f.toFixed(1);
+      $('m_v').textContent = s1.m + ' g (' + s1.T.toFixed(2) + ' N)';
+      $('mu_v').textContent = s1.mu.toFixed(1) + ' g/m';
+      $('L1_v').textContent = s1.L.toFixed(2) + ' m';
+      $('Q_v').textContent = String(s1.Q);
+    } else {
+      const lam = s2.v / s2.f, p = liveSize(s2, true), db = p > 0 ? 20 * Math.log10(p / Math.SQRT2 / 20e-6) : -Infinity;
+      $('readout2').innerHTML =
+        card('Speed of sound', s2.v.toFixed(1) + ' m/s', 'at ' + s2.T + ' °C: <i>v</i> = 331.3 m/s × √(1 + <i>T</i>/273.15)') +
+        card('Wavelength at ' + s2.f.toFixed(0) + ' Hz', lam.toFixed(3) + ' m', '<i>λ</i> = <i>v</i>/<i>f</i>; the pipe is ' + s2.L.toFixed(2) + ' m long' +
+          (s2.endc ? ', but acts ' + s2.g.Leff.toFixed(3) + ' m long' : '')) +
+        card('Loudest pressure swing inside', p.toFixed(2) + ' Pa', status(s2) + (isFinite(db) && db > 0 ? '; ' + db.toFixed(0) + ' dB at that spot' : ''));
+      $('f2_v').textContent = s2.f.toFixed(0);
+      $('L2_v').textContent = s2.L.toFixed(2) + ' m';
+      $('T_v').textContent = s2.T + ' °C';
+    }
+  }
+
+  const TEXT = {
+    1: { lede: 'A string runs from a vibrator, over a pulley, to a hanging weight. The vibrator shakes its end of the string up and down by just a millimeter, at the frequency you choose. At most frequencies the string hardly moves. Hunt for the frequencies where it suddenly swings wide, and count the loops each time. Is there a pattern?',
+         notes: '<p><b>What to try.</b> Sweep up slowly from 5 Hz with the buttons, pausing a moment at each step so the swing can settle; every settled measurement goes on the graph. When the string swings wide, fine-tune to the top of the peak and count the loops. Find four or five of these frequencies and compare them with the lowest one. Then quadruple the hanging mass: every resonance moves up by a factor of two, because the wave speed goes as the square root of the tension. Switch to slow motion to see the loops rock, and notice that the vibrator\'s end hardly moves even at resonance.</p>' +
+                '<p><b>Why.</b> A wave sent down the string reflects at the pulley and comes back. When a whole number of half-wavelengths fits between the two ends, <i>L</i> = <i>nλ</i>/2, each returning wave arrives in step with the next push, and the swing builds up until damping takes away as much energy each cycle as the vibrator puts in. So the resonances are at <i>f<sub>n</sub></i> = <i>nv</i>/2<i>L</i>, with <i>v</i> = √(<i>T</i>/<i>μ</i>). Tick "show where the theory puts the resonances" to check your list against it.</p>' +
+                '<p><b>The model.</b> Small swings of a uniform string with no stiffness and no sag, fixed at the pulley and moved ±1 mm at the vibrator end, which is why that end is only nearly a node. Damping is a drag proportional to speed, set so that the lowest harmonic has the quality factor <i>Q</i> you choose; that makes every resonance peak equally high, at 2<i>AQ</i>/π. Up-and-down motion is drawn 6 times larger than it is. The model is exact for this setup: a sum of 80 harmonics, each moving exactly as a damped, driven oscillator.</p>' },
+    2: { lede: 'A loudspeaker plays a steady tone into the open end of a pipe. Hunt for the frequencies where the pipe booms, first with the far end open and then with it closed. Does closing the end just shift the resonances, or change which ones there are?',
+         notes: '<p><b>What to try.</b> With the far end open, find the lowest resonance and the next three, and work out their ratios. Then close the end and do the same. Compare the lowest resonance of the closed pipe with the open one, and look at which multiples of it you find. In slow motion, watch the slices of air: where they swing most, the pressure hardly changes, and where the air cannot move at all, at a closed end, the pressure swings most. Warm the air and every resonance rises, by about 0.17% per degree.</p>' +
+                '<p><b>Why.</b> An open end lets the air move freely but keeps its pressure at room pressure, so it is a pressure node and a displacement antinode. A closed end stops the air, so it is a displacement node and a pressure antinode. A pipe open at both ends fits whole half-wavelengths, <i>f<sub>n</sub></i> = <i>nv</i>/2<i>L</i>. A pipe closed at one end fits odd quarter-wavelengths, <i>f<sub>n</sub></i> = <i>nv</i>/4<i>L</i> with <i>n</i> = 1, 3, 5 …, so its lowest note is an octave lower and the even harmonics are missing. That is why a clarinet, which acts like a closed pipe, sounds so different from a flute.</p>' +
+                '<p><b>The model.</b> Sound travels along the pipe as a plane wave; the pipe is 2 cm in radius. The speaker is a steady source just at the mouth, and the losses are set so that every resonance, open or closed, is equally loud: the closed pipe\'s lowest resonance has a quality factor of 25, and the higher ones are sharper. An open end is treated as a perfect pressure node unless you tick the end correction, which moves that node 0.6 radius beyond the mouth, as measurements on real pipes show. The air\'s motion is magnified 4000 times; the real motion is a few micrometers. The pipe\'s motion is a sum of 60 harmonics, each moving exactly as a damped, driven oscillator.</p>' }
+  };
+
+  function setTab(n) {
+    st.tab = n;
+    [1, 2].forEach(k => $('tab' + k).setAttribute('aria-selected', String(k === n)));
+    $('lede').innerHTML = TEXT[n].lede; $('notes').innerHTML = TEXT[n].notes;
+    $('p1').hidden = n !== 1; $('p2').hidden = n !== 2;
+    readout(); draw();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  function setPlay(on) { st.playing = on; $('play1').textContent = $('play2').textContent = on ? 'Pause' : 'Play'; }
+  $('play1').addEventListener('click', () => setPlay(!st.playing));
+  $('play2').addEventListener('click', () => setPlay(!st.playing));
+
+  // frequency: slider and nudge buttons; retuning keeps the motion continuous
+  function setF(s, pipe, f) {
+    const lo = pipe ? 50 : 5, hi = pipe ? 2000 : 150;
+    s.f = Math.min(hi, Math.max(lo, pipe ? Math.round(f) : Math.round(f * 10) / 10));
+    $(pipe ? 'f2' : 'f1').value = String(s.f);
+    retune(s.run, TAU * s.f); s.hist = [];
+    readout(); draw();
+  }
+  $('f1').addEventListener('input', () => setF(s1, false, +$('f1').value));
+  $('f2').addEventListener('input', () => setF(s2, true, +$('f2').value));
+  document.querySelectorAll('#p1 .freq button').forEach(b => b.addEventListener('click', () => setF(s1, false, s1.f + +b.dataset.d)));
+  document.querySelectorAll('#p2 .freq button').forEach(b => b.addEventListener('click', () => setF(s2, true, s2.f + +b.dataset.d)));
+
+  // the string's settings: tension, string and damping keep the motion; a new length starts it again
+  [['m', 'm'], ['mu', 'mu'], ['Q', 'Q']].forEach(([id, key]) => $(id).addEventListener('input', () => { s1[key] = +$(id).value; s1.pts.clear(); buildString(true); readout(); draw(); }));
+  $('L1').addEventListener('input', () => { s1.L = +$('L1').value; s1.pts.clear(); buildString(false); readout(); draw(); });
+  $('T').addEventListener('input', () => { s2.T = +$('T').value; s2.pts.clear(); buildPipe(true); readout(); draw(); });
+  $('L2').addEventListener('input', () => { s2.L = +$('L2').value; s2.pts.clear(); buildPipe(false); readout(); draw(); });
+  $('endc').addEventListener('change', () => { s2.endc = $('endc').checked; s2.pts.clear(); buildPipe(false); readout(); draw(); });
+  document.querySelectorAll('#ends button').forEach(b => b.addEventListener('click', () => {
+    s2.ends = b.dataset.e; document.querySelectorAll('#ends button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    s2.pts.clear(); buildPipe(false); readout(); draw();
+  }));
+  $('pred1').addEventListener('change', () => { s1.pred = $('pred1').checked; draw(); });
+  $('pred2').addEventListener('change', () => { s2.pred = $('pred2').checked; draw(); });
+  [['speed1', s1], ['speed2', s2]].forEach(([id, s]) => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => {
+    s.speed = b.dataset.s; s.hist = []; document.querySelectorAll('#' + id + ' button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); draw();
+  })));
+  // skip the start-up wobble: jump to where the motion will have settled
+  $('skip1').addEventListener('click', () => { settle(s1.run); s1.hist = []; run(s1, 1 / s1.f, false); readout(); draw(); });
+  $('skip2').addEventListener('click', () => { settle(s2.run); s2.hist = []; run(s2, 1 / s2.f, true); readout(); draw(); });
+  $('clear1').addEventListener('click', () => { s1.pts.clear(); draw(); });
+  $('clear2').addEventListener('click', () => { s2.pts.clear(); draw(); });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (st.playing && !document.hidden && dt > 0) {
+      const s = st.tab === 1 ? s1 : s2, pipe = st.tab === 2;
+      run(s, s.speed === 'slow' ? dt * SLOW_CPS / s.f : dt, pipe);
+      readout();
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+  buildString(false); buildPipe(false);
+  run(s1, 1e-4, false); run(s2, 1e-5, true);
+  $('f1').value = String(s1.f); $('f2').value = String(s2.f);
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setPlay(false); s1.speed = s2.speed = 'slow';
+    document.querySelectorAll('.seg[aria-label="Playback"] button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === 'slow'))); }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
