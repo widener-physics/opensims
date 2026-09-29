@@ -21,7 +21,7 @@ window.SIMS = [
     topic: 'modern',
     tags: ['special relativity', 'time dilation', 'length contraction', 'simultaneity', 'light clock', 'twin paradox', 'Doppler'],
     blurb: "Light clocks on a platform and a passing train, with a switch to ride either one: each observer finds the other's clocks slow and short. A toggle shows why length contraction is forced. Then the twin paradox, told with birthday flashes, from Earth's frame and then the traveler's: when he turns round, his 'now' on Earth jumps forward 12.8 years.",
-    level: 'intro',
+    level: 'intermediate',
     added: '2026-09-27',
     status: 'ready'
   },
@@ -91,7 +91,7 @@ window.SIMS = [
     topic: 'em',
     tags: ['electric flux', 'field lines', 'symmetry', 'line charge'],
     blurb: 'Drag charges and drag a closed surface while the flux is measured piece by piece around the boundary and compared with the charge enclosed over epsilon-zero. Move a charge outside and the total falls to zero while the field does not.',
-    level: 'intermediate',
+    level: 'intro',
     added: '2026-09-08',
     status: 'ready'
   },
@@ -121,7 +121,7 @@ window.SIMS = [
     topic: 'em',
     tags: ['magnetic force', 'velocity selector', 'mass spectrometer', 'cyclotron', 'Lorentz force'],
     blurb: 'Four screens on one idea: a magnetic field turns a charge without doing work. Circular orbits whose period ignores speed, a crossed-field speed filter, isotope separation on a detector, and a cyclotron that falls out of step when you detune it.',
-    level: 'intermediate',
+    level: 'intro',
     added: '2026-09-08',
     status: 'ready'
   },
@@ -161,7 +161,7 @@ window.SIMS = [
     topic: 'dynamics',
     tags: ['center of mass', 'momentum', 'drag', 'impulse'],
     blurb: 'A person walks the length of a floating boat. Without drag the boat slides back and stays; with linear drag it drifts home while the center of mass moves. Both cases side by side with x(t) plots.',
-    level: 'intro',
+    level: 'intermediate',
     added: '2026-09-02',
     status: 'ready'
   },
