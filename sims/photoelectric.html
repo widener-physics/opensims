@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<!--
+  The photoelectric effect - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Fowler's function
+  agrees with direct numerical integration to 1e-13; the current agrees with a direct count of the
+  electrons of a Fermi-Dirac metal to within 1% of saturation near threshold; no current flows below
+  threshold or past the stopping voltage; the work functions are Michaelson's (1977) preferred
+  polycrystalline values; and a simulated stopping-voltage experiment, read off the meter the way a
+  student would, recovers Planck's constant to within 0.2% for every metal.
+  Credit: stands in for PhET's "Photoelectric Effect", which PhET publishes only in the retired Java
+  format. PhET is writing an HTML5 version (github.com/phetsims/photoelectric-effect), unpublished as of
+  September 2026.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The photoelectric effect</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32; --elec: #1D4F73; --metal: #8C979E; --glass: #EAF2F6;
+    --wire: #5C6B73; --fit: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 380; }
+  #graph { aspect-ratio: 900 / 300; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  select { font: inherit; font-family: var(--sans); font-size: 14px; padding: 5px 8px; border: 1px solid var(--ink); border-radius: 4px; background: var(--panel); color: var(--ink); }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
+  .chips span { color: var(--muted); margin-right: 4px; }
+  .chips button, .nudge button { padding: 2px 7px; font-size: 13px; background: transparent; color: var(--ink); border-color: var(--rule); font-variant-numeric: tabular-nums; }
+  .chips button:hover, .nudge button:hover { border-color: var(--ink); }
+  .nudge { display: flex; gap: 4px; margin-top: 4px; justify-content: space-between; }
+
+  #datawrap { margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  #datawrap h2 { font-size: 14px; font-weight: 600; margin: 0 0 6px; }
+  table.data { border-collapse: collapse; width: 100%; background: var(--panel); border: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+  table.data th, table.data td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--soft); }
+  table.data th { color: var(--muted); font-weight: 500; }
+  table.data td.x { text-align: center; width: 1%; }
+  table.data td.x button { padding: 0 6px; font-size: 13px; background: transparent; color: var(--muted); border: 0; }
+  table.data td.empty { text-align: left; color: var(--muted); }
+  table.data th:first-child, table.data td:first-child { text-align: left; }
+  .answer { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.95; }
+    #graph { aspect-ratio: 4 / 3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 6px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+  /* this sim */
+  @media (min-width: 1200px) and (min-height: 620px) {
+    .sidebar > #datawrap { order: 2; margin-top: 0; }
+    .sidebar table.data th, .sidebar table.data td { padding: 4px 6px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>The photoelectric effect</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Explore</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Measure h</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Mystery metal</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="A lamp shines on a metal plate in a vacuum tube; electrons knocked out of it cross to a second plate, and a meter in the circuit reads the current"></canvas>
+  <div class="row2">
+    <button id="rec">Record stopping voltage</button>
+    <button id="fitb" class="secondary">Fit a line</button>
+    <button id="clr" class="secondary">Clear graph</button>
+    <button id="newm" class="secondary">New metal</button>
+    <span class="answer" id="guess"><label for="ans">It is</label><select id="ans"></select><button id="check">Check</button><button id="reveal" class="secondary" hidden>Reveal</button><span class="hint" id="verdict" aria-live="polite"></span></span>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Graph of the measurements so far"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_metal"><div class="row"><span>Metal plate</span></div>
+      <select id="metal"></select></label>
+    <div><label><div class="row"><span>Wavelength of the light</span><span class="val" id="lam_v"></span></div>
+      <input type="range" id="lam" min="150" max="850" step="1" value="650"></label>
+      <div class="chips" id="hg"><span>mercury lines:</span></div></div>
+    <label><div class="row"><span>Brightness (photons per second)</span><span class="val" id="bri_v"></span></div>
+      <input type="range" id="bri" min="0" max="100" step="1" value="50"></label>
+    <div><label><div class="row"><span>Battery: far plate relative to the metal</span><span class="val" id="vol_v"></span></div>
+      <input type="range" id="vol" min="-7" max="3" step="0.01" value="0"></label>
+      <div class="nudge" role="group" aria-label="Fine adjustment of the battery voltage">
+        <button data-d="-0.1">−0.1 V</button><button data-d="-0.01">−0.01 V</button><button data-d="0">0 V</button><button data-d="0.01">+0.01 V</button><button data-d="0.1">+0.1 V</button>
+      </div></div>
+  </div>
+
+  <div id="datawrap">
+    <h2>Your measurements</h2>
+    <table class="data" id="data"></table>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against numerical integration, a direct count
+  //    of a Fermi-Dirac metal's electrons, and a simulated experiment. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: the photoelectric effect ----
+  // Light of wavelength lambda falls on a metal plate (the cathode) inside an evacuated tube. A second plate
+  // (the anode) faces it, and a battery holds the anode at voltage V relative to the cathode; V < 0 pushes
+  // electrons back. An ammeter reads the current of electrons that reach the anode.
+  //
+  // Einstein: an electron that absorbs one photon leaves with at most K_max = h f - phi.
+  // The spread below K_max follows Fowler's model (Phys. Rev. 38, 45, 1931) of a free-electron metal: the
+  // photon adds its energy to an electron's motion toward the surface, and the electron escapes if that is
+  // enough to climb the barrier. Counting the electrons of the metal (Sommerfeld's Fermi-Dirac gas) that
+  // can escape gives Fowler's law for the yield near threshold,
+  //     yield  proportional to  (kT)^2 F((h f - phi) / kT),   F(x) = integral_0^inf ln(1 + e^(x - y)) dy,
+  // which at room temperature is almost exactly (h f - phi)^2 / 2 just above threshold.
+  // Between two parallel plates only the motion toward the anode matters, so a retarding voltage simply
+  // raises the barrier by e|V|; DuBridge (Phys. Rev. 43, 727, 1933) showed the current is then
+  //     I(V)  proportional to  (kT)^2 F((h f - phi - e|V|) / kT),
+  // a curve that reaches zero at e|V| = K_max, parabolically at absolute zero and with a thin thermal tail
+  // at room temperature. An accelerating voltage collects every emitted electron (saturation).
+  // Not modeled: the contact potential between two different metals, space charge, reflection of
+  // electrons at the anode, and the real (non-free-electron) band structure of each metal.
+
+  const HC = 1239.841984;                 // h c in eV nm (exact SI constants)
+  const H_EV = 4.135667696e-15;           // h in eV s
+  const H_SI = 6.62607015e-34;            // h in J s
+  const QE = 1.602176634e-19;             // elementary charge, C
+  const CL = 299792458;                   // speed of light, m/s
+  const KB = 8.617333262e-5;              // Boltzmann constant, eV/K
+  const T_ROOM = 295;                     // the cathode is at room temperature
+  const KT = KB * T_ROOM;                 // 0.0254 eV
+
+  // Work functions of clean polycrystalline metals, eV: the preferred values of H. B. Michaelson,
+  // J. Appl. Phys. 48, 4729 (1977), Table III, which are the polycrystalline values in the CRC Handbook.
+  const METALS = {
+    cesium: { name: 'Cesium', sym: 'Cs', phi: 2.14 },
+    rubidium: { name: 'Rubidium', sym: 'Rb', phi: 2.16 },
+    potassium: { name: 'Potassium', sym: 'K', phi: 2.30 },
+    sodium: { name: 'Sodium', sym: 'Na', phi: 2.75 },
+    calcium: { name: 'Calcium', sym: 'Ca', phi: 2.87 },
+    lithium: { name: 'Lithium', sym: 'Li', phi: 2.9 },
+    magnesium: { name: 'Magnesium', sym: 'Mg', phi: 3.66 },
+    aluminum: { name: 'Aluminum', sym: 'Al', phi: 4.28 },
+    zinc: { name: 'Zinc', sym: 'Zn', phi: 4.33 },
+    copper: { name: 'Copper', sym: 'Cu', phi: 4.65 },
+    gold: { name: 'Gold', sym: 'Au', phi: 5.1 },
+    platinum: { name: 'Platinum', sym: 'Pt', phi: 5.65 }
+  };
+  const EXPLORE = ['cesium', 'potassium', 'sodium', 'calcium', 'magnesium', 'zinc', 'copper', 'platinum'];
+  const MYSTERY = ['rubidium', 'lithium', 'magnesium', 'aluminum', 'gold', 'platinum'];   // at least 0.55 eV apart
+
+  const photonEV = lam => HC / lam;                   // photon energy, eV (lambda in nm)
+  const freq = lam => CL / (lam * 1e-9);              // Hz
+  const thresholdNm = phi => HC / phi;                // longest wavelength that frees electrons
+
+  // Fowler's function F(x) = -Li2(-e^x) = sum over k of (-1)^(k+1) e^(kx) / k^2 for x <= 0. Far below zero
+  // the series converges fast; near zero it alternates slowly, so there it is summed with the acceleration
+  // of Cohen, Rodriguez Villegas and Zagier (Experimental Math. 9, 3, 2000). For x > 0,
+  // F(x) = pi^2/6 + x^2/2 - F(-x).
+  function fowler(x) {
+    if (x > 0) return Math.PI * Math.PI / 6 + x * x / 2 - fowler(-x);
+    const z = Math.exp(x);
+    if (z < 0.5) {
+      let s = 0, zk = 1;
+      for (let k = 1; k <= 80; k++) { zk *= z; const t = zk / (k * k); s += (k % 2 ? t : -t); if (t < 1e-18 * s) break; }
+      return s;
+    }
+    const n = 36;
+    let d = Math.pow(3 + Math.sqrt(8), n); d = (d + 1 / d) / 2;
+    let b = -1, c = -d, s = 0, zk = z;
+    for (let k = 0; k < n; k++) {
+      c = b - c; s += c * zk / ((k + 1) * (k + 1));
+      b = (k + n) * (k - n) * b / ((k + 0.5) * (k + 1)); zk *= z;
+    }
+    return s / d;
+  }
+
+  // Photoelectrons per photon. Y0 is set so that the yield is 1e-3 an electron per photon 1 eV above
+  // threshold (typical of clean metals), growing as the square of the excess energy.
+  const Y0 = 2e-3;                                     // per eV^2
+  function yieldOf(lam, phi) { return Y0 * KT * KT * fowler((photonEV(lam) - phi) / KT); }
+
+  // Current (A) reaching the anode. rate = photons per second hitting the cathode; V = anode relative to
+  // cathode, in volts.
+  function current(lam, phi, V, rate) {
+    const barrier = V < 0 ? -V : 0;
+    return QE * rate * Y0 * KT * KT * fowler((photonEV(lam) - phi - barrier) / KT);
+  }
+  function saturation(lam, phi, rate) { return current(lam, phi, 0, rate); }
+
+  // The ammeter: resolution 1 pA, so anything below half a picoampere reads zero.
+  const RES = 1e-12;
+  function ammeter(I) {
+    const n = Math.round(I / RES);
+    if (n === 0) return { amps: 0, text: '0.000 nA' };
+    const a = n * RES;
+    if (a >= 1e-6) return { amps: a, text: (a * 1e6).toFixed(a >= 1e-5 ? 2 : 3) + ' µA' };
+    return { amps: a, text: (a * 1e9).toFixed(a >= 1e-7 ? 1 : a >= 1e-8 ? 2 : 3) + ' nA' };
+  }
+
+  // Kinetic energy of motion toward the anode for one emitted electron, drawn from the same distribution
+  // the current comes from: density proportional to ln(1 + e^((Kmax - E)/kT)) for E >= 0.
+  function sampleEnergy(Kmax, rnd) {
+    const dens = E => Math.log1p(Math.exp((Kmax - E) / KT));
+    const top = Math.max(Kmax, 0) + 12 * KT, dmax = dens(0);
+    for (let tries = 0; tries < 10000; tries++) {
+      const E = rnd() * top;
+      if (rnd() * dmax <= dens(E)) return E;
+    }
+    return Math.max(0, Kmax) * rnd();
+  }
+
+  // Straight line through (x, y) points by least squares, with standard errors.
+  function fitLine(pts) {
+    const n = pts.length;
+    if (n < 2) return null;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    pts.forEach(p => { sx += p[0]; sy += p[1]; sxx += p[0] * p[0]; sxy += p[0] * p[1]; });
+    const D = n * sxx - sx * sx;
+    if (Math.abs(D) < 1e-30 * (n * sxx + 1e-300)) return null;
+    const m = (n * sxy - sx * sy) / D, b = (sy - m * sx) / n;
+    let ss = 0; pts.forEach(p => { const r = p[1] - m * p[0] - b; ss += r * r; });
+    const s2 = n > 2 ? ss / (n - 2) : NaN;
+    return { m, b, sm: Math.sqrt(s2 * n / D), sb: Math.sqrt(s2 * sxx / D) };
+  }
+  // ---- end of core ----
+
+  const TAU = 2 * Math.PI;
+  const RATE = 1e14;                 // photons per second at full brightness (about 40 microwatts of violet light)
+  const PER_DOT = 2.5e9;             // each dot drawn stands for this many electrons
+  const MAX_DOTS = 900;
+  const C0 = 1.25;                   // drawing speed: a 1 eV electron crosses the gap in 0.8 s (really about a nanosecond)
+  const TAB = {
+    1: { metal: 'sodium', lam: 650, bri: 50, V: 0 },
+    2: { metal: 'sodium', lam: 405, bri: 50, V: 0, data: [], fitted: false },
+    3: { metal: null, lam: 405, bri: 50, V: 0, data: [], fitted: false, answer: null, revealed: false }
+  };
+  const HG = [253.7, 296.7, 313.2, 365.0, 404.7, 435.8, 546.1, 577.0];
+  let tab = 1;
+  const S = () => TAB[tab];
+  const phiNow = () => METALS[S().metal].phi;
+
+  // current through the meter, as the meter shows it
+  const meter = () => ammeter(current(S().lam, phiNow(), S().V, S().bri / 100 * RATE));
+
+  // tab 1's current-voltage traces: one per metal, color and brightness, built only from voltages visited
+  let traces = [];
+  function visit() {
+    const s = TAB[1], key = [s.metal, s.lam, s.bri].join('|');
+    let t = traces.find(q => q.key === key);
+    if (!t) { t = { key, metal: s.metal, lam: s.lam, bri: s.bri, pts: new Map() }; if (traces.length >= 6) traces.shift(); }
+    else traces = traces.filter(q => q !== t);
+    traces.push(t);                                                  // the one being traced is drawn last, on top
+    t.pts.set(Math.round(s.V * 100), ammeter(current(s.lam, METALS[s.metal].phi, s.V, s.bri / 100 * RATE)).amps);
+  }
+
+  function newMystery() {
+    const s = TAB[3], pool = MYSTERY.filter(k => k !== s.metal);
+    s.metal = pool[Math.floor(Math.random() * pool.length)];
+    s.data = []; s.fitted = false; s.answer = null; s.revealed = false;
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+
+  // the color of the lamp's light on screen: a rough visible spectrum; ultraviolet and infrared get stand-ins
+  function lamRGB(l) {
+    if (l < 380) return [118, 88, 168];
+    if (l > 750) return [120, 40, 40];
+    let r = 0, g = 0, b = 0;
+    if (l < 440) { r = (440 - l) / 60; b = 1; } else if (l < 490) { g = (l - 440) / 50; b = 1; }
+    else if (l < 510) { g = 1; b = (510 - l) / 20; } else if (l < 580) { r = (l - 510) / 70; g = 1; }
+    else if (l < 645) { r = 1; g = (645 - l) / 65; } else r = 1;
+    const k = l < 420 ? 0.3 + 0.7 * (l - 380) / 40 : l > 700 ? 0.3 + 0.7 * (750 - l) / 50 : 1;
+    return [r, g, b].map(v => Math.round(255 * Math.pow(v * k, 0.8)));
+  }
+  const rgba = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+  function band(l) {
+    if (l < 380) return 'ultraviolet (invisible)';
+    if (l > 750) return 'infrared (invisible)';
+    return l < 450 ? 'violet' : l < 495 ? 'blue' : l < 570 ? 'green' : l < 590 ? 'yellow' : l < 620 ? 'orange' : 'red';
+  }
+
+  // the electrons in flight: x runs 0 (metal) to 1 (far plate); E is their energy toward the far plate, eV
+  let dots = [], owed = 0, flash = 0;
+  let geo = null;
+  function spawn(dt) {
+    const s = S(), Isat = saturation(s.lam, phiNow(), s.bri / 100 * RATE);
+    owed += Isat / QE / PER_DOT * dt;
+    const K = photonEV(s.lam) - phiNow();
+    while (owed >= 1) {
+      owed -= 1;
+      if (dots.length >= MAX_DOTS) continue;
+      const E = sampleEnergy(K, Math.random);
+      dots.push({ x: 0, y: Math.random(), v: C0 * Math.sqrt(E), age: 0 });
+    }
+  }
+  function step(dt) {
+    const a = C0 * C0 * S().V / 2;          // from v^2 = C0^2 E and dE/dx = V (eV per gap)
+    const keep = [];
+    for (const d of dots) {
+      d.x += d.v * dt + 0.5 * a * dt * dt; d.v += a * dt; d.age += dt;
+      if (d.x >= 1) { flash = 0.15; continue; }
+      if (d.x < 0 || d.age > 12) continue;
+      keep.push(d);
+    }
+    dots = keep;
+    flash = Math.max(0, flash - dt);
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    const s = S(), col = lamRGB(s.lam), m = meter();
+    // tube
+    const tx0 = compact ? W * 0.12 : W * 0.24, tx1 = compact ? W * 0.88 : W * 0.76, ty0 = H * (compact ? 0.26 : 0.22), ty1 = H * (compact ? 0.64 : 0.68);
+    const cx = tx0 + (tx1 - tx0) * 0.12, ax = tx1 - (tx1 - tx0) * 0.12, py0 = ty0 + (ty1 - ty0) * 0.14, py1 = ty1 - (ty1 - ty0) * 0.14, pw = compact ? 8 : 10;
+    geo = { cx, ax, py0, py1 };
+    ctx.fillStyle = C('--glass'); ctx.strokeStyle = '#A9C1CE'; ctx.lineWidth = 2;
+    const rr = (ty1 - ty0) / 2;
+    ctx.beginPath(); ctx.moveTo(tx0 + rr, ty0); ctx.lineTo(tx1 - rr, ty0); ctx.arc(tx1 - rr, ty0 + rr, rr, -Math.PI / 2, Math.PI / 2); ctx.lineTo(tx0 + rr, ty1); ctx.arc(tx0 + rr, ty0 + rr, rr, Math.PI / 2, 3 * Math.PI / 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('vacuum', (tx0 + tx1) / 2, ty1 - 6);
+    // lamp and beam, falling on the face of the metal plate
+    const lx = compact ? W * 0.62 : W * 0.58, ly = compact ? H * 0.08 : H * 0.07, on = s.bri > 0;
+    if (on) {
+      const a = 0.12 + 0.5 * s.bri / 100;
+      ctx.fillStyle = rgba(col, a);
+      ctx.beginPath(); ctx.moveTo(lx - 12, ly + 10); ctx.lineTo(lx + 12, ly + 10); ctx.lineTo(cx + pw / 2 + 2, py1 - 6); ctx.lineTo(cx + pw / 2 + 2, py0 + 6); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#39444B'; ctx.save(); ctx.translate(lx, ly); ctx.rotate(Math.atan2(((py0 + py1) / 2) - ly, cx - lx) - Math.PI / 2);
+    ctx.fillRect(-16, -22, 32, 26); ctx.fillStyle = on ? rgba(col, 1) : '#777'; ctx.fillRect(-14, 2, 28, 5); ctx.restore();
+    font(ctx, 12); ctx.textAlign = 'left'; ctx.fillStyle = C('--ink');
+    const lamText = s.lam + ' nm, ' + band(s.lam);
+    ctx.fillText(compact ? s.lam + ' nm' : 'lamp: ' + lamText, lx + 34, ly + 4);
+    if (compact) { font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.fillText(band(s.lam), lx + 34, ly + 18); }
+    // plates
+    ctx.fillStyle = C('--metal'); ctx.fillRect(cx - pw / 2, py0, pw, py1 - py0);
+    ctx.fillStyle = flash > 0 ? '#6E8FA6' : C('--metal'); ctx.fillRect(ax - pw / 2, py0, pw, py1 - py0);
+    font(ctx, compact ? 11 : 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+    const name = tab === 3 && !TAB[3].revealed && TAB[3].answer !== TAB[3].metal ? 'unknown metal' : METALS[s.metal].name.toLowerCase();
+    ctx.fillText(name, cx, ty0 - 8);
+    ctx.fillText('far plate', ax, ty0 - 8);
+    // electrons
+    ctx.fillStyle = C('--elec');
+    const gx0 = cx + pw / 2 + 2, gx1 = ax - pw / 2 - 2;
+    for (const d of dots) { ctx.beginPath(); ctx.arc(gx0 + d.x * (gx1 - gx0), py0 + 6 + d.y * (py1 - py0 - 12), compact ? 2 : 2.4, 0, TAU); ctx.fill(); }
+    // circuit: from each plate down to the bottom wire, with the meter on the left and the battery in the middle
+    const wy = H * (compact ? 0.8 : 0.82);
+    ctx.strokeStyle = C('--wire'); ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(cx - pw / 2, (py0 + py1) / 2); ctx.lineTo(tx0 - 14, (py0 + py1) / 2); ctx.lineTo(tx0 - 14, wy); ctx.lineTo(W / 2 - 14, wy);
+    ctx.moveTo(W / 2 + 14, wy); ctx.lineTo(tx1 + 14, wy); ctx.lineTo(tx1 + 14, (py0 + py1) / 2); ctx.lineTo(ax + pw / 2, (py0 + py1) / 2); ctx.stroke();
+    // battery: long line is +; it sits on the side of the far plate when V > 0
+    const pos = s.V >= 0, bx = W / 2;
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2;
+    const longX = pos ? bx + 6 : bx - 6, shortX = pos ? bx - 6 : bx + 6;
+    ctx.beginPath(); ctx.moveTo(longX, wy - 14); ctx.lineTo(longX, wy + 14); ctx.stroke();
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(shortX, wy - 7); ctx.lineTo(shortX, wy + 7); ctx.stroke();
+    ctx.strokeStyle = C('--wire'); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(bx - 14, wy); ctx.lineTo(bx - 6, wy); ctx.moveTo(bx + 6, wy); ctx.lineTo(bx + 14, wy); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    if (Math.abs(s.V) >= 0.005) { ctx.fillText('+', longX + (pos ? 7 : -7), wy - 10); ctx.fillText('−', shortX + (pos ? -7 : 7), wy - 10); }
+    font(ctx, 12); ctx.fillStyle = C('--ink');
+    ctx.textAlign = 'left'; ctx.fillText((s.V > 0 ? '+' : s.V < 0 ? '−' : '') + Math.abs(s.V).toFixed(2) + ' V', bx + 20, wy + 17);
+    // meter
+    const mx = tx0 - 14, my = (wy + (py0 + py1) / 2) / 2 + 10, mr = compact ? 13 : 15;
+    ctx.fillStyle = C('--panel'); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(mx, my, mr, 0, TAU); ctx.fill(); ctx.stroke();
+    font(ctx, 13, '600'); ctx.fillStyle = C('--ink'); ctx.fillText('A', mx, my + 5);
+    font(ctx, compact ? 13 : 15, '600'); ctx.textAlign = compact ? 'left' : 'right';
+    ctx.fillText(m.text, compact ? mx + mr + 6 : mx - mr - 8, my + 5);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText(compact ? 'each dot: 2.5 billion electrons, slowed down' : 'each dot stands for 2.5 billion electrons; their motion is slowed down about a billion times', 10, H - 8);
+  }
+
+  // shared axes
+  function axes(ctx, box, xr, yr, xt, yt, xl, yl, fx, fy) {
+    const { x0, y0, w, h } = box, X = v => x0 + (v - xr[0]) / (xr[1] - xr[0]) * w, Y = v => y0 + h - (v - yr[0]) / (yr[1] - yr[0]) * h;
+    ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1; font(ctx, 11); ctx.fillStyle = C('--muted');
+    xt.forEach(v => { ctx.beginPath(); ctx.moveTo(X(v) + 0.5, y0); ctx.lineTo(X(v) + 0.5, y0 + h); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(fx(v), X(v), y0 + h + 14); });
+    yt.forEach(v => { ctx.beginPath(); ctx.moveTo(x0, Y(v) + 0.5); ctx.lineTo(x0 + w, Y(v) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(fy(v), x0 - 5, Y(v) + 4); });
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1;
+    if (xr[0] < 0 && xr[1] > 0) { ctx.beginPath(); ctx.moveTo(X(0) + 0.5, y0); ctx.lineTo(X(0) + 0.5, y0 + h); ctx.stroke(); }
+    if (yr[0] < 0 && yr[1] > 0) { ctx.beginPath(); ctx.moveTo(x0, Y(0) + 0.5); ctx.lineTo(x0 + w, Y(0) + 0.5); ctx.stroke(); }
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(x0, y0, w, h);
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText(xl, x0 + w / 2, y0 + h + 30);
+    ctx.save(); ctx.translate(12, y0 + h / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(yl, 0, 0); ctx.restore();
+    return { X, Y };
+  }
+  const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))), r = v / p; return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p; };
+
+  // tab 1: current against battery voltage, traced only where the voltage has been
+  function drawIV() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    const box = { x0: compact ? 56 : 70, y0: 28, w: W - (compact ? 56 : 70) - (compact ? 12 : 150), h: H - 28 - 42 };
+    let top = 0; traces.forEach(t => t.pts.forEach(I => { top = Math.max(top, I); }));
+    const cur = meter().amps; top = Math.max(top, cur);
+    const ymax = top > 0 ? nice(top * 1.1) : 1e-9, unitUA = ymax > 2e-6, u = unitUA ? 1e-6 : 1e-9;
+    const yt = []; for (let k = 0; k <= 5; k++) yt.push(ymax * k / 5);
+    const dec = (ymax / u) / 5 >= 1 ? 0 : (ymax / u) / 5 >= 0.1 ? 1 : 2;
+    const { X, Y } = axes(ctx, box, [-7, 3], [0, ymax], compact ? [-6, -4, -2, 0, 2] : [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3], yt,
+      'battery voltage: far plate relative to the metal (V)', 'current (' + (unitUA ? 'µA' : 'nA') + ')', v => String(v).replace('-', '−'), v => (v / u).toFixed(dec));
+    traces.forEach((t, i) => {
+      const col = lamRGB(t.lam), newest = i === traces.length - 1, ks = [...t.pts.keys()].sort((a, b) => a - b);
+      ctx.strokeStyle = rgba(col, newest ? 1 : 0.45); ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = newest ? 2 : 1.4;
+      // join points closer than 0.3 V; leave gaps where the voltage jumped
+      ctx.beginPath(); let prev = null;
+      ks.forEach(k => { const x = X(k / 100), y = Y(t.pts.get(k)); if (prev !== null && k - prev <= 30) ctx.lineTo(x, y); else ctx.moveTo(x, y); prev = k; });
+      ctx.stroke();
+      ks.forEach(k => { ctx.fillRect(X(k / 100) - 1, Y(t.pts.get(k)) - 1, 2, 2); });
+      if (!compact && ks.length) {
+        const k = ks[ks.length - 1]; font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = rgba([60, 70, 78], newest ? 1 : 0.6);
+        ctx.fillText(METALS[t.metal].sym + ', ' + t.lam + ' nm, ' + t.bri + '%', box.x0 + box.w + 8, Math.max(box.y0 + 10, Math.min(box.y0 + box.h, Y(t.pts.get(k)) + 4)));
+      }
+    });
+    // where things stand now
+    const s = S(); ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(s.V), Y(cur), 5, 0, TAU); ctx.stroke();
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(compact ? 'current vs. voltage' : 'current against battery voltage (drawn only where you have set the voltage)', box.x0, 18);
+  }
+
+  // tabs 2 and 3: stopping voltage against frequency, with the student's own line once asked for
+  function drawVf() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    const s = S(), box = { x0: compact ? 44 : 56, y0: 28, w: W - (compact ? 44 : 56) - 14, h: H - 28 - 42 };
+    const { X, Y } = axes(ctx, box, [0, 20], [-6, 7], compact ? [0, 5, 10, 15, 20] : [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20], [-6, -4, -2, 0, 2, 4, 6],
+      'frequency of the light (× 10¹⁴ Hz)', 'stopping voltage (V)', v => String(v), v => String(v).replace('-', '−'));
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(compact ? 'stopping voltage vs. frequency' : 'stopping voltage against frequency', box.x0, 18);
+    const f = s.fitted ? fitLine(s.data.map(p => [p.f / 1e14, p.Vs])) : null;
+    if (f) {
+      ctx.strokeStyle = C('--fit'); ctx.lineWidth = 1.6;
+      const xa = 0, xb = 20; ctx.save(); ctx.beginPath(); ctx.rect(box.x0, box.y0, box.w, box.h); ctx.clip();
+      ctx.beginPath(); ctx.moveTo(X(xa), Y(f.m * xa + f.b)); ctx.lineTo(X(xb), Y(f.m * xb + f.b)); ctx.stroke(); ctx.restore();
+      font(ctx, 12); ctx.fillStyle = C('--fit'); ctx.textAlign = 'right';
+      ctx.fillText((compact ? 'meets axis at ' : 'your line meets the axis at ') + f.b.toFixed(2).replace('-', '−') + ' V', box.x0 + box.w, 18);
+    }
+    s.data.forEach(p => {
+      const col = lamRGB(p.lam); ctx.fillStyle = rgba(col, 1); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(X(p.f / 1e14), Y(Math.max(-6, Math.min(7, p.Vs))), 4.5, 0, TAU); ctx.fill(); ctx.stroke();
+    });
+    if (!s.data.length) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('no measurements yet', box.x0 + box.w / 2, box.y0 + box.h / 2); }
+    // where the light is set now
+    ctx.strokeStyle = rgba(lamRGB(s.lam), 0.9); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2;
+    const xn = X(freq(s.lam) / 1e14); if (xn <= box.x0 + box.w) { ctx.beginPath(); ctx.moveTo(xn + 0.5, box.y0); ctx.lineTo(xn + 0.5, box.y0 + box.h); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  function drawGraph() { if (tab === 1) drawIV(); else drawVf(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const sci = (x, p) => { const e = Math.floor(Math.log10(Math.abs(x))), m = x / Math.pow(10, e); return m.toFixed(p) + ' × 10' + String(e).replace('-', '⁻').replace(/\d/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]); };
+  function readout() {
+    const s = S(), m = meter(), rate = s.bri / 100 * RATE;
+    let html = card('The light', s.lam + ' nm, ' + band(s.lam),
+      'frequency ' + (freq(s.lam) / 1e14).toFixed(2) + ' × 10¹⁴ Hz; each photon carries ' + photonEV(s.lam).toFixed(2) + ' eV; ' + (rate ? sci(rate, 1) + ' photons a second' : 'the lamp is off'));
+    const push = s.V < -0.004 ? 'the far plate is negative: it pushes electrons back' : s.V > 0.004 ? 'the far plate is positive: it pulls electrons across' : 'no battery voltage: electrons coast across';
+    html += card('Current through the meter', m.text, push);
+    if (tab > 1) {
+      const f = s.fitted ? fitLine(s.data.map(p => [p.f, p.Vs])) : null;
+      if (!f) html += card('Your line', '—', s.fitted ? 'record at least two different colors to fit a line' : 'record the stopping voltage for several colors, then fit a line');
+      else {
+        const h = f.m * QE, unc = isFinite(f.sm) ? ' ± ' + (f.sm * QE / 1e-34).toFixed(2) : '';
+        const phi = -f.b, f0 = -f.b / f.m;
+        let tail = 'slope × <i>e</i> = Planck\'s constant. The intercept at zero frequency is −<i>φ</i>/<i>e</i>, so the work function is ' + phi.toFixed(2) + ' eV, and no electrons come out below ' + (f0 / 1e14).toFixed(2) + ' × 10¹⁴ Hz (' + (CL / f0 * 1e9).toFixed(0) + ' nm).';
+        if (tab === 2) tail += ' Accepted: <i>h</i> = 6.626 × 10⁻³⁴ J s; ' + METALS[s.metal].name.toLowerCase() + '\'s work function is ' + METALS[s.metal].phi.toFixed(2) + ' eV.';
+        html += card('Your line', '<i>h</i> = ' + (h / 1e-34).toFixed(2) + unc + ' × 10⁻³⁴ J s', tail);
+      }
+    } else html += card('The metal', METALS[s.metal].name, 'a clean surface in a vacuum; the battery and meter are connected between the two plates');
+    // the verdict sits beside the Check button, where the eye already is
+    const T3 = TAB[3], nm = k => METALS[k].name.toLowerCase();
+    $('verdict').textContent = !T3.answer ? '' : T3.answer === T3.metal ? 'Right: it is ' + nm(T3.metal) + '.' : T3.revealed ? 'It was ' + nm(T3.metal) + '.' : 'Not ' + nm(T3.answer) + '. Look again at your intercept.';
+    $('readout').innerHTML = html;
+    $('lam_v').textContent = s.lam + ' nm'; $('bri_v').textContent = s.bri + '%';
+    $('vol_v').textContent = (s.V > 0 ? '+' : s.V < 0 ? '−' : '') + Math.abs(s.V).toFixed(2) + ' V';
+  }
+  function table() {
+    const s = S();
+    if (tab === 1) return;
+    let h = '<tr><th>light</th><th>frequency</th><th>stopping V</th><th>meter</th><th></th></tr>';
+    if (!s.data.length) h += '<tr><td class="empty" colspan="5">Set a color, lower the battery voltage until the meter just reads zero, and record.</td></tr>';
+    s.data.forEach((p, i) => { h += '<tr><td>' + p.lam + ' nm</td><td>' + (p.f / 1e14).toFixed(2) + '</td><td>' + p.Vs.toFixed(2) + '</td><td>' + p.I + '</td><td class="x"><button data-i="' + i + '" aria-label="remove this measurement">×</button></td></tr>'; });
+    $('data').innerHTML = h;
+    $('data').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { s.data.splice(+b.dataset.i, 1); upd(); }));
+  }
+
+  const TEXT = {
+    1: { lede: 'Light shines on a clean metal plate sealed in a vacuum tube. If it knocks electrons loose, some cross to the far plate and the meter shows a current. The plate is sodium and the light is red. Predict: if you turn the brightness all the way up, will any current flow? Then try other colors.',
+         notes: '<p><b>What to try.</b> Make the red light as bright as you like: nothing. Now slide the wavelength toward blue. Somewhere the electrons start to come out, and from then on even the dimmest light frees a few at once, with no waiting for energy to build up. Above that point, double the brightness and the current doubles. Then set a color that works and slide the battery voltage negative, so the far plate pushes the electrons back: the slow ones turn around first, the current falls, and at some voltage it reaches zero. Try a brighter light at that voltage, and then a bluer one. Change the metal and find its cutoff color.</p>' +
+                '<p><b>Why.</b> Light arrives in lumps, photons, each carrying energy <i>hf</i>. One photon gives all its energy to one electron. Pulling an electron out of the metal costs at least the work function <i>φ</i>, so if <i>hf</i> &lt; <i>φ</i> no electron ever escapes, however many photons arrive. If <i>hf</i> &gt; <i>φ</i>, the electron leaves with at most <i>K</i><sub>max</sub> = <i>hf</i> − <i>φ</i>. A brighter lamp sends more photons, so more electrons, but each still gets the same energy. The voltage that just stops the fastest electrons measures that energy: <i>eV</i><sub>stop</sub> = <i>K</i><sub>max</sub>. A wave theory of light predicts the opposite on every count: any color should work if bright enough, and brighter light should make faster electrons.</p>' +
+                '<p><b>Why the current fades gradually.</b> Most electrons that escape have less than the maximum energy, because they started deeper in the metal, so the current dies away gradually as the voltage grows more negative, and reaches zero only when even the fastest are turned back. The graph shows this: it is not a step.</p>' +
+                '<p><b>The model.</b> Einstein\'s photon picture, with the spread of electron energies worked out by Fowler (1931) and DuBridge (1933) for a metal whose electrons fill their levels up to the Fermi energy, at room temperature. Near threshold the yield grows as (<i>hf</i> − <i>φ</i>)²: about 1 electron per 1000 photons 1 eV above threshold. Work functions are the handbook values for clean polycrystalline metals (Michaelson, 1977). The plates are parallel, so every electron that leaves is collected once the far plate is positive. Not modeled: the contact voltage between two different metals, which shifts real stopping voltages by a fraction of a volt; oxide layers, which raise work functions a lot in practice; and the glass, which would block ultraviolet light shorter than about 300 nm (real tubes use quartz).</p>' },
+    2: { lede: 'The stopping voltage measures the fastest electrons\' energy. Measure it for several colors of light, record each one, and plot it against the light\'s frequency. Predict: what will the slope of your line be, and what fundamental constant does it give you?',
+         notes: '<p><b>What to do.</b> Pick a color (the mercury lines are the ones used in teaching labs). Lower the battery voltage until the meter just reads zero; use the fine buttons near the end. Record. Repeat for at least four colors that release electrons, then fit a line. The points fall on a straight line, and every metal gives the same slope.</p>' +
+                '<p><b>Why.</b> <i>eV</i><sub>stop</sub> = <i>hf</i> − <i>φ</i>, so <i>V</i><sub>stop</sub> = (<i>h</i>/<i>e</i>)<i>f</i> − <i>φ</i>/<i>e</i>: a straight line whose slope is <i>h</i>/<i>e</i> and whose intercept is −<i>φ</i>/<i>e</i>. Millikan did this in 1916, expecting to prove Einstein wrong, and instead measured Planck\'s constant to within 1%.</p>' +
+                '<p><b>Why your work function comes out a little low.</b> At room temperature a few electrons have slightly more than <i>hf</i> − <i>φ</i>, and the meter can see currents down to a picoampere, so the current reaches zero a little past the ideal stopping voltage, by up to about 0.1 V. That shifts every point up by nearly the same amount, which leaves the slope, and so <i>h</i>, almost untouched. A dimmer lamp makes the tail harder to see and the shift smaller. Real experiments have a bigger shift from the contact voltage between the two plates, which is why teaching labs trust the slope more than the intercept.</p>' +
+                '<p><b>The model.</b> As on the first screen. Your line is an ordinary least-squares fit; the ± on <i>h</i> is the standard error of the slope, which appears once you have three points.</p>' },
+    3: { lede: 'The plate in this tube is one of six metals, listed with their work functions beside the Check button, but its label has come off. Measure, fit a line, and identify it.',
+         notes: '<p><b>What to do.</b> Find a few colors that release electrons, measure their stopping voltages, and fit a line. Where it meets the vertical axis gives −<i>φ</i>/<i>e</i>. Compare with the work functions in the list and check your answer. A second route: sweep the wavelength to find the longest one that still gives a current, and use <i>hf</i> = <i>φ</i>. Do both answers agree?</p>' +
+                '<p><b>Why it works.</b> Every metal gives the same slope, <i>h</i>/<i>e</i>; only the intercept, set by the work function, tells them apart. The six candidates differ by at least half an electron volt, much more than the measurement\'s thermal tail.</p>' +
+                '<p><b>The model.</b> As on the first screen. Work functions from Michaelson (1977); real surfaces vary with cleanliness, oxidation and crystal face by several tenths of a volt.</p>' }
+  };
+
+  const SHOW = { rec: [2, 3], fitb: [2, 3], newm: [3], lab_metal: [1, 2], hg: [2, 3], datawrap: [2, 3], guess: [3] };
+  function visibility() {
+    Object.keys(SHOW).forEach(id => { $(id).hidden = SHOW[id].indexOf(tab) < 0; });
+    $('clr').textContent = tab === 1 ? 'Clear graph' : 'Clear data';
+    $('hint').textContent = tab === 1 ? 'the graph traces the current as you change the voltage' : '';
+    $('fitb').disabled = tab > 1 && S().data.length < 2;
+    $('reveal').hidden = !(tab === 3 && TAB[3].answer && TAB[3].answer !== TAB[3].metal && !TAB[3].revealed);
+  }
+  function sync() {
+    const s = S();
+    $('lam').value = String(s.lam); $('bri').value = String(s.bri); $('vol').value = String(s.V);
+    if (s.metal && tab < 3) $('metal').value = s.metal;
+  }
+  function setTab(k) {
+    tab = k; dots = []; owed = 0;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  function upd() { visibility(); readout(); table(); drawGraph(); drawScene(); }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  EXPLORE.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = METALS[k].name; $('metal').appendChild(o); });
+  // the six candidates, with their handbook work functions, are the choices for the answer
+  MYSTERY.slice().sort((a, b) => METALS[a].phi - METALS[b].phi).forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = METALS[k].name.toLowerCase() + ' (' + METALS[k].phi.toFixed(2) + ' eV)'; $('ans').appendChild(o); });
+  HG.forEach(l => { const b = document.createElement('button'); b.textContent = Math.round(l); b.title = l + ' nm'; b.addEventListener('click', () => { S().lam = Math.round(l); sync(); changed(); }); $('hg').appendChild(b); });
+
+  function changed() { if (tab === 1) visit(); upd(); }
+  $('metal').addEventListener('change', () => { S().metal = $('metal').value; dots = []; upd(); });
+  $('lam').addEventListener('input', () => { S().lam = +$('lam').value; upd(); });
+  $('bri').addEventListener('input', () => { S().bri = +$('bri').value; upd(); });
+  const setV = v => { S().V = Math.round(Math.max(-7, Math.min(3, v)) * 100) / 100; $('vol').value = String(S().V); changed(); };
+  $('vol').addEventListener('input', () => setV(+$('vol').value));
+  document.querySelectorAll('.nudge button').forEach(b => b.addEventListener('click', () => { const d = +b.dataset.d; setV(d === 0 ? 0 : S().V + d); }));
+  $('rec').addEventListener('click', () => {
+    const s = S(); s.data.push({ lam: s.lam, f: freq(s.lam), Vs: -s.V, I: meter().text }); upd();
+  });
+  $('fitb').addEventListener('click', () => { S().fitted = true; upd(); });
+  $('clr').addEventListener('click', () => { if (tab === 1) traces = []; else { S().data = []; S().fitted = false; } upd(); });
+  $('newm').addEventListener('click', () => { newMystery(); dots = []; upd(); });
+  $('check').addEventListener('click', () => { TAB[3].answer = $('ans').value; upd(); });
+  $('ans').addEventListener('change', () => { if (!TAB[3].revealed) { TAB[3].answer = null; upd(); } });
+  $('reveal').addEventListener('click', () => { TAB[3].revealed = true; upd(); });
+  window.addEventListener('resize', () => { drawGraph(); drawScene(); });
+
+  // ================================================================
+  // 4. LOOP: the electrons fly; everything else redraws only when something changes
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (!document.hidden && dt > 0) { spawn(dt); step(dt); drawScene(); }
+    requestAnimationFrame(frame);
+  }
+  newMystery();
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

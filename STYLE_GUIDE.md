@@ -44,6 +44,7 @@ Use the CSS custom properties exactly as named in `style.json`; every sim shares
 - **Be honest about what's fake.** If time is accelerated, say so and show a real-time counter. If a mass or force is exaggerated to make an effect visible, make it a labeled slider that starts at the real value. If carriers or particles are schematic, say "a handful stand in for 10¹⁷". Students take what the screen shows as true.
 - **Prefer analytic solutions** where they exist (projectiles, Kepler orbits); they make scrubbing exact. Where you must integrate, use a symplectic integrator for orbits and oscillators (leapfrog / kick-drift-kick), keep the step small enough that energy drift is invisible over a session, and remove bodies that leave the domain rather than letting `NaN` propagate.
 - **Check the limiting cases** before shipping: does the sim reproduce the textbook result when drag is zero, mass is zero, angle is zero? Put that comparison in the readout when you can (the boat sim shows predicted and simulated shift side by side).
+- **Keep the model in a marked block and test it.** Put the physics between the comments `// ---- physics core` and `// ---- end of core ----`, using only plain JavaScript and `Math`, and add `tests/<slug>.test.js`. The tests load that block straight from the page, so they check what ships. A test must reach the answer by a different route from the sim: a numerical integration against a closed form, a transformation against a formula, a published table. See `tests/README.md`.
 
 ## 5. Interaction
 
@@ -100,6 +101,7 @@ Below those sizes the page is the stacked column described next, identical to th
 
 - [ ] Opens from a local file with no network and no console errors.
 - [ ] The physics functions are at the top and reproduce the textbook limiting case.
+- [ ] The model is in a marked physics core with a test file, and `node tests/run.js` passes.
 - [ ] Assumptions, units, and any time acceleration or exaggeration are stated on the page.
 - [ ] Works at 390px wide with readable labels and usable sliders.
 - [ ] At 1920x950, 1536x730 and 1366x650, every slider and button is on screen without scrolling, and no canvas label overlaps another.

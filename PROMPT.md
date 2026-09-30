@@ -78,7 +78,7 @@ This is the description that produced the ballistics cart:
 The model's output is a draft. Before it goes in `sims/`:
 
 1. Open the file from your desktop with no network. It must run with no console errors.
-2. Check the physics yourself. Change a parameter to a value where you know the answer and compare with the readout. The model's own list of limiting cases is a starting point, not a substitute.
+2. Check the physics yourself. Change a parameter to a value where you know the answer and compare with the readout. The model's own list of limiting cases is a starting point, not a substitute. Better still, ask for the model in a marked physics core and a test file that checks it by an independent route (see `tests/README.md`), then run `node tests/run.js`.
 3. Read the text on the page as a student would. Cut anything that sounds like marketing.
 4. Try it at phone width (resize the browser to about 390px), and on a laptop-sized window
    (about 1366x650): every slider and button should be visible without scrolling.

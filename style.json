@@ -106,7 +106,8 @@
     "Use symplectic integration (leapfrog / kick-drift-kick) for orbits and oscillators; fixed small step; remove bodies that leave the domain instead of propagating NaN.",
     "Any time acceleration, exaggerated parameter, or schematic representation must be stated on screen; exaggerations are sliders that start at the real value.",
     "Show a limiting-case check in the readout when possible (predicted vs simulated).",
-    "Pause the loop when document.hidden; cap integration steps per frame so slow devices degrade gracefully."
+    "Pause the loop when document.hidden; cap integration steps per frame so slow devices degrade gracefully.",
+    "Keep the model between the comments '// ---- physics core' and '// ---- end of core ----', using only plain JavaScript and Math, and add tests/<slug>.test.js that checks it by an independent route (numerical integration, a transformation, a published table). tests/load.js loads the block straight from the page."
   ],
   "interaction_rules": [
     "Slider changes apply immediately; analytic sims reset t to 0 on parameter change.",
@@ -153,6 +154,7 @@
   "submission_checklist": [
     "Opens from a local file with no network and no console errors",
     "Physics functions at the top; textbook limiting case reproduced",
+    "Physics core marked and tested; node tests/run.js passes",
     "Assumptions, units, time acceleration, exaggerations stated on the page",
     "Usable at 390px wide with readable labels",
     "At 1920x950, 1536x730 and 1366x650 every slider and button is on screen without scrolling",

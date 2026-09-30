@@ -16,6 +16,26 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'photoelectric',
+    title: 'The photoelectric effect',
+    topic: 'modern',
+    tags: ['photoelectric effect', 'photons', 'work function', 'stopping voltage', "Planck's constant", 'Einstein', 'Millikan', 'quantum'],
+    blurb: "Shine light on a metal in a vacuum tube and watch for electrons. Find the color below which no brightness will do, stop the fastest electrons with a battery, measure Planck's constant from your own stopping voltages, and identify a mystery metal by its work function.",
+    level: 'intro',
+    added: '2026-09-30',
+    status: 'ready'
+  },
+  {
+    slug: 'thin-film',
+    title: 'Thin-film interference',
+    topic: 'optics',
+    tags: ['interference', 'thin films', 'soap film', 'phase change on reflection', 'anti-reflection coating', 'air wedge', "Newton's rings", 'color'],
+    blurb: "A draining soap film, an oil slick, a coated lens and an air wedge, each colored by the daylight it actually reflects. A probe shows the two reflected waves falling into and out of step, and the half-wave flips that decide why the top of a soap film turns black just before it bursts.",
+    level: 'intro',
+    added: '2026-09-30',
+    status: 'ready'
+  },
+  {
     slug: 'standing-waves',
     title: 'Standing waves',
     topic: 'oscillations',

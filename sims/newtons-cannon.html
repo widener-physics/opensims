@@ -194,6 +194,7 @@
   const css = getComputedStyle(document.documentElement);
   const C = n => css.getPropertyValue(n).trim();
   const $ = id => document.getElementById(id);
+  // ---- physics core (tests/newtons-cannon.test.js loads this block from the page and checks it) ----
   const TAU = Math.PI * 2;
 
   const MU = 3.986004418e14;      // GM for the Earth, m^3/s^2
@@ -299,6 +300,7 @@
     const r = rOf(o, nu), a = worldAngle(o, nu);
     return [r * Math.cos(a), r * Math.sin(a)];
   }
+  // ---- end of core ----
   // Two orbits are in play. `orb` is whatever the speed slider currently describes, which the
   // readouts report on so you can aim before you shoot. `shot` is the one actually in the air or
   // already landed, and it is the only one the canvas ever draws. They are the same object from

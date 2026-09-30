@@ -12,6 +12,7 @@ TEMPLATE.html     a complete starter simulation to copy from
 PROMPT.md         how to draft a simulation with an AI model, with the prompt to use
 STYLE_GUIDE.md    what a simulation should look and behave like, and why
 style.json        the same rules in machine-readable form, for AI-assisted authoring
+tests/            physics tests, run against the sims as they ship (node tests/run.js)
 LICENSE           GPL v3
 README.md
 ```
@@ -21,6 +22,14 @@ README.md
 Read `STYLE_GUIDE.md` first; it is short and it is what reviewers check against. Then copy `TEMPLATE.html`, which already has the shared CSS, the page structure (home link, title, lede, canvas, transport, readouts, controls, notes), the wide-screen app layout, the phone layout, and a small worked example of an analytic model.
 
 If you are using an AI model to draft the code, see `PROMPT.md`: it has the prompt to use, the two files to attach (`style.json` and `TEMPLATE.html`), a worked example of a physics description, and what to check before the result goes into the library. You remain responsible for verifying the physics; the file header says who did, and that disclosure stays in the file.
+
+## Testing the physics
+
+`node tests/run.js` checks each tested simulation's physics against independent calculations: numerical
+integrations, transfer matrices, Lorentz transformations, published tables and measurements. It needs only
+Node.js, and it loads each model straight out of the page in `sims/`, so it tests exactly what ships. The
+tests also run on GitHub on every push. See `tests/README.md` for what each one checks and how to add tests
+for a new simulation.
 
 ## Adding it to the library
 

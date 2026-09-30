@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<!--
+  Thin-film interference - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The exact reflectance
+  (every bounce inside the film, both polarizations, any viewing angle) agrees with an independent
+  transfer-matrix calculation to rounding error in 3000 random cases, and that calculation conserves
+  energy. It reproduces the textbook limits: a film of zero thickness leaves the bare surface; a
+  quarter-wave magnesium fluoride coating on glass reflects 1.26%; a half-wave layer is invisible; a thin
+  soap film is black; a film of lower index than what is under it is bright in the thin limit. The color
+  matching functions agree with the CIE 1931 table to within 0.009, daylight on a perfect mirror comes
+  out white, and a soap film's colors follow Newton's sequence (black, white, yellow, purple, blue,
+  green, yellow, red...) at the thicknesses it should.
+  Credit: fills a gap - to our knowledge PhET has no thin-film simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thin-film interference</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32; --w1: #1D4F73; --w2: #B5306D; --sum: #172128;
+    --dark: #12181D; --wire: #9AA7AE; --glassline: #7FA3B8; --probe: #FFFFFF;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 360; touch-action: none; cursor: crosshair; }
+  .panes { display: grid; grid-template-columns: 1.1fr 1fr; gap: 12px; margin-top: 12px; }
+  #waves { aspect-ratio: 470 / 290; }
+  #spec { aspect-ratio: 430 / 290; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 12px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .toggles { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-family: var(--sans); font-size: 14px; align-items: center; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1; }
+    .panes { grid-template-columns: 1fr; }
+    #waves, #spec { aspect-ratio: 4 / 3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 6px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Thin-film interference</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Soap film</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Oil on water</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Lens coating</button>
+    <button role="tab" id="tab4" aria-selected="false"><span>4</span>Air wedge and rings</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="The film, colored by the light it reflects; click or drag to move the probe"></canvas>
+  <div class="row2">
+    <button id="play">Pause</button>
+    <button id="dip" class="secondary">dip the loop again</button>
+    <div class="seg" id="spd" role="group" aria-label="Draining speed">
+      <button data-s="1" aria-pressed="true">real speed</button>
+      <button data-s="4" aria-pressed="false">4× faster</button>
+    </div>
+    <button id="mystery" class="secondary">mystery spacer</button>
+    <button id="reveal" class="secondary" hidden>reveal the spacer</button>
+    <span class="hint" id="hint">click or drag on the picture to move the probe</span>
+  </div>
+  <div class="panes">
+    <canvas id="waves" aria-label="At the probe: the two reflected waves and their sum"></canvas>
+    <canvas id="spec" aria-label="At the probe: how much of each color is reflected"></canvas>
+  </div>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp"><div>Light</div>
+      <div class="seg" id="light" role="group" aria-label="Light">
+        <button data-l="white" aria-pressed="true">daylight</button>
+        <button data-l="mono" aria-pressed="false">one color</button>
+      </div>
+    </div>
+    <label><div class="row"><span>Wavelength (one-color light, and the waves in the diagram)</span><span class="val" id="lam_v"></span></div>
+      <input type="range" id="lam" min="400" max="700" step="1" value="550"></label>
+    <label id="lab_dc"><div class="row"><span>Oil thickness in the middle</span><span class="val" id="dc_v"></span></div>
+      <input type="range" id="dc" min="100" max="2000" step="10" value="800"></label>
+    <label id="lab_noil"><div class="row"><span>Oil's refractive index (water's is 1.33)</span><span class="val" id="noil_v"></span></div>
+      <input type="range" id="noil" min="1.2" max="1.6" step="0.01" value="1.47"></label>
+    <label id="lab_dcoat"><div class="row"><span>Coating thickness</span><span class="val" id="dcoat_v"></span></div>
+      <input type="range" id="dcoat" min="0" max="400" step="1" value="40"></label>
+    <label id="lab_ncoat"><div class="row"><span>Coating's refractive index (glass is 1.52)</span><span class="val" id="ncoat_v"></span></div>
+      <input type="range" id="ncoat" min="1.2" max="1.7" step="0.01" value="1.38"></label>
+    <div class="grp" id="lab_kind"><div>Setup</div>
+      <div class="seg" id="kind" role="group" aria-label="Setup">
+        <button data-k="wedge" aria-pressed="true">air wedge</button>
+        <button data-k="rings" aria-pressed="false">Newton's rings</button>
+      </div>
+    </div>
+    <label id="lab_h"><div class="row"><span>Spacer thickness</span><span class="val" id="h_v"></span></div>
+      <input type="range" id="h" min="2" max="30" step="0.1" value="10"></label>
+    <label id="lab_R"><div class="row"><span>Lens's radius of curvature</span><span class="val" id="R_v"></span></div>
+      <input type="range" id="R" min="0.5" max="5" step="0.1" value="1"></label>
+    <label><div class="row"><span>Viewing angle, from straight on</span><span class="val" id="ang_v"></span></div>
+      <input type="range" id="ang" min="0" max="60" step="1" value="0"></label>
+  </div>
+  <div class="toggles" id="lab_water">
+    <label><input type="checkbox" id="wgap"> fill the gap with water</label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against an independent transfer-matrix
+  //    calculation, textbook limits and the CIE 1931 color tables. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: thin-film interference ----
+  // A film of index n1 and thickness d sits between an upper medium n0 (where the light comes from and
+  // the eye is) and a lower medium n2. Light arrives at angle theta0 in the outside air (n = 1); Snell's
+  // law keeps n sin(theta) the same in every layer, so the upper medium can itself be glass.
+  //
+  // Exact reflectance, counting every bounce inside the film (the Airy sum), for each polarization:
+  //     r = (r01 + r12 e^{2i delta}) / (1 + r01 r12 e^{2i delta}),   delta = 2 pi n1 d cos(theta1) / lambda,
+  // with Fresnel coefficients r_ij. Unpolarized light: R = (|r_s|^2 + |r_p|^2) / 2.
+  // The two-wave picture used in the diagrams keeps only the first reflection off each surface:
+  //     r ~ r01 + t01 t10 r12 e^{2i delta}.
+  // A reflection coefficient that comes out negative is the "half-wave flip".
+  // All media are transparent here, so every coefficient is real.
+  const TAU = 2 * Math.PI;
+
+  // refractive indices (lambda in nm), two-term Cauchy fits: water to the handbook values at 20 C
+  // (1.3371 at 486 nm, 1.3330 at 589 nm, 1.3311 at 656 nm), BK7-type crown glass to the Schott catalog
+  // (1.5224, 1.5168, 1.5143 at the same lines); the film materials are given as constants.
+  const water = l => 1.3238 + 3141 / (l * l);           // 1.3329 at 589 nm
+  const glass = l => 1.5046 + 4200 / (l * l);           // 1.517 at 589 nm
+  const constant = n => () => n;
+
+  function cosIn(n, s) { const c2 = 1 - (s / n) * (s / n); return c2 > 0 ? Math.sqrt(c2) : NaN; }    // s = sin(theta) in air
+  // amplitude reflection coefficients a -> b; p is signed so that it matches s at normal incidence,
+  // which makes "negative" mean the same half-wave flip for both
+  function fresnel(na, nb, ca, cb) {
+    return { rs: (na * ca - nb * cb) / (na * ca + nb * cb), rp: (na * cb - nb * ca) / (na * cb + nb * ca) };
+  }
+  // everything about the film at one wavelength: exact R, and the pieces of the two-wave picture
+  function film(n0, n1, n2, d, lam, sinAir) {
+    const s = sinAir || 0, c0 = cosIn(n0, s), c1 = cosIn(n1, s), c2 = cosIn(n2, s);
+    const f01 = fresnel(n0, n1, c0, c1), f12 = fresnel(n1, n2, c1, c2);
+    const delta = TAU * n1 * d * c1 / lam, cs = Math.cos(2 * delta), sn = Math.sin(2 * delta);
+    const airy = (a, b) => {                 // |(a + b e^{2i delta}) / (1 + a b e^{2i delta})|^2
+      const nr = a + b * cs, ni = b * sn, dr = 1 + a * b * cs, di = a * b * sn;
+      return (nr * nr + ni * ni) / (dr * dr + di * di);
+    };
+    const R = (airy(f01.rs, f12.rs) + airy(f01.rp, f12.rp)) / 2;
+    // two-wave picture: the wave off the top surface (r01) and the one that crosses the film, reflects off
+    // the bottom and crosses back ((1 - r01^2) r12), for s and p polarization; the diagram shows their average
+    const r1 = (f01.rs + f01.rp) / 2, a2 = ((1 - f01.rs * f01.rs) * f12.rs + (1 - f01.rp * f01.rp) * f12.rp) / 2;
+    const two = (a, b) => a * a + b * b + 2 * a * b * Math.cos(2 * delta);
+    return { R, delta, c1, r1, a2,
+      flipTop: n1 > n0, flipBottom: n2 > n1,
+      pathNm: 2 * n1 * d * c1,                                  // extra optical path of the second wave
+      twoWave: (two(f01.rs, (1 - f01.rs * f01.rs) * f12.rs) + two(f01.rp, (1 - f01.rp * f01.rp) * f12.rp)) / 2 };
+  }
+
+  // A film too thick for daylight to interfere with itself (beyond a few micrometers the colors of all the
+  // orders blur together): add the intensities of all the bounces instead of their amplitudes.
+  function filmIncoherent(n0, n1, n2, lam, sinAir) {
+    const s = sinAir || 0, c0 = cosIn(n0, s), c1 = cosIn(n1, s), c2 = cosIn(n2, s);
+    const f01 = fresnel(n0, n1, c0, c1), f12 = fresnel(n1, n2, c1, c2);
+    const one = (a, b) => { const A = a * a, B = b * b; return A + (1 - A) * (1 - A) * B / (1 - A * B); };
+    return (one(f01.rs, f12.rs) + one(f01.rp, f12.rp)) / 2;
+  }
+
+  // ---- color: CIE 1931 2-degree observer (multi-lobe fit of Wyman, Sloan and Shirley, 2013) ----
+  function g(x, mu, s1, s2) { const t = (x - mu) / (x < mu ? s1 : s2); return Math.exp(-0.5 * t * t); }
+  function cmf(l) {
+    return [1.056 * g(l, 599.8, 37.9, 31.0) + 0.362 * g(l, 442.0, 16.0, 26.7) - 0.065 * g(l, 501.1, 20.4, 26.2),
+            0.821 * g(l, 568.8, 46.9, 40.5) + 0.286 * g(l, 530.9, 16.3, 31.1),
+            1.217 * g(l, 437.0, 11.8, 36.0) + 0.681 * g(l, 459.0, 26.0, 13.8)];
+  }
+  // daylight, modeled as the sun's 5800 K blackbody (only its shape matters)
+  function planck(l, T) { const x = 1.4388e7 / (l * T); return 1 / (Math.pow(l, 5) * (Math.exp(x) - 1)); }
+  const LAMS = []; for (let l = 380; l <= 780; l += 1) LAMS.push(l);      // 1 nm steps keep thick films from aliasing
+  const SUN = LAMS.map(l => planck(l, 5800));
+  const CM = LAMS.map(cmf);
+  // XYZ of the light reflected by a surface with reflectance R(lambda) under daylight, scaled so that a
+  // perfect mirror gives Y = 1
+  const SUN_Y = LAMS.reduce((a, l, i) => a + SUN[i] * CM[i][1], 0);
+  function xyzOf(Rfun) {
+    let X = 0, Y = 0, Z = 0;
+    LAMS.forEach((l, i) => { const w = SUN[i] * Rfun(l, i); X += w * CM[i][0]; Y += w * CM[i][1]; Z += w * CM[i][2]; });
+    return [X / SUN_Y, Y / SUN_Y, Z / SUN_Y];
+  }
+  const WHITE = xyzOf(() => 1);
+  // von Kries adaptation in the Bradford cone space, so daylight looks white, then linear sRGB (D65)
+  const MB = [[0.8951, 0.2664, -0.1614], [-0.7502, 1.7135, 0.0367], [0.0389, -0.0685, 1.0296]];
+  const MBi = [[0.9869929, -0.1470543, 0.1599627], [0.4323053, 0.5183603, 0.0492912], [-0.0085287, 0.0400428, 0.9684867]];
+  const D65 = [0.95047, 1, 1.08883];
+  const mul = (M, v) => M.map(r => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
+  const LW = mul(MB, WHITE), LD = mul(MB, D65);
+  const XYZ2RGB = [[3.2406, -1.5372, -0.4986], [-0.9689, 1.8758, 0.0415], [0.0557, -0.2040, 1.0570]];
+  function linRGB(xyz) { const l = mul(MB, xyz); return mul(XYZ2RGB, mul(MBi, [l[0] * LD[0] / LW[0], l[1] * LD[1] / LW[1], l[2] * LD[2] / LW[2]])); }
+  // out-of-gamut colors are pulled toward gray of the same brightness until they fit, then clipped
+  function toGamut(rgb) {
+    const Y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2], m = Math.min(...rgb);
+    if (m >= 0) return rgb;
+    const k = Y / (Y - m);
+    return rgb.map(c => Y + (c - Y) * k);
+  }
+  const enc = c => { c = Math.max(0, Math.min(1, c)); return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+  function sRGB(lin) { return toGamut(lin).map(enc); }
+  // the color of a single wavelength, as bright as a screen can show it
+  function spectralRGB(l) {
+    const c = cmf(l), lin = toGamut(mul(XYZ2RGB, c)), m = Math.max(...lin);
+    return lin.map(v => v / m);
+  }
+  // ---- end of core ----
+
+  const st = { tab: 1, playing: true, light: 'white', lam: 550, ang: 0 };
+  const T1 = { u: 0.45, t: 0, speed: 1, popped: false };                     // soap film
+  const T2 = { x: 0.62, y: 0.5, dc: 800, n: 1.47 };                          // oil slick; probe in the slick's own box
+  const T3 = { d: 40, n: 1.38 };                                              // coating
+  const T4 = { kind: 'wedge', h: 10, R: 1, water: false, mystery: false, u: 0.5, r: 0.35 };   // wedge / rings
+
+  // --- the soap film drains: a wedge that thins with time; a black film forms where it gets below 30 nm
+  const SOAP = { D0: 1500, tau: 12, p: 1.2, u0: 0.25, blackAt: 30, black: 8, popAt: 0.3 };
+  const soapD = u => SOAP.D0 * Math.exp(-T1.t / SOAP.tau) * Math.pow((u + SOAP.u0) / (1 + SOAP.u0), SOAP.p);
+  const soapThick = u => { const d = soapD(u); return d < SOAP.blackAt ? SOAP.black : d; };
+  // --- the oil slick: thickest in the middle, thinning to nothing at a wavy edge
+  function oilThick(X, Y) {       // X, Y in -1..1 across the slick's box
+    const r = Math.hypot(X, Y), th = Math.atan2(Y, X), w = 1 + 0.10 * Math.sin(3 * th + 0.7) + 0.06 * Math.sin(5 * th + 2.1);
+    const q = 1 - (r / w) * (r / w);
+    return q > 0 ? T2.dc * Math.pow(q, 0.8) : 0;
+  }
+  // --- wedge: 60 mm plates; rings: seen out to 6 mm from the contact point
+  const WEDGE_L = 60, RING_R = 3;                                            // mm
+  const wedgeThick = u => T4.h * 1000 * u;                                   // nm
+  const ringThick = rmm => (rmm * 1e-3) * (rmm * 1e-3) / (2 * T4.R) * 1e9;  // nm, the sag r^2 / 2R
+
+  // the three media for each screen: [where the light comes from, the film, what is under it]
+  function media(tab, l) {
+    if (tab === 1) return [1, water(l), 1];
+    if (tab === 2) return [1, T2.n, water(l)];
+    if (tab === 3) return [1, T3.n, glass(l)];
+    return [glass(l), T4.water ? water(l) : 1, glass(l)];
+  }
+  const NAMES = { 1: ['air', 'soapy water', 'air'], 2: ['air', 'oil', 'water'], 3: ['air', 'coating', 'glass'] };
+  const names = tab => tab === 4 ? ['glass', T4.water ? 'water' : 'air', 'glass'] : NAMES[tab];
+  const GAIN = { 1: 8, 2: 8, 3: 8, 4: 4 };        // the reflections are brightened this much so the colors show
+  const RMAX = { 1: 0.12, 2: 0.12, 3: 0.12, 4: 0.25 };
+  const AMAX = { 1: 0.32, 2: 0.36, 3: 0.36, 4: 0.46 };
+  const sinA = () => Math.sin(st.ang * Math.PI / 180);
+
+  // the film's thickness at the probe on the present screen (nm), or null where there is no film
+  function probeThick() {
+    if (st.tab === 1) return T1.popped ? null : soapThick(T1.u);
+    if (st.tab === 2) { const d = oilThick(T2.x * 2 - 1, T2.y * 2 - 1); return d > 0 ? d : null; }
+    if (st.tab === 3) return T3.d;
+    return T4.kind === 'wedge' ? wedgeThick(T4.u) : ringThick(T4.r * RING_R);
+  }
+
+  // Colors are looked up by thickness from a table rebuilt only when the light, the materials or the
+  // angle change. Daylight: every wavelength from 380 to 780 nm, exact up to 6 micrometers and the
+  // incoherent sum beyond (by then all the orders have blurred to white). One color: exact everywhere.
+  const COH = 6000;
+  let LUT = null;
+  function lutKey() { return [st.tab, st.light, st.light === 'mono' ? st.lam : 0, st.ang, T2.n, T3.n, T4.water].join('|'); }
+  function dmaxFor(tab) { return tab === 1 ? 1600 : tab === 2 ? 2400 : tab === 3 ? 420 : 45000; }
+  function buildLUT() {
+    const tab = st.tab, s = sinA(), g = GAIN[tab], mono = st.light === 'mono';
+    const dmax = dmaxFor(tab), top = mono ? dmax : Math.min(dmax, COH);
+    const step = d => (mono || d < 1000) ? 1 : 4;
+    const ds = []; for (let d = 0; d <= top; d += step(d)) ds.push(d);
+    const rgb = new Float32Array(ds.length * 3);
+    const nl = LAMS.map(l => media(tab, l));
+    const monoRGB = spectralRGB(st.lam), mm = media(tab, st.lam);
+    ds.forEach((d, k) => {
+      let c;
+      if (mono) { const R = film(mm[0], mm[1], mm[2], d, st.lam, s).R; c = monoRGB.map(v => enc(v * Math.min(1, R * g))); }
+      else c = sRGB(linRGB(xyzOf((l, i) => film(nl[i][0], nl[i][1], nl[i][2], d, l, s).R)).map(v => v * g));
+      rgb[3 * k] = c[0]; rgb[3 * k + 1] = c[1]; rgb[3 * k + 2] = c[2];
+    });
+    let far = null;
+    if (!mono && dmax > COH) far = sRGB(linRGB(xyzOf((l, i) => filmIncoherent(nl[i][0], nl[i][1], nl[i][2], l, s))).map(v => v * g));
+    LUT = { key: lutKey(), rgb, n: ds.length, top, far };
+  }
+  function colorAt(d) {       // [r, g, b] 0..255
+    if (!LUT || LUT.key !== lutKey()) buildLUT();
+    if (d > LUT.top) return LUT.far ? LUT.far.map(v => Math.round(v * 255)) : [0, 0, 0];
+    const k = d < 1000 ? Math.round(d) : Math.min(LUT.n - 1, 1000 + Math.round((d - 1000) / 4));
+    const kk = (st.light === 'mono') ? Math.min(LUT.n - 1, Math.round(d)) : k;
+    return [LUT.rgb[3 * kk] * 255, LUT.rgb[3 * kk + 1] * 255, LUT.rgb[3 * kk + 2] * 255].map(Math.round);
+  }
+  const cssRGB = c => 'rgb(' + c.join(',') + ')';
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+  let hit = null;                  // maps a click on the scene to a new probe position, set by each scene
+  const off = document.createElement('canvas');
+  let offKey = '';
+
+  function caption(ctx, W, text, right) {
+    font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(text, 12, 18);
+    if (right) { ctx.textAlign = 'right'; ctx.fillText(right, W - 12, 18); }
+  }
+  const lightCap = () => st.light === 'mono' ? st.lam + ' nm light' : 'daylight';
+
+  // 1. soap film in a wire loop, with its thickness profile beside it
+  function drawSoap(ctx, W, H, compact) {
+    const fx = compact ? 16 : 40, fy = compact ? 48 : 34, fw = compact ? W * 0.5 : W * 0.4, fh = H - fy - 18;
+    ctx.fillStyle = C('--dark'); ctx.fillRect(fx, fy, fw, fh);
+    if (!T1.popped) for (let py = 0; py < fh; py++) { ctx.fillStyle = cssRGB(colorAt(soapThick((py + 0.5) / fh))); ctx.fillRect(fx, fy + py, fw, 1.2); }
+    else { ctx.fillStyle = '#9AA7AE'; font(ctx, 16, '600'); ctx.textAlign = 'center'; ctx.fillText('pop!', fx + fw / 2, fy + fh / 2); font(ctx, 12); ctx.fillText('dip the loop again', fx + fw / 2, fy + fh / 2 + 20); }
+    ctx.strokeStyle = C('--wire'); ctx.lineWidth = 4; ctx.strokeRect(fx - 2, fy - 2, fw + 4, fh + 4);
+    // profile
+    const px0 = fx + fw + (compact ? 34 : 70), pw = W - px0 - (compact ? 12 : 24), X = d => px0 + d / 1600 * pw;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(px0, fy, pw, fh);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    [0, 400, 800, 1200, 1600].forEach(d => { if (compact && d % 800) return; ctx.beginPath(); ctx.moveTo(X(d) + 0.5, fy + fh); ctx.lineTo(X(d) + 0.5, fy + fh + 4); ctx.stroke(); ctx.fillText(String(d), X(d), fy + fh + 15); });
+    ctx.textAlign = 'left'; ctx.fillText(compact ? 'thickness (nm)' : 'film thickness (nm), top to bottom', px0, fy - 6);
+    if (!T1.popped) {
+      ctx.strokeStyle = C('--body'); ctx.lineWidth = 2; ctx.beginPath();
+      for (let py = 0; py <= fh; py += 2) { const x = X(soapThick(py / fh)); py ? ctx.lineTo(x, fy + py) : ctx.moveTo(x, fy + py); } ctx.stroke();
+    }
+    // probe
+    const yp = fy + T1.u * fh;
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(fx - 8, yp); ctx.lineTo(fx + fw + 8, yp); ctx.moveTo(px0, yp); ctx.lineTo(px0 + pw, yp); ctx.stroke(); ctx.setLineDash([]);
+    hit = (x, y) => { T1.u = Math.min(0.995, Math.max(0.005, (y - fy) / fh)); };
+    caption(ctx, W, compact ? lightCap() + ', brightened ×' + GAIN[1] : lightCap() + ' reflected by the film, brightened ×' + GAIN[1],
+      T1.popped ? 'popped after ' + T1.t.toFixed(0) + ' s' : T1.t.toFixed(0) + ' s since dipping');
+  }
+
+  // 2. oil slick on a puddle, from above
+  function drawOil(ctx, W, H, compact) {
+    ctx.fillStyle = cssRGB(colorAt(0)); ctx.fillRect(0, 0, W, H);          // bare water everywhere else
+    const bx = compact ? 12 : 30, by = 30, bw = compact ? W - 24 : W * 0.62, bh = H - by - 14;
+    const cell = 3, nx = Math.ceil(bw / cell), ny = Math.ceil(bh / cell), key = [lutKey(), T2.dc, nx, ny].join('|');
+    if (offKey !== key) {
+      off.width = nx; off.height = ny; const o = off.getContext('2d'), img = o.createImageData(nx, ny);
+      const water0 = colorAt(0);
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+        const X = ((i + 0.5) / nx) * 2.3 - 1.15, Y = ((j + 0.5) / ny) * 2.3 - 1.15, d = oilThick(X, Y), c = d > 0 ? colorAt(d) : water0, k = 4 * (j * nx + i);
+        img.data[k] = c[0]; img.data[k + 1] = c[1]; img.data[k + 2] = c[2]; img.data[k + 3] = 255;
+      }
+      o.putImageData(img, 0, 0); offKey = key;
+    }
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(off, bx, by, bw, bh);
+    // probe (T2.x, T2.y are in the 0..1 box that maps to -1..1 of the slick; the drawn box spans -1.15..1.15)
+    const toPx = (u, v) => [bx + ((u * 2 - 1) + 1.15) / 2.3 * bw, by + ((v * 2 - 1) + 1.15) / 2.3 * bh];
+    const [px, py] = toPx(T2.x, T2.y);
+    ctx.strokeStyle = C('--probe'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(px, py, 7, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(px, py, 9, 0, TAU); ctx.stroke();
+    hit = (x, y) => { T2.x = ((x - bx) / bw * 2.3 - 1.15 + 1) / 2; T2.y = ((y - by) / bh * 2.3 - 1.15 + 1) / 2; T2.x = Math.min(1.07, Math.max(-0.07, T2.x)); T2.y = Math.min(1.07, Math.max(-0.07, T2.y)); };
+    if (!compact) {   // thickness along the line through the probe
+      const qx = bx + bw + 40, qw = W - qx - 30, qy = by + 26, qh = bh - 60, X = d => qx + d / 2000 * qw;
+      ctx.fillStyle = C('--panel'); ctx.fillRect(qx - 14, qy - 22, qw + 28, qh + 44);
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(qx, qy, qw, qh);
+      ctx.strokeStyle = C('--body'); ctx.lineWidth = 2; ctx.beginPath();
+      for (let k = 0; k <= 100; k++) { const u = -0.07 + 1.14 * k / 100, d = oilThick(u * 2 - 1, T2.y * 2 - 1), yy = qy + k / 100 * qh; k ? ctx.lineTo(X(d), yy) : ctx.moveTo(X(d), yy); } ctx.stroke();
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText('thickness across the slick', qx, qy - 6);
+      [[0, 'left', '0'], [1000, 'center', '1000'], [2000, 'right', '2000 nm']].forEach(([d, a, t]) => { ctx.textAlign = a; ctx.fillText(t, X(d), qy + qh + 14); });
+      ctx.strokeStyle = C('--hot'); ctx.setLineDash([4, 3]); const yk = qy + (T2.x + 0.07) / 1.14 * qh; ctx.beginPath(); ctx.moveTo(qx, yk); ctx.lineTo(qx + qw, yk); ctx.stroke(); ctx.setLineDash([]);
+    }
+    font(ctx, 12); ctx.fillStyle = C('--panel'); ctx.fillRect(0, 0, W, 26); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText(compact ? lightCap() + ', ×' + GAIN[2] : lightCap() + ' reflected by oil on a puddle, brightened ×' + GAIN[2], 12, 18);
+  }
+
+  // 3. two lenses on a dark cloth, each showing the reflection of a bright window
+  function drawCoat(ctx, W, H, compact) {
+    ctx.fillStyle = C('--dark'); ctx.fillRect(0, 0, W, H);
+    const r = Math.min(W * 0.2, H * 0.36), cy = H * 0.5;
+    [[W * 0.28, 0, 'bare glass'], [W * 0.72, T3.d, compact ? 'coated' : 'coated: ' + T3.d + ' nm, n = ' + T3.n.toFixed(2)]].forEach(([cx, d, label]) => {
+      const grd = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+      grd.addColorStop(0, 'rgba(160,190,205,0.10)'); grd.addColorStop(1, 'rgba(160,190,205,0.02)');
+      ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+      ctx.strokeStyle = 'rgba(200,215,225,0.45)'; ctx.lineWidth = 2; ctx.stroke();
+      // the reflected window: its color is daylight times the surface's reflectance, brightened
+      const c = colorAt(d), ww = r * 0.62, wh = r * 0.8, wx = cx - ww / 2 - r * 0.12, wy = cy - wh / 2 - r * 0.1;
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r - 3, 0, TAU); ctx.clip();
+      ctx.fillStyle = cssRGB(c); ctx.fillRect(wx, wy, ww, wh);
+      ctx.fillStyle = C('--dark'); ctx.fillRect(wx + ww / 2 - 2, wy, 4, wh); ctx.fillRect(wx, wy + wh / 2 - 2, ww, 4);   // window bars
+      ctx.restore();
+      font(ctx, 13); ctx.fillStyle = '#C9D3D9'; ctx.textAlign = 'center'; ctx.fillText(label, cx, cy + r + 20);
+    });
+    ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.arc(W * 0.72, cy, r + 6, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    hit = null;
+    font(ctx, 12); ctx.fillStyle = '#C9D3D9'; ctx.textAlign = 'left';
+    ctx.fillText(compact ? 'a window reflected, ×' + GAIN[3] : 'a bright window reflected in each lens (' + lightCap() + ', brightened ×' + GAIN[3] + ')', 12, 18);
+    ctx.textAlign = 'right'; if (!compact) ctx.fillText('the probe is on the coated lens', W - 12, 18);
+  }
+
+  // 4a. air wedge: plates seen from above, with a side view beneath
+  function drawWedge(ctx, W, H, compact) {
+    const x0 = compact ? 14 : 30, x1 = W - (compact ? 14 : 30), tw = x1 - x0, ty = 32, th = H * 0.52;
+    for (let px = 0; px < tw; px++) { ctx.fillStyle = cssRGB(colorAt(wedgeThick((px + 0.5) / tw))); ctx.fillRect(x0 + px, ty, 1.2, th); }
+    ctx.strokeStyle = C('--glassline'); ctx.lineWidth = 1.5; ctx.strokeRect(x0, ty, tw, th);
+    // side view, gap hugely exaggerated
+    const sy = ty + th + (compact ? 34 : 40), sh = 16, lift = compact ? 16 : 22;
+    ctx.fillStyle = '#DCE8EF'; ctx.strokeStyle = C('--glassline'); ctx.lineWidth = 1.2;
+    ctx.fillRect(x0, sy + lift, tw, sh); ctx.strokeRect(x0, sy + lift, tw, sh);
+    ctx.beginPath(); ctx.moveTo(x0, sy + lift); ctx.lineTo(x1, sy); ctx.lineTo(x1, sy - sh); ctx.lineTo(x0, sy + lift - sh); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C('--ink'); ctx.fillRect(x1 - 10, sy, 8, lift);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    ctx.fillText('spacer' + (T4.mystery ? ' (thickness unknown)' : ', ' + T4.h.toFixed(1) + ' µm'), x1 - 14, sy + lift - 2);
+    ctx.textAlign = 'left'; ctx.fillText(compact ? 'side view, gap exaggerated' : 'side view, with the gap hugely exaggerated; the plates touch at the left', x0, sy + lift + sh + 14);
+    ctx.textAlign = 'center'; ctx.fillText('0', x0, ty + th + 14); ctx.fillText(WEDGE_L + ' mm', x1 - 14, ty + th + 14);
+    const xp = x0 + T4.u * tw;
+    ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(xp, ty - 4); ctx.lineTo(xp, sy + lift + sh); ctx.stroke(); ctx.setLineDash([]);
+    hit = (x) => { T4.u = Math.min(1, Math.max(0, (x - x0) / tw)); };
+    caption(ctx, W, compact ? 'from above, ×' + GAIN[4] : 'the plates seen from above in ' + lightCap() + ', brightened ×' + GAIN[4], compact ? '' : T4.water ? 'gap filled with water' : '');
+  }
+  // 4b. Newton's rings: a curved lens resting on a flat plate
+  function drawRings(ctx, W, H, compact) {
+    const size = Math.min(H - 44, compact ? W - 28 : W * 0.5), cx = compact ? W / 2 : 30 + size / 2, cy = 32 + size / 2, rr = size / 2;
+    const cell = 2, n = Math.ceil(size / cell), key = [lutKey(), T4.R, n, 'rings'].join('|');
+    if (offKey !== key) {
+      off.width = n; off.height = n; const o = off.getContext('2d'), img = o.createImageData(n, n);
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const dx = (i + 0.5) / n * 2 - 1, dy = (j + 0.5) / n * 2 - 1, rho = Math.hypot(dx, dy), k = 4 * (j * n + i);
+        if (rho > 1) { img.data[k + 3] = 0; continue; }
+        const c = colorAt(ringThick(rho * RING_R));
+        img.data[k] = c[0]; img.data[k + 1] = c[1]; img.data[k + 2] = c[2]; img.data[k + 3] = 255;
+      }
+      o.putImageData(img, 0, 0); offKey = key;
+    }
+    ctx.drawImage(off, cx - rr, cy - rr, size, size);
+    ctx.strokeStyle = C('--glassline'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.stroke();
+    const pr = T4.r * rr;
+    ctx.strokeStyle = C('--hot'); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + pr, cy); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(cx + pr, cy, 6, 0, TAU); ctx.stroke();
+    hit = (x, y) => { T4.r = Math.min(1, Math.hypot(x - cx, y - cy) / rr); };
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText((2 * RING_R) + ' mm across', cx, cy + rr + 12);
+    if (!compact) {   // side view
+      const sx0 = cx + rr + 50, sx1 = W - 30, sm = (sx0 + sx1) / 2, base = cy + 40;
+      ctx.fillStyle = '#DCE8EF'; ctx.strokeStyle = C('--glassline'); ctx.lineWidth = 1.2;
+      ctx.fillRect(sx0, base, sx1 - sx0, 18); ctx.strokeRect(sx0, base, sx1 - sx0, 18);
+      const half = (sx1 - sx0) * 0.42, sag = 30;
+      ctx.beginPath(); ctx.moveTo(sm - half, base - sag); ctx.quadraticCurveTo(sm, base + sag, sm + half, base - sag); ctx.lineTo(sm + half, base - sag - 40); ctx.lineTo(sm - half, base - sag - 40); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+      ctx.fillText('side view: a gently curved lens on a flat plate', sm, base + 38);
+      ctx.fillText('(curvature hugely exaggerated)', sm, base + 54);
+    }
+    caption(ctx, W, compact ? 'from above, ×' + GAIN[4] : 'seen from above in ' + lightCap() + ', brightened ×' + GAIN[4]);
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (st.tab === 1) drawSoap(ctx, W, H, compact);
+    else if (st.tab === 2) drawOil(ctx, W, H, compact);
+    else if (st.tab === 3) drawCoat(ctx, W, H, compact);
+    else if (T4.kind === 'wedge') drawWedge(ctx, W, H, compact); else drawRings(ctx, W, H, compact);
+  }
+
+  // the waves at the probe: a cross-section of the film, the two reflected waves and their sum
+  function drawWaves() {
+    const { ctx, W, H, compact } = fit($('waves'));
+    ctx.clearRect(0, 0, W, H); font(ctx, 12);
+    const d = probeThick(), nm = names(st.tab), n = media(st.tab, st.lam);
+    if (d === null) { ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('no film here: move the probe onto it', W / 2, H / 2); return; }
+    const f = film(n[0], n[1], n[2], d, st.lam, sinA());
+    // cross-section, not to scale
+    const cw = compact ? W * 0.38 : W * 0.36, top = 44, fy0 = H * 0.42, fy1 = H * 0.62, bot = H - 14;
+    ctx.fillStyle = st.tab === 4 ? '#E6EFF4' : '#F7F9FA'; ctx.fillRect(10, top, cw, fy0 - top);
+    ctx.fillStyle = st.tab === 4 ? (T4.water ? '#D8E9F3' : '#FFFFFF') : '#E2EEF5'; ctx.fillRect(10, fy0, cw, fy1 - fy0);
+    ctx.fillStyle = st.tab === 1 ? '#F7F9FA' : st.tab === 2 ? '#CFE0EA' : '#E6EFF4'; ctx.fillRect(10, fy1, cw, bot - fy1);
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(10, top, cw, bot - top);
+    ctx.beginPath(); ctx.moveTo(10, fy0); ctx.lineTo(10 + cw, fy0); ctx.moveTo(10, fy1); ctx.lineTo(10 + cw, fy1); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    ctx.fillText(nm[0], 6 + cw, top + 13); ctx.fillText(nm[1], 6 + cw, fy0 + 13); ctx.fillText(d < 1000 ? d.toFixed(0) + ' nm' : (d / 1000).toFixed(2) + ' µm', 6 + cw, fy0 + 26); ctx.fillText(nm[2], 6 + cw, fy1 + 13);
+    // rays: in at A, back out at A (wave 1); down to B and back up to C (wave 2)
+    const ax = 10 + cw * 0.22, bx = ax + cw * 0.1, cx2 = bx + cw * 0.1;
+    ctx.lineWidth = 2;
+    const sp = cw * 0.14;
+    ctx.strokeStyle = C('--muted'); ctx.beginPath(); ctx.moveTo(ax - sp, top + 6); ctx.lineTo(ax, fy0); ctx.stroke();
+    ctx.strokeStyle = C('--w1'); ctx.beginPath(); ctx.moveTo(ax, fy0); ctx.lineTo(ax + sp, top + 6); ctx.stroke();
+    ctx.strokeStyle = C('--w2'); ctx.beginPath(); ctx.moveTo(ax, fy0); ctx.lineTo(bx, fy1); ctx.lineTo(cx2, fy0); ctx.lineTo(cx2 + sp, top + 6); ctx.stroke();
+    font(ctx, 11); ctx.textAlign = 'right';
+    // each interface says what its reflection does, just above the line
+    const tag = (y, flip) => { ctx.fillStyle = flip ? C('--hot') : C('--muted'); ctx.fillText(flip ? '½-wave flip' : 'no flip', 6 + cw, y - 5); };
+    tag(fy0, f.flipTop); tag(fy1, f.flipBottom);
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--w1'); ctx.fillText('1', ax + sp + 3, top + 14); ctx.fillStyle = C('--w2'); ctx.fillText('2', cx2 + sp + 3, top + 14);
+    // traces
+    const tx = 10 + cw + (compact ? 12 : 18), tw = W - tx - 10, rows = [top + (H - top) * 0.16, top + (H - top) * 0.46, top + (H - top) * 0.80];
+    const amp = (H - top) * 0.12 / AMAX[st.tab], cycles = 2.5, lag = f.pathNm / st.lam;
+    const trace = (y0, fn, col, w, label) => {
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tx, y0); ctx.lineTo(tx + tw, y0); ctx.stroke();
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+      for (let i = 0; i <= 200; i++) { const x = i / 200, y = y0 - fn(x * cycles * TAU) * amp; i ? ctx.lineTo(tx + x * tw, y) : ctx.moveTo(tx + x * tw, y); } ctx.stroke();
+      font(ctx, 11); ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.fillText(label, tx, y0 - (H - top) * 0.13);
+    };
+    const w1 = p => f.r1 * Math.cos(p), w2 = p => f.a2 * Math.cos(p - TAU * lag);
+    trace(rows[0], w1, C('--w1'), 2, compact ? '1: off the top' : 'wave 1, off the top surface');
+    trace(rows[1], w2, C('--w2'), 2, compact ? '2: off the bottom' : 'wave 2, off the bottom: ' + lag.toFixed(2) + ' wavelengths further');
+    trace(rows[2], p => w1(p) + w2(p), C('--sum'), 2.4, 'together');
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText('at the probe, for ' + st.lam + ' nm light (film not to scale)', 10, 18);
+  }
+
+  // reflectance spectrum at the probe, and the color it adds up to
+  function drawSpec() {
+    const { ctx, W, H, compact } = fit($('spec'));
+    ctx.clearRect(0, 0, W, H); font(ctx, 12);
+    const d = probeThick(), ymax = RMAX[st.tab];
+    const ml = 44, mr = 12, mt = 30, mb = 34, pw = W - ml - mr, ph = H - mt - mb;
+    const X = l => ml + (l - 380) / 340 * pw, Y = r => mt + ph - Math.min(r, ymax) / ymax * ph;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    const yt = ymax > 0.2 ? [0, 0.05, 0.1, 0.15, 0.2, 0.25] : [0, 0.03, 0.06, 0.09, 0.12];
+    yt.forEach(r => { ctx.beginPath(); ctx.moveTo(ml, Y(r) + 0.5); ctx.lineTo(ml + pw, Y(r) + 0.5); ctx.stroke(); ctx.fillText((r * 100).toFixed(0) + '%', ml - 5, Y(r) + 4); });
+    ctx.textAlign = 'center';
+    [400, 500, 600, 700].forEach(l => ctx.fillText(String(l), X(l), mt + ph + 14));
+    ctx.fillText('wavelength (nm)', ml + pw / 2, H - 4);
+    // rainbow strip under the axis
+    for (let l = 380; l < 720; l += 2) { const c = spectralRGB(l).map(v => Math.round(enc(v) * 255)); ctx.fillStyle = cssRGB(c); ctx.fillRect(X(l), mt + ph + 1, X(l + 2) - X(l) + 0.5, 3); }
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText(compact ? 'fraction reflected' : 'fraction of each color reflected here', ml, 16);
+    if (d === null) return;
+    const s = sinA();
+    // the bare surface under the film, for comparison
+    if (st.tab === 3) {
+      ctx.strokeStyle = C('--muted'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2; ctx.beginPath();
+      for (let l = 380; l <= 720; l += 4) { const g = glass(l), R = film(1, g, g, 0, l, s).R; l === 380 ? ctx.moveTo(X(l), Y(R)) : ctx.lineTo(X(l), Y(R)); } ctx.stroke(); ctx.setLineDash([]);
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.fillText('bare glass', X(640), Y(film(1, glass(640), glass(640), 0, 640, s).R) - 5);
+    }
+    // filled with each wavelength's own color
+    const Rl = l => { const n = media(st.tab, l); return d > COH && st.light === 'white' ? filmIncoherent(n[0], n[1], n[2], l, s) : film(n[0], n[1], n[2], d, l, s).R; };
+    for (let l = 380; l < 720; l += 1) { const R = Rl(l), c = spectralRGB(l).map(v => Math.round(enc(v * 0.55 + 0.45) * 255)); ctx.fillStyle = cssRGB(c); ctx.fillRect(X(l), Y(R), X(l + 1) - X(l) + 0.6, mt + ph - Y(R)); }
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.6; ctx.beginPath();
+    for (let l = 380; l <= 720; l += 1) { const yy = Y(Rl(l)); l === 380 ? ctx.moveTo(X(l), yy) : ctx.lineTo(X(l), yy); } ctx.stroke();
+    // the wavelength of the diagram / the one-color light
+    ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(st.lam) + 0.5, mt); ctx.lineTo(X(st.lam) + 0.5, mt + ph); ctx.stroke();
+    // the color seen at the probe
+    const sw = compact ? 22 : 30, sx = W - mr - sw, sy = 6;
+    ctx.fillStyle = cssRGB(colorAt(d)); ctx.fillRect(sx, sy, sw, 18); ctx.strokeStyle = C('--rule'); ctx.strokeRect(sx, sy, sw, 18);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(compact ? 'seen' : 'what you see here', sx - 6, sy + 13);
+  }
+
+  function draw() { drawScene(); drawWaves(); drawSpec(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const fmtD = d => d < 1000 ? d.toFixed(0) + ' nm' : (d / 1000).toFixed(2) + ' µm';
+  function flipLine(n, nm) {
+    const top = n[1] > n[0], bot = n[2] > n[1];
+    return nm[0] + ' to ' + nm[1] + ': ' + (top ? 'flips' : 'no flip') + '; ' + nm[1] + ' to ' + nm[2] + ': ' + (bot ? 'flips' : 'no flip');
+  }
+  // the daylight reflected, as a fraction of the daylight falling on it (weighted by the eye's sensitivity)
+  function lumR(tab, d) { const s = sinA(); return xyzOf(l => { const n = media(tab, l); return film(n[0], n[1], n[2], d, l, s).R; })[1]; }
+  function readout() {
+    const d = probeThick(), n = media(st.tab, st.lam), nm = names(st.tab), hide = st.tab === 4 && T4.kind === 'wedge' && T4.mystery;
+    let html = '';
+    if (d === null) html += card('Film thickness here', '—', 'no film at the probe');
+    else {
+      const f = film(n[0], n[1], n[2], d, st.lam, sinA());
+      const shift = f.pathNm / st.lam + ((f.flipBottom ? 0.5 : 0) - (f.flipTop ? 0.5 : 0)), frac = ((shift % 1) + 1) % 1;
+      const verdict = frac < 0.1 || frac > 0.9 ? 'in step: they add up' : Math.abs(frac - 0.5) < 0.1 ? 'out of step: they cancel' : 'partly out of step';
+      html += card('Film thickness here', hide ? '?' : fmtD(d), hide ? 'count the dark fringes to find it' : 'wave 2 goes 2<i>nd</i> cos <i>θ</i> = ' + fmtD(f.pathNm) + ' further');
+      html += card('Reflected at ' + st.lam + ' nm', (f.R * 100).toFixed(2) + '%',
+        'wave 2 ends up ' + frac.toFixed(2) + ' of a wave behind wave 1, ' + verdict + '. Counting every bounce; the two-wave picture says ' + (f.twoWave * 100).toFixed(2) + '%');
+    }
+    if (st.tab === 1) html += card('The film', T1.popped ? 'popped' : T1.t.toFixed(0) + ' s since dipping', 'thinnest at the top, where the liquid drains away first. ' + flipLine(n, nm));
+    if (st.tab === 2) { const tp = n[1] > n[0], bt = n[2] > n[1];
+      html += card('Half-wave flips', tp && bt ? 'both reflections' : tp ? 'top reflection only' : bt ? 'bottom reflection only' : 'neither', flipLine(n, nm) + (Math.abs(n[1] - n[2]) < 0.005 ? '; oil and water match, so the bottom surface hardly reflects' : '')); }
+    if (st.tab === 3) { const c = lumR(3, T3.d), b = lumR(3, 0); html += card('Daylight reflected', (c * 100).toFixed(2) + '% coated', 'bare glass reflects ' + (b * 100).toFixed(2) + '%; the coating cuts the glare to ' + (100 * c / b).toFixed(0) + '% of that'); }
+    if (st.tab === 4) html += T4.kind === 'wedge'
+      ? card('The spacer', hide ? '?' : T4.h.toFixed(1) + ' µm', 'the gap grows from nothing where the plates touch to the spacer\'s thickness ' + WEDGE_L + ' mm away. ' + flipLine(n, nm))
+      : card('The lens', 'radius ' + T4.R.toFixed(1) + ' m', 'the gap at distance <i>r</i> from the contact point is <i>r</i>²/2<i>R</i>. ' + flipLine(n, nm));
+    $('readout').innerHTML = html;
+    $('lam_v').textContent = st.lam + ' nm'; $('ang_v').textContent = st.ang + '°';
+    $('dc_v').textContent = T2.dc + ' nm'; $('noil_v').textContent = T2.n.toFixed(2);
+    $('dcoat_v').textContent = T3.d + ' nm'; $('ncoat_v').textContent = T3.n.toFixed(2);
+    $('h_v').textContent = hide ? '?' : T4.h.toFixed(1) + ' µm'; $('R_v').textContent = T4.R.toFixed(1) + ' m';
+  }
+
+  const TEXT = {
+    1: { lede: 'A wire loop has just been lifted out of soapy water. The film in it is thicker at the bottom, because the liquid drains downward, and it gets thinner every second. Watch the colored bands slide down, and predict: just before the film pops, what color is its top?',
+         notes: '<p><b>What to try.</b> Pause the draining and drag the probe from a bright band to a dark one, watching the two waves in the diagram fall into and out of step. Switch to one color of light: the colored bands become bright and dark stripes, and each stripe marks another half-wavelength of thickness (divided by the film\'s index). Tilt the viewing angle and every band shifts, because the wave inside the film crosses it at a slant and its extra path, 2<i>nd</i> cos <i>θ</i>, gets shorter.</p>' +
+                '<p><b>Why.</b> Some light reflects off the front of the film and some off the back. Going from air into soapy water the reflection flips the wave by half a wavelength; coming back out into air it does not. So in a very thin film the two waves are exactly out of step, whatever the color, and the film looks black. That is why the top goes black just before it bursts. In a thicker film, some colors come back in step and some cancel, and what is left is colored. The thicker the film, the more the colors that survive are spread through the spectrum, so the bands near the bottom are pale.</p>' +
+                '<p><b>The model.</b> The film has the refractive index of water, which changes a little with color. Its thickness grows with depth, from about 200 nm at the top to 1500 nm at the bottom when it is first lifted out, and shrinks exponentially with time; where it drops below 30 nm a "black film" 8 nm thick takes over, and the film pops when that covers the top 30%. That is a picture of draining, not a fluid-dynamics calculation. Daylight is modeled as the sun\'s 5800 K glow, the colors come from the CIE 1931 color-matching functions, and all reflections are brightened 8 times so they show up. The reflectance counts every bounce inside the film; the diagram shows only the first two waves, which is why its number differs slightly.</p>' },
+    2: { lede: 'A drop of oil has spread across a puddle. It is thickest in the middle and thins to nothing at its edge. Where does the slick look black, and where colored? Then predict what the thin edge will look like if the oil\'s refractive index is lower than water\'s.',
+         notes: '<p><b>What to try.</b> Move the probe to the thin rim of the slick. With ordinary oil (index 1.47) it is dark, like the top of a soap film: only the top reflection flips. Now drag the oil\'s index below 1.33. Both reflections flip, the flips cancel, and the thinnest oil turns bright. At exactly 1.33 the bottom reflection disappears and the slick vanishes from view. Make the slick thicker and more bands appear, paling toward the middle.</p>' +
+                '<p><b>Why.</b> A reflection flips the wave by half a wavelength when light goes from a lower index to a higher one. Air to oil does; oil to water does not, because water\'s index is lower. With one flip, the thin limit is dark. If the oil\'s index were below water\'s, both reflections would flip, the two flips would cancel, and the thinnest film would reflect in step.</p>' +
+                '<p><b>The model.</b> The oil has a single refractive index you choose; water\'s changes slightly with color. The slick\'s shape is made up for the picture. Colors as in the soap film, brightened 8 times; the water itself reflects about 2% of daylight.</p>' },
+    3: { lede: 'Camera lenses and eyeglasses carry a coating a few hundred atoms thick to cut glare. The left lens is bare glass; on the right one you choose the coating\'s thickness and index. Find the thickness that makes the reflected window dimmest. Why does a coated lens still reflect a faint purple?',
+         notes: '<p><b>What to try.</b> Slide the thickness and watch "daylight reflected": it bottoms out near 100 nm, a quarter of a wavelength of green light inside the coating (550 nm ÷ 4 ÷ 1.38). The window that is left is purple, because the coating works best for green, where the eye is most sensitive, and less well for red and blue. Double the thickness to a half-wave and the coating is invisible: the lens reflects just like bare glass. Set the index to 1.23, close to the square root of glass\'s 1.52, and the reflection of green disappears completely.</p>' +
+                '<p><b>Why.</b> Here both reflections flip, air to coating and coating to glass, since each goes into a higher index. The flips cancel, so the extra path alone decides. A quarter-wave layer makes the second wave travel half a wavelength further, and the two reflections cancel. They cancel completely only if they are equally strong, which is what an index of √<i>n</i><sub>glass</sub> arranges.</p>' +
+                '<p><b>The model.</b> One layer on crown glass, whose index changes slightly with color; magnesium fluoride, the usual single-layer coating, has index 1.38. Real lenses often stack several layers to cover more colors. Reflections brightened 8 times.</p>' },
+    4: { lede: 'Two flat glass plates touch at one edge and are held apart at the other by a thin spacer, leaving a wedge of air between them. In one color of light the wedge fills with bright and dark stripes. Count them and you can measure the spacer, to a fraction of a micrometer, without touching it. Rest a curved lens on the plate instead and the stripes become rings.',
+         notes: '<p><b>What to try.</b> Switch to one color. Every dark fringe marks another half-wavelength of gap, so the spacer\'s thickness is the number of dark fringes times <i>λ</i>/2. Press "mystery spacer", count, work it out, and then reveal it. Change the wavelength and the fringes spread or crowd. Fill the gap with water and they crowd by a factor of 1.33, because the light\'s wavelength in the water is shorter. In daylight you see only a few colored fringes near the contact line; beyond that the colors overlap and wash out to white. With Newton\'s rings, the dark rings sit at radii √(<i>mλR</i>): the rings crowd together going outward because the gap grows as the square of the distance.</p>' +
+                '<p><b>Why.</b> Here the film is the air, and the light comes from inside the glass. Glass to air does not flip; air back into glass does. So where the plates touch the two waves cancel, and the contact point is dark, just like the top of a soap film.</p>' +
+                '<p><b>The model.</b> Only the two surfaces facing the gap are counted; the plates\' outer surfaces add a uniform glare in a real setup, which lowers the contrast. Beyond a gap of 6 µm, daylight is treated as incoherent. Reflections brightened 4 times.</p>' }
+  };
+
+  const SHOW = { hint: [1, 2, 4], play: [1], dip: [1], spd: [1], mystery: [4], lab_dc: [2], lab_noil: [2], lab_dcoat: [3], lab_ncoat: [3], lab_kind: [4], lab_h: [4], lab_R: [4], lab_water: [4] };
+  function visibility() {
+    Object.keys(SHOW).forEach(id => { $(id).hidden = SHOW[id].indexOf(st.tab) < 0; });
+    // a mystery spacer hides its slider too, since the slider's position would give it away
+    if (st.tab === 4) { $('lab_h').hidden = T4.kind !== 'wedge' || T4.mystery; $('lab_R').hidden = T4.kind !== 'rings'; $('mystery').hidden = T4.kind !== 'wedge'; }
+    $('reveal').hidden = !(st.tab === 4 && T4.kind === 'wedge' && T4.mystery);
+  }
+  function setTab(k) {
+    st.tab = k; offKey = '';
+    [1, 2, 3, 4].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    visibility(); readout(); draw();
+  }
+  [1, 2, 3, 4].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  const upd = () => { readout(); draw(); };
+  const seg = (id, attr, fn) => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#' + id + ' button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); fn(b.dataset[attr]); visibility(); upd(); }));
+  seg('light', 'l', v => { st.light = v; });
+  seg('kind', 'k', v => { T4.kind = v; offKey = ''; });
+  seg('spd', 's', v => { T1.speed = +v; });
+  $('lam').addEventListener('input', () => { st.lam = +$('lam').value; upd(); });
+  $('ang').addEventListener('input', () => { st.ang = +$('ang').value; upd(); });
+  $('dc').addEventListener('input', () => { T2.dc = +$('dc').value; upd(); });
+  $('noil').addEventListener('input', () => { T2.n = +$('noil').value; upd(); });
+  $('dcoat').addEventListener('input', () => { T3.d = +$('dcoat').value; upd(); });
+  $('ncoat').addEventListener('input', () => { T3.n = +$('ncoat').value; upd(); });
+  $('h').addEventListener('input', () => { T4.h = +$('h').value; upd(); });
+  $('R').addEventListener('input', () => { T4.R = +$('R').value; offKey = ''; upd(); });
+  $('wgap').addEventListener('change', () => { T4.water = $('wgap').checked; upd(); });
+  function setPlay(on) { st.playing = on; $('play').textContent = on ? 'Pause' : 'Play'; }
+  $('play').addEventListener('click', () => setPlay(!st.playing));
+  $('dip').addEventListener('click', () => { T1.t = 0; T1.popped = false; setPlay(true); upd(); });
+  $('mystery').addEventListener('click', () => { T4.mystery = true; T4.h = Math.round((3 + Math.random() * 9) * 10) / 10; $('h').value = String(T4.h); visibility(); upd(); });
+  $('reveal').addEventListener('click', () => { T4.mystery = false; visibility(); upd(); });
+  // the probe follows a click or a drag on the scene
+  let dragging = false;
+  const probeTo = e => { if (!hit) return; const r = $('scene').getBoundingClientRect(); hit(e.clientX - r.left, e.clientY - r.top); upd(); };
+  $('scene').addEventListener('pointerdown', e => { dragging = true; $('scene').setPointerCapture(e.pointerId); probeTo(e); });
+  $('scene').addEventListener('pointermove', e => { if (dragging) probeTo(e); });
+  $('scene').addEventListener('pointerup', () => { dragging = false; });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP: only the soap film changes with time
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (st.tab === 1 && st.playing && !T1.popped && !document.hidden && dt > 0) {
+      T1.t += dt * T1.speed;
+      // pop once the black film covers the top 30% of the loop
+      if (soapD(SOAP.popAt) < SOAP.blackAt) T1.popped = true;
+      readout(); draw();
+    }
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) setPlay(false);
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Runs the physics tests on every push and pull request. The tests load each simulation's physics core
+# straight out of its page in sims/, so a change to a sim that breaks its physics fails here.
+name: physics tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node tests/run.js
