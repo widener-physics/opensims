@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'ramp',
+    title: 'A crate on a ramp',
+    topic: 'dynamics',
+    tags: ['inclined plane', 'friction', 'static friction', 'kinetic friction', 'free-body diagram', 'work', 'energy', 'work-energy theorem', 'thermal energy'],
+    blurb: "Push a crate up or down a ramp, or let it go and see whether it slides. A free-body diagram shows static friction holding until it can't, energy bars show your work turning into motion, height and heat with the books always balancing, and a mystery crate challenges you to measure both friction coefficients.",
+    level: 'intro',
+    added: '2026-10-01',
+    status: 'ready'
+  },
+  {
     slug: 'photoelectric',
     title: 'The photoelectric effect',
     topic: 'modern',

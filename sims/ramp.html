@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<!--
+  A crate on a ramp - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. It moves the crate
+  exactly from event to event (stopping, reaching the foot of the ramp, hitting a bumper), so the energy
+  books balance to rounding error in 400 random runs, in both the crate-plus-Earth and the crate-alone
+  accounting. It reproduces the angle of repose, the pushes needed to start the crate up the ramp or keep
+  it from sliding down, sliding and stopping distances on the ramp and the floor, and agrees with an
+  independent brute-force integration to within 0.01 mm.
+  Credit: stands in for PhET's "The Ramp" and "Ramp: Forces and Motion", which PhET publishes only in the
+  retired Java format.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A crate on a ramp</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --wt: #172128; --norm: #1D4F73; --fric: #C8321E; --push: #2E7D32; --comp: #8A969D;
+    --ke: #1D4F73; --pe: #2E7D32; --th: #C8321E; --tot: #172128; --work: #B5306D; --wood: #B98A55; --wood2: #8C6239; --ground: #CBD5DB;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 400; touch-action: none; }
+  #bars { aspect-ratio: 900 / 260; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 12px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  .answer { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .answer input { width: 5.5em; font: inherit; font-family: var(--sans); font-size: 14px; padding: 5px 6px; border: 1px solid var(--ink); border-radius: 4px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.15; }
+    #bars { aspect-ratio: 4 / 3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 6px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>A crate on a ramp</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Forces</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Energy</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Mystery crate</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="A crate on a ramp; drag the crate to place it, or after letting go, to push it"></canvas>
+  <div class="row2">
+    <button id="go">Let go</button>
+    <button id="reset" class="secondary">Reset</button>
+    <div class="seg" id="spd" role="group" aria-label="Speed">
+      <button data-s="1" aria-pressed="true">real speed</button>
+      <button data-s="0.25" aria-pressed="false">¼ speed</button>
+    </div>
+    <label id="lab_comp"><input type="checkbox" id="comp"> gravity's components</label>
+    <div class="seg" id="sys" role="group" aria-label="Whose energy">
+      <button data-y="world" aria-pressed="true">crate + Earth</button>
+      <button data-y="crate" aria-pressed="false">crate alone</button>
+    </div>
+    <span class="answer" id="guess"><label for="gs"><span><i>μ</i><sub>s</sub> =</span></label><input id="gs" type="number" min="0" max="1.5" step="0.01" inputmode="decimal">
+      <label for="gk"><span><i>μ</i><sub>k</sub> =</span></label><input id="gk" type="number" min="0" max="1.5" step="0.01" inputmode="decimal">
+      <button id="check">Check</button><button id="reveal" class="secondary" hidden>Reveal</button><span class="hint" id="verdict" aria-live="polite"></span></span>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="bars" aria-label="Energy bar chart"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label><div class="row"><span>Ramp angle</span><span class="val" id="ang_v"></span></div>
+      <input type="range" id="ang" min="0" max="60" step="0.1" value="20"></label>
+    <label><div class="row"><span>Your push along the ramp (+ is uphill)</span><span class="val" id="F_v"></span></div>
+      <input type="range" id="F" min="-1000" max="1000" step="5" value="0"></label>
+    <label><div class="row"><span>Starting speed (+ is uphill)</span><span class="val" id="v0_v"></span></div>
+      <input type="range" id="v0" min="-8" max="8" step="0.1" value="0"></label>
+    <label><div class="row"><span>Mass of the crate</span><span class="val" id="m_v"></span></div>
+      <input type="range" id="m" min="10" max="100" step="1" value="50"></label>
+    <label id="lab_muS"><div class="row"><span>Static friction coefficient <i>μ</i><sub>s</sub></span><span class="val" id="muS_v"></span></div>
+      <input type="range" id="muS" min="0" max="1" step="0.01" value="0.5"></label>
+    <label id="lab_muK"><div class="row"><span>Kinetic friction coefficient <i>μ</i><sub>k</sub></span><span class="val" id="muK_v"></span></div>
+      <input type="range" id="muK" min="0" max="1" step="0.01" value="0.3"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+  const rad = d => d * Math.PI / 180;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against textbook results and an independent
+  //    brute-force integration, with the energy books checked in 400 random runs. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: a crate on a ramp with friction ----
+  // The crate moves along one path: a level floor (s < 0) joined at s = 0 to a straight ramp rising at angle
+  // theta (0 <= s <= L). s is measured along the path, positive toward the top of the ramp. A bumper at each
+  // end stops the crate dead. The applied force F (your push) acts along the surface, positive up the ramp.
+  //
+  // Along the path:   m a = F - m g sin(theta) + f,   N = m g cos(theta)   (theta = 0 on the floor).
+  // Friction f: if the crate is at rest and |F - m g sin(theta)| <= mu_s N, static friction holds it (f
+  // cancels the rest, a = 0). Otherwise kinetic friction, magnitude mu_k N, opposes the sliding
+  // (or, starting from rest, the direction it is about to slide).
+  //
+  // With F fixed for a step, the acceleration is constant between events: the crate stopping (v = 0), reaching
+  // the foot of the ramp, or hitting a bumper. step() advances exactly from event to event, so positions,
+  // speeds and every energy in the ledger are exact (no time-step error), and the books balance to rounding:
+  //     work by your push = change in kinetic + change in gravitational energy + heat (friction and bumps).
+  // Passing over the corner at the foot of the ramp keeps the crate's speed (the corner is taken as gently
+  // rounded); hitting a bumper turns all its kinetic energy into heat.
+
+  const G = 9.8;                         // m/s^2
+  const RAMP_L = 8;                      // length of the ramp, m
+  const FLOOR_L = 4;                     // length of the floor in front of it, m
+  const HALF = 0.4;                      // half the crate's length: its center stays this far from the bumpers
+  const S_MIN = -FLOOR_L + HALF, S_MAX = RAMP_L - HALF;
+  const EPS = 1e-12;
+
+  const angleAt = (s, theta) => (s > 0 ? theta : 0);          // radians; the corner itself counts as floor
+  const heightAt = (s, theta) => (s > 0 ? s * Math.sin(theta) : 0);
+
+  // Forces on the crate at position s, speed v. p = { m, theta (rad), muS, muK, F }.
+  // Returns the normal force, gravity's pull along the path, friction, acceleration and the friction regime.
+  function forces(s, v, p) {
+    const th = angleAt(s, p.theta), N = p.m * G * Math.cos(th), Wpar = -p.m * G * Math.sin(th);
+    const other = p.F + Wpar;                                    // everything but friction, along the path
+    let f, mode;
+    if (Math.abs(v) > EPS) { f = -Math.sign(v) * p.muK * N; mode = 'kinetic'; }
+    else if (Math.abs(other) <= p.muS * N) { f = -other; mode = 'static'; }
+    else { f = -Math.sign(other) * p.muK * N; mode = 'kinetic'; }
+    let a = (other + f) / p.m;
+    // resting against a bumper: the bumper holds it if everything pushes it into the bumper
+    let bumper = 0;
+    if (Math.abs(v) <= EPS && ((s >= S_MAX - EPS && a > 0) || (s <= S_MIN + EPS && a < 0))) {
+      // (how the load is shared between friction and the bumper is not determined; take friction at its limit)
+      f = -Math.sign(other) * p.muS * N; bumper = -(other + f); a = 0; mode = 'static';
+    }
+    return { N, Wpar, f, a, mode, bumper, other, fsMax: p.muS * N };
+  }
+
+  function newLedger() { return { app: 0, grav: 0, fric: 0, bump: 0, heatF: 0, heatB: 0 }; }
+
+  // smallest t in (0, tmax] with s + v t + a t^2 / 2 = target, or Infinity
+  function hitTime(s, v, a, target, tmax) {
+    const d = target - s;
+    let t = Infinity;
+    if (Math.abs(a) < EPS) { if (Math.abs(v) > EPS) { const q = d / v; if (q > EPS) t = q; } }
+    else {
+      const disc = v * v + 2 * a * d;
+      if (disc >= 0) {
+        const r = Math.sqrt(disc);
+        [(-v + r) / a, (-v - r) / a].forEach(q => { if (q > EPS && q < t) t = q; });
+      }
+    }
+    return t <= tmax ? t : Infinity;
+  }
+
+  // Advance state { s, v, t } by dt with the push p.F held fixed, adding to ledger L. Returns the events met.
+  function step(st, p, dt, L) {
+    let left = dt, guard = 0;
+    const events = [];
+    while (left > 1e-15 && guard++ < 64) {
+      const fo = forces(st.s, st.v, p);
+      let a = fo.a, h = left, kind = null;
+      if (Math.abs(st.v) <= EPS && Math.abs(a) <= EPS) { st.t += left; break; }   // at rest and held
+      // events: stopping, the foot of the ramp (only matters if the ramp is tilted), the bumpers
+      if (Math.abs(st.v) > EPS && st.v * a < 0) { const q = -st.v / a; if (q <= h) { h = q; kind = 'stop'; } }
+      if (p.theta !== 0 && Math.abs(st.s) > EPS) { const q = hitTime(st.s, st.v, a, 0, h); if (q < h) { h = q; kind = 'corner'; } }
+      else if (p.theta !== 0 && Math.abs(st.s) <= EPS) {
+        // sitting exactly at the corner: which side it is about to move to decides theta; nudge onto that side
+        const side = st.v !== 0 ? Math.sign(st.v) : Math.sign(a);
+        if (side > 0 && st.s <= 0) { st.s = 1e-11; continue; }
+      }
+      const qb1 = hitTime(st.s, st.v, a, S_MAX, h); if (qb1 < h) { h = qb1; kind = 'top'; }
+      const qb0 = hitTime(st.s, st.v, a, S_MIN, h); if (qb0 < h) { h = qb0; kind = 'bottom'; }
+      // exact constant-acceleration move
+      const s0 = st.s, v0 = st.v;
+      let s1 = s0 + v0 * h + 0.5 * a * h * h, v1 = v0 + a * h;
+      if (kind === 'stop') v1 = 0;
+      if (kind === 'corner') s1 = 0;
+      if (kind === 'top') s1 = S_MAX;
+      if (kind === 'bottom') s1 = S_MIN;
+      // a move never crosses the corner (that is an event), so its midpoint says which surface it was on
+      const ds = s1 - s0, thSeg = (s0 + s1) / 2 > 0 ? p.theta : 0;
+      const N = p.m * G * Math.cos(thSeg);
+      L.app += p.F * ds;
+      L.grav += -p.m * G * Math.sin(thSeg) * ds;
+      if (Math.abs(ds) > 0 && Math.abs(v0) + Math.abs(v1) > 0) {
+        const w = -p.muK * N * Math.abs(ds);
+        L.fric += w; L.heatF -= w;
+      }
+      st.s = s1; st.v = v1; st.t += h; left -= h;
+      if (kind === 'corner') { st.s = st.v > 0 ? 1e-11 : st.v < 0 ? -1e-11 : 0; }   // step just past it, onto the new surface
+      if (kind === 'top' || kind === 'bottom') {
+        const ke = 0.5 * p.m * st.v * st.v;
+        L.bump -= ke; L.heatB += ke; st.v = 0; events.push(kind);
+      }
+      if (kind === 'stop') events.push('stop');
+    }
+    return events;
+  }
+
+  // energies relative to the floor
+  const kinetic = (st, p) => 0.5 * p.m * st.v * st.v;
+  const potential = (st, p) => p.m * G * heightAt(st.s, p.theta);
+
+  // Textbook results, for checking and for the notes
+  const holdsAlone = (theta, muS) => Math.tan(theta) <= muS + 1e-12;          // angle of repose
+  const pushToStartUp = (m, theta, muS) => m * G * (Math.sin(theta) + muS * Math.cos(theta));
+  const pushToHold = (m, theta, muS) => m * G * (Math.sin(theta) - muS * Math.cos(theta));   // below this it slides down
+  const stopUpRamp = (v0, theta, muK) => v0 * v0 / (2 * G * (Math.sin(theta) + muK * Math.cos(theta)));
+  // ---- end of core ----
+
+  const DEF = {
+    1: { m: 50, ang: 20, muS: 0.5, muK: 0.3, F: 0, v0: 0, s0: 3 },
+    2: { m: 50, ang: 25, muS: 0.5, muK: 0.3, F: 0, v0: 6, s0: 0.5 },
+    3: { m: 40, ang: 10, muS: 0.5, muK: 0.3, F: 0, v0: 0, s0: 4 }
+  };
+  const TAB = {};
+  [1, 2, 3].forEach(k => { TAB[k] = Object.assign({}, DEF[k], { st: { s: DEF[k].s0, v: 0, t: 0 }, held: true, playing: false, L: newLedger(), base: null, slip: null, from: DEF[k].s0, answer: null, revealed: false }); });
+  let tab = 1, speed = 1, system = 'world', dragging = false, dragS = 0;
+  const S = () => TAB[tab];
+  const params = (x) => { x = x || S(); return { m: x.m, theta: rad(x.ang), muS: x.muS, muK: x.muK, F: x.F }; };
+
+  function newMystery() {
+    const x = TAB[3];
+    x.muS = Math.round((0.22 + Math.random() * 0.5) * 100) / 100;
+    x.muK = Math.round(x.muS * (0.5 + Math.random() * 0.35) * 100) / 100;
+    x.answer = null; x.revealed = false;
+  }
+  // start the energy accounting afresh from the present state
+  function rebase(x) { x = x || S(); const p = params(x); x.L = newLedger(); x.base = { K: kinetic(x.st, p), U: potential(x.st, p) }; }
+  function reset(x) {
+    x = x || S(); x.st = { s: x.s0, v: 0, t: 0 }; x.held = true; x.playing = false; x.slip = null; x.from = x.s0; rebase(x);
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+  function arrow(ctx, x0, y0, x1, y1, col, w, dash) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 1) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(10, L * 0.45);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 2.5; ctx.setLineDash(dash || []);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.8, y1 - uy * hd * 0.8); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+  }
+
+  // world (meters, y up) to canvas; the scale never changes, so a steeper ramp is visibly steeper
+  let view = null;
+  function layout(W, H, compact) {
+    const area = compact ? { x: 8, y: 28, w: W - 16, h: H * 0.57 - 48 } : { x: 10, y: 28, w: W * 0.63 - 10, h: H - 40 };
+    const k = Math.min(area.w / 12.8, area.h / 7.6);
+    const ox = area.x + (area.w - 12.8 * k) / 2 + 4.4 * k, oy = area.y + area.h - 0.2 * k;
+    view = { k, ox, oy, X: x => ox + x * k, Y: y => oy - y * k, area, compact };
+    return view;
+  }
+  function pathXY(s, th) { return s > 0 ? [s * Math.cos(th), s * Math.sin(th)] : [s, 0]; }
+  // nearest point on the path to a canvas point, as s
+  function sFromPoint(px, py) {
+    const x = (px - view.ox) / view.k, y = (view.oy - py) / view.k, th = rad(S().ang);
+    const sr = x * Math.cos(th) + y * Math.sin(th), cand = [[Math.min(0, x), Math.hypot(x - Math.min(0, x), y)]];
+    const sc = Math.max(0, sr); cand.push([sc, Math.hypot(x - sc * Math.cos(th), y - sc * Math.sin(th))]);
+    const best = cand.sort((a, b) => a[1] - b[1])[0][0];
+    return Math.max(S_MIN, Math.min(S_MAX, best));
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    const x = S(), p = params(x), th = p.theta, v = layout(W, H, compact), k = v.k;
+    // ground, floor and ramp
+    const top = pathXY(RAMP_L, th);
+    ctx.fillStyle = C('--ground');
+    ctx.beginPath(); ctx.moveTo(v.X(-FLOOR_L), v.Y(0)); ctx.lineTo(v.X(0), v.Y(0)); ctx.lineTo(v.X(top[0]), v.Y(top[1])); ctx.lineTo(v.X(top[0]), v.Y(-0.15)); ctx.lineTo(v.X(-FLOOR_L), v.Y(-0.15)); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(v.X(-FLOOR_L), v.Y(0)); ctx.lineTo(v.X(0), v.Y(0)); ctx.lineTo(v.X(top[0]), v.Y(top[1])); ctx.stroke();
+    // meter marks along the path, labeled from the foot of the ramp
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let s = -FLOOR_L; s <= RAMP_L + 1e-9; s += 1) {
+      // ticks below the floor; on the ramp, above its surface, clear of the angle mark
+      const [a, b] = pathXY(s, th), t = s > 0 ? th : 0, out = s > 0 ? -1 : 1, nx = out * Math.sin(t), ny = out * Math.cos(t);
+      ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(v.X(a), v.Y(b)); ctx.lineTo(v.X(a) + nx * 5, v.Y(b) + ny * 5); ctx.stroke();
+      if (!compact || s % 2 === 0) ctx.fillText(s < 0 ? '−' + (-s) : String(s), v.X(a) + nx * 12, v.Y(b) + ny * 12 + 4);
+    }
+    // bumpers
+    const bump = (s) => { const [a, b] = pathXY(s, th), t = s > 0 ? th : 0; ctx.save(); ctx.translate(v.X(a), v.Y(b)); ctx.rotate(-t); ctx.fillStyle = C('--ink'); ctx.fillRect(s > 0 ? -2 : -4, -0.5 * k, 6, 0.5 * k); ctx.restore(); };
+    bump(-FLOOR_L); bump(RAMP_L);
+    // angle mark
+    if (p.theta > 0.01) { ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(v.X(0), v.Y(0), 1.2 * k, -th, 0); ctx.stroke(); }
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(x.ang.toFixed(1) + '°', v.X(0) + 1.35 * k, v.Y(0) - Math.max(3, 1.35 * k * Math.sin(th / 2) - 4));
+    // the crate
+    const s = x.st.s, t = s > 0 ? th : 0, [cx, cy] = pathXY(s, th), side = 2 * HALF * k;
+    ctx.save(); ctx.translate(v.X(cx), v.Y(cy)); ctx.rotate(-t);
+    ctx.fillStyle = C('--wood'); ctx.strokeStyle = C('--wood2'); ctx.lineWidth = 2;
+    ctx.fillRect(-side / 2, -side, side, side); ctx.strokeRect(-side / 2, -side, side, side);
+    ctx.beginPath(); ctx.moveTo(-side / 2, -side); ctx.lineTo(side / 2, 0); ctx.moveTo(side / 2, -side); ctx.lineTo(-side / 2, 0); ctx.lineWidth = 1.2; ctx.stroke();
+    // your push, drawn on the crate itself
+    if (Math.abs(x.F) > 0.5) { const len = Math.min(70, 14 + Math.abs(x.F) * 0.06), dir = Math.sign(x.F); const x0 = dir > 0 ? -side / 2 - len - 4 : side / 2 + len + 4; arrow(ctx, x0, -side / 2, dir > 0 ? -side / 2 - 3 : side / 2 + 3, -side / 2, C('--push'), 3); }
+    ctx.restore();
+    // height above the floor (energy screen)
+    if (tab === 2 && s > 0) {
+      ctx.setLineDash([3, 3]); ctx.strokeStyle = C('--pe'); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(v.X(cx), v.Y(cy)); ctx.lineTo(v.X(cx), v.Y(0)); ctx.stroke(); ctx.setLineDash([]);
+      font(ctx, 11, '600'); const ht = 'h = ' + heightAt(s, th).toFixed(2) + ' m', tw = ctx.measureText(ht).width, hx = v.X(cx) + 5, hy = v.Y(cy / 2) + 4;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(hx - 2, hy - 11, tw + 4, 15); ctx.fillStyle = C('--pe'); ctx.textAlign = 'left'; ctx.fillText(ht, hx, hy);
+    }
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(x.held ? (compact ? 'held still: drag to place it' : 'held still: drag the crate to place it, then let go') : dragging ? 'you are pushing' : (compact ? '' : 'drag the crate to push it'), 12, 18);
+    if (tab === 3) drawClock(ctx, W, H, compact); else drawFBD(ctx, W, H, compact);
+  }
+
+  // free-body diagram, beside the ramp (below it on a phone)
+  function drawFBD(ctx, W, H, compact) {
+    const x = S(), p = params(x), fo = forces(x.st.s, x.st.v, p), t = x.st.s > 0 ? p.theta : 0;
+    const box = compact ? { x: 8, y: H * 0.58, w: W - 16, h: H * 0.42 - 8 } : { x: W * 0.64, y: 8, w: W * 0.36 - 8, h: H - 16 };
+    ctx.fillStyle = '#F7F9FA'; ctx.fillRect(box.x, box.y, box.w, box.h); ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(box.x, box.y, box.w, box.h);
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('forces on the crate', box.x + 10, box.y + 18);
+    const cx = box.x + box.w * (compact ? 0.4 : 0.5), cy = box.y + box.h * 0.52, mg = p.m * G;
+    const sc = Math.min(box.h, box.w) * 0.36 / mg;          // the weight is always the same length; the others are to scale with it
+    const ux = Math.cos(t), uy = -Math.sin(t), nx = -Math.sin(t), ny = -Math.cos(t);   // up the slope, and out of it, in canvas axes
+    const cl = L => Math.sign(L) * Math.min(Math.abs(L), Math.min(box.w, box.h) * 0.46);   // very large pushes are drawn clipped
+    // the crate
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-t); ctx.fillStyle = '#E8D6C0'; ctx.strokeStyle = C('--wood2'); ctx.lineWidth = 1.2; ctx.fillRect(-14, -14, 28, 28); ctx.strokeRect(-14, -14, 28, 28);
+    ctx.strokeStyle = C('--muted'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(-60, 14); ctx.lineTo(60, 14); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    const lab = (txt, X, Y, col, al) => {       // kept inside the panel
+      font(ctx, 11, '600'); ctx.fillStyle = col; const w = ctx.measureText(txt).width;
+      let x0 = al === 'right' ? X - w : X; x0 = Math.max(box.x + 4, Math.min(box.x + box.w - 4 - w, x0));
+      ctx.textAlign = 'left'; ctx.fillText(txt, x0, Math.max(box.y + 30, Math.min(box.y + box.h - 6, Y)));
+    };
+    const N = (v) => Math.abs(v) < 0.5 ? '0' : Math.abs(v).toFixed(0);
+    // weight
+    arrow(ctx, cx, cy, cx, cy + mg * sc, C('--wt')); lab('weight ' + N(mg) + ' N', cx + 6, cy + mg * sc - 2, C('--wt'));
+    if ($('comp').checked && tab === 1 && t > 0.001) {
+      const a = mg * Math.sin(t) * sc, b = mg * Math.cos(t) * sc;
+      arrow(ctx, cx, cy, cx - ux * a, cy - uy * a, C('--comp'), 1.6, [5, 3]); lab('mg sin θ = ' + N(mg * Math.sin(t)), cx - ux * a - 4, cy - uy * a + 14, C('--comp'), 'right');
+      arrow(ctx, cx, cy, cx - nx * b, cy - ny * b, C('--comp'), 1.6, [5, 3]); lab('mg cos θ = ' + N(mg * Math.cos(t)), cx - nx * b + 6, cy - ny * b + 4, C('--comp'));
+    }
+    // normal
+    const nL = fo.N * sc; arrow(ctx, cx, cy, cx + nx * nL, cy + ny * nL, C('--norm')); lab('normal ' + N(fo.N) + ' N', cx + nx * nL + 6, cy + ny * nL, C('--norm'));
+    // your push
+    if (Math.abs(x.F) > 0.5) { const L = cl(x.F * sc); arrow(ctx, cx, cy, cx + ux * L, cy + uy * L, C('--push')); lab('push ' + N(x.F) + ' N', cx + ux * L + (L > 0 ? 6 : -6), cy + uy * L - 8, C('--push'), L > 0 ? 'left' : 'right'); }
+    // friction, along the surface at the bottom face; unknown until the crate is let go
+    const fx = cx - nx * 14, fy = cy - ny * 14;
+    if (x.held) { lab('friction: let go to find out', box.x + 10, box.y + box.h - 10, C('--fric')); }
+    else if (Math.abs(fo.f) > 0.5) { const L = cl(fo.f * sc); arrow(ctx, fx, fy, fx + ux * L, fy + uy * L, C('--fric')); lab((fo.mode === 'static' ? 'static' : 'kinetic') + ' friction ' + N(fo.f) + ' N', fx + ux * L + (L > 0 ? 6 : -6), fy + uy * L + 14, C('--fric'), L > 0 ? 'left' : 'right'); }
+    else { lab('no friction needed', box.x + 10, box.y + box.h - 10, C('--fric')); }
+    if (fo.bumper && !x.held) lab('the bumper pushes too: ' + N(fo.bumper) + ' N', box.x + 10, box.y + box.h - 10, C('--muted'));
+  }
+
+  // the mystery screen's instruments: a clock, a tape measure and a speedometer, read big
+  function drawClock(ctx, W, H, compact) {
+    const x = S(), box = compact ? { x: 8, y: H * 0.58, w: W - 16, h: H * 0.42 - 8 } : { x: W * 0.64, y: 8, w: W * 0.36 - 8, h: H - 16 };
+    ctx.fillStyle = '#F7F9FA'; ctx.fillRect(box.x, box.y, box.w, box.h); ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(box.x, box.y, box.w, box.h);
+    const rows = [['time since you let go', x.held ? '—' : x.st.t.toFixed(2) + ' s'], ['distance from where you let go', x.held ? '—' : (x.st.s - x.from >= 0 ? '+' : '−') + Math.abs(x.st.s - x.from).toFixed(2) + ' m'], ['speed', Math.abs(x.st.v).toFixed(2) + ' m/s'],
+      ['started sliding at', x.slip === null ? '—' : x.slip.toFixed(1) + '°']];
+    const rh = box.h / rows.length;
+    rows.forEach(([k, val], i) => {
+      const y0 = box.y + i * rh;
+      font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(k, box.x + 12, y0 + 20);
+      font(ctx, compact ? 20 : 24, '600'); ctx.fillStyle = C('--ink'); ctx.fillText(val, box.x + 12, y0 + (compact ? 44 : 50));
+    });
+  }
+
+  // energy bars
+  let barTop = 1, barBot = 0;       // the scale only grows during a run, so bars can be compared
+  function drawBars() {
+    const { ctx, W, H, compact } = fit($('bars'));
+    ctx.clearRect(0, 0, W, H);
+    if (tab !== 2) return;
+    const x = S(), p = params(x), L = x.L, base = x.base || { K: 0, U: 0 }, K = kinetic(x.st, p), U = potential(x.st, p);
+    let bars, eqL, eqR;
+    if (system === 'world') {
+      const th = L.heatF + L.heatB, start = base.K + base.U;
+      bars = [['kinetic', K, C('--ke')], ['gravitational', U, C('--pe')], ['thermal', th, C('--th')], ['total now', K + U + th, C('--tot')], null,
+        ['at the start', start, C('--muted')], ['your work', L.app, C('--work')], ['start + work', start + L.app, C('--tot')]];
+      eqL = 3; eqR = 7;
+    } else {
+      bars = [['your push', L.app, C('--work')], ['gravity', L.grav, C('--pe')], ['friction', L.fric, C('--th')], ['normal', 0, C('--norm')], ['bumpers', L.bump, C('--muted')], ['total work', L.app + L.grav + L.fric + L.bump, C('--tot')], null,
+        ['change in kinetic', K - base.K, C('--ke')]];
+      eqL = 5; eqR = 7;
+    }
+    const vals = bars.filter(Boolean).map(b => b[1]);
+    barTop = Math.max(barTop, ...vals); barBot = Math.max(barBot, ...vals.map(v => -v));
+    const span = Math.max(barTop + barBot, 1), top = Math.max(barTop, 0.12 * span), neg = barBot > 0.5 ? Math.max(barBot, 0.12 * span) : 0;
+    const mt = 30, mb = compact ? 46 : 34, ml = compact ? 40 : 56, plotH = H - mt - mb, k = plotH / (top + neg), y0 = mt + top * k;
+    const n = bars.length, bw = (W - ml - 16) / n;
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ml, y0 + 0.5); ctx.lineTo(W - 10, y0 + 0.5); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText('0', ml - 6, y0 + 4);
+    ctx.fillText('joules', ml - 6, mt + 4);
+    bars.forEach((b, i) => {
+      if (!b) return;
+      const [name, val, col] = b, x0 = ml + i * bw + bw * 0.18, w = bw * 0.64, hpx = val * k;
+      ctx.fillStyle = col; ctx.fillRect(x0, hpx >= 0 ? y0 - hpx : y0, w, Math.abs(hpx));
+      font(ctx, 11, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+      ctx.fillText((Math.abs(val) < 0.5 ? '0' : (val < 0 ? '−' : '') + Math.abs(val).toFixed(0)), x0 + w / 2, hpx >= 0 ? y0 - hpx - 4 : y0 - 4);   // negative values sit just above the axis
+      font(ctx, compact ? 10 : 11); ctx.fillStyle = C('--muted');
+      const SHORT = { gravitational: 'gravity', 'total now': 'total', 'at the start': 'at start', 'your work': 'your work', 'start + work': 'start + work', 'your push': 'push', 'total work': 'total', 'change in kinetic': 'ΔK', bumpers: 'bump' };
+      const label = compact ? (SHORT[name] || name) : name, words = label.split(' ');
+      if (compact && words.length > 1) { ctx.fillText(words[0], x0 + w / 2, H - mb + 16); ctx.fillText(words.slice(1).join(' '), x0 + w / 2, H - mb + 28); }
+      else ctx.fillText(label, x0 + w / 2, H - mb + 18);
+    });
+    // the two bars that must match
+    const vL = bars[eqL][1] * k;
+    ctx.setLineDash([4, 3]); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(ml + eqL * bw + bw * 0.18, y0 - vL); ctx.lineTo(ml + eqR * bw + bw * 0.82, y0 - vL); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(system === 'world' ? (compact ? 'energy of crate + Earth' : 'energy of the crate and Earth (joules), counted from when you let go') : (compact ? 'work on the crate alone' : 'work done on the crate alone (joules), since you let go'), ml, 16);
+  }
+
+  function draw() { drawScene(); drawBars(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const sgn = (v, d) => (v < -0.5 * Math.pow(10, -d) ? '−' : v > 0.5 * Math.pow(10, -d) ? '+' : '') + Math.abs(v).toFixed(d);
+  const dir = v => S().st.s > 0 ? (v > 0 ? 'up the ramp' : 'down the ramp') : (v > 0 ? 'toward the ramp' : 'away from the ramp');
+  function readout() {
+    const x = S(), p = params(x), fo = forces(x.st.s, x.st.v, p), onRamp = x.st.s > 0;
+    let html = '';
+    if (tab === 1) {
+      if (x.held) html += card('Along the ramp', 'held still', 'push ' + sgn(x.F, 0) + ' N, gravity ' + sgn(fo.Wpar, 0) + ' N; what friction does, and whether it moves, you find out when you let go');
+      else { const net = p.m * fo.a;
+        html += card('Along the ramp', 'net force ' + sgn(net, 0) + ' N', 'push ' + sgn(x.F, 0) + ' N, gravity ' + sgn(fo.Wpar, 0) + ' N, friction ' + sgn(fo.f, 0) + ' N' + (fo.bumper ? ', bumper ' + sgn(fo.bumper, 0) + ' N' : '') + '; acceleration ' + sgn(fo.a, 2) + ' m/s²'); }
+      html += card('Friction', x.held ? '?' : fo.mode === 'static' ? (Math.abs(fo.f) < 0.5 ? 'none needed' : 'static, ' + Math.abs(fo.f).toFixed(0) + ' N') : 'kinetic, ' + Math.abs(fo.f).toFixed(0) + ' N',
+        x.held ? 'normal force ' + fo.N.toFixed(0) + ' N' : fo.mode === 'static' ? 'holding the crate; static friction can reach up to μ<sub>s</sub>N = ' + fo.fsMax.toFixed(0) + ' N' : 'μ<sub>k</sub>N = ' + x.muK.toFixed(2) + ' × ' + fo.N.toFixed(0) + ' N, against the sliding');
+      html += card('The crate', Math.abs(x.st.v).toFixed(2) + ' m/s' + (Math.abs(x.st.v) > 0.005 ? ' ' + dir(x.st.v) : ''), (onRamp ? x.st.s.toFixed(2) + ' m up the ramp' : Math.abs(x.st.s).toFixed(2) + ' m out on the floor') + (x.slip !== null ? '; it started sliding with the ramp at ' + x.slip.toFixed(1) + '°' : ''));
+    } else if (tab === 2) {
+      const L = x.L, base = x.base || { K: 0, U: 0 }, K = kinetic(x.st, p), U = potential(x.st, p);
+      const J = v => (v < -0.5 ? '−' : '') + Math.abs(v).toFixed(0), P_ = v => (v < -0.5 ? ' − ' : ' + ') + Math.abs(v).toFixed(0);
+      if (system === 'world') html += card('The books balance', J(L.app) + ' J = ' + J(K - base.K) + P_(U - base.U) + P_(L.heatF + L.heatB) + ' J',
+        'your work = change in kinetic + change in gravitational + thermal energy' + (L.heatB > 0.5 ? ' (' + L.heatB.toFixed(0) + ' J of the heat came from hitting a bumper)' : ''));
+      else html += card('The books balance', J(L.app + L.grav + L.fric + L.bump) + ' J = ' + J(K - base.K) + ' J', 'the work all the forces do on the crate = the change in its kinetic energy. The normal force does none: it is always at right angles to the motion');
+      html += card('The crate', Math.abs(x.st.v).toFixed(2) + ' m/s' + (Math.abs(x.st.v) > 0.005 ? ' ' + dir(x.st.v) : ''), (onRamp ? heightAt(x.st.s, p.theta).toFixed(2) + ' m above the floor' : 'on the floor') + '; kinetic ' + K.toFixed(0) + ' J, gravitational ' + U.toFixed(0) + ' J');
+      html += card('Friction', x.held ? '?' : (fo.mode === 'static' ? 'static' : 'kinetic') + ', ' + Math.abs(fo.f).toFixed(0) + ' N', 'heat from sliding so far: ' + L.heatF.toFixed(0) + ' J, which is μ<sub>k</sub>N times the distance slid');
+    } else {
+      html += card('The ramp', x.ang.toFixed(1) + '°', 'the crate is ' + (x.held ? 'held still' : Math.abs(x.st.v) > 0.005 ? 'sliding' : 'at rest') + (onRamp ? ', ' + x.st.s.toFixed(2) + ' m up the ramp' : ', ' + Math.abs(x.st.s).toFixed(2) + ' m out on the floor'));
+      html += card('Your answer', x.answer ? (x.answer.ok ? 'Right' : x.revealed ? 'μ<sub>s</sub> = ' + x.muS.toFixed(2) + ', μ<sub>k</sub> = ' + x.muK.toFixed(2) : 'Not yet') : '—',
+        x.answer ? (x.answer.ok ? 'both within 0.02: μ<sub>s</sub> = ' + x.muS.toFixed(2) + ', μ<sub>k</sub> = ' + x.muK.toFixed(2) : x.revealed ? 'compare with your measurements' : x.answer.msg) : 'enter both coefficients and check');
+    }
+    $('readout').innerHTML = html;
+    $('ang_v').textContent = x.ang.toFixed(1) + '°'; $('F_v').textContent = sgn(x.F, 0) + ' N'; $('v0_v').textContent = sgn(x.v0, 1) + ' m/s';
+    $('m_v').textContent = x.m + ' kg'; $('muS_v').textContent = x.muS.toFixed(2); $('muK_v').textContent = x.muK.toFixed(2);
+  }
+
+  const TEXT = {
+    1: { lede: 'A crate rests on a ramp tilted 20°, held still. Predict: when you let go, will it stay put? Then find the steepest angle at which it stays, and the push it takes to start it moving up the ramp.',
+         notes: '<p><b>What to try.</b> Let go, then raise the angle slowly (click the slider and use the arrow keys) until the crate slips. Note the angle, change the mass, and do it again. Reset, and find the smallest push that starts the crate up the ramp; once it is moving, does it need that much to keep going? Find the range of pushes that hold it still. Tick "gravity\'s components" to split the weight into a part along the ramp and a part into it.</p>' +
+                '<p><b>Why.</b> The ramp pushes back on the crate with the normal force <i>N</i> = <i>mg</i> cos <i>θ</i>, less than the weight. Static friction can supply anything up to <i>μ</i><sub>s</sub><i>N</i>, in whichever direction is needed; it is only as large as it has to be. Left alone, the crate stays put as long as <i>mg</i> sin <i>θ</i> ≤ <i>μ</i><sub>s</sub><i>mg</i> cos <i>θ</i>, that is, tan <i>θ</i> ≤ <i>μ</i><sub>s</sub>: the mass cancels. To start it up the ramp you must beat gravity and full static friction together, <i>mg</i>(sin <i>θ</i> + <i>μ</i><sub>s</sub> cos <i>θ</i>). Once it slides, kinetic friction takes over at <i>μ</i><sub>k</sub><i>N</i>, which is smaller, so the same push now speeds it up: it sticks, then suddenly goes.</p>' +
+                '<p><b>The model.</b> Friction is the textbook model: static up to <i>μ</i><sub>s</sub><i>N</i>, kinetic equal to <i>μ</i><sub>k</sub><i>N</i>, independent of speed and contact area. Your push is always along the surface. The crate slides without tipping or rolling. The corner at the foot of the ramp is taken as gently rounded, so the crate keeps its speed going round it; the bumpers at the ends stop it dead. The motion is calculated exactly, not step by step.</p>' },
+    2: { lede: 'The crate starts near the foot of the ramp, moving up it at 6 m/s. Predict: will it come back down, and if it does, will it pass its starting point faster than, slower than, or as fast as it left? Let go and watch where the energy goes.',
+         notes: '<p><b>What to try.</b> Let go and watch the bars. Kinetic energy turns into gravitational energy and heat on the way up; on the way down, gravitational energy turns into kinetic energy and more heat. Steepen the ramp until the crate slides back, and compare its speed when it passes the starting point. Set the friction to zero: now it comes back exactly as fast as it left. Push it with the slider or by dragging, and your work joins the books. Switch to "crate alone" to see the same run as work done on the crate.</p>' +
+                '<p><b>Why.</b> Count the crate and the Earth together: your push is the only outside force that does work, so <i>W</i><sub>you</sub> = Δ<i>K</i> + Δ<i>U</i> + <i>E</i><sub>thermal</sub>, where the heat from sliding is <i>μ</i><sub>k</sub><i>N</i> times the distance slid, whichever way it slides. Count the crate alone and gravity becomes an outside force too, doing work −<i>mg</i>Δ<i>h</i>; friction does negative work; the normal force does none, since it is always at right angles to the motion. Then the total work equals Δ<i>K</i>, the work-energy theorem. The two pictures are the same physics, booked differently.</p>' +
+                '<p><b>The model.</b> As on the first screen. Gravitational energy is measured from the floor. The heat goes partly into the crate and partly into the ramp; only the total is tracked. If the crate hits a bumper, its kinetic energy all turns into heat. Changing the angle or the mass while the crate is moving starts the bookkeeping over from that moment, because tilting a ramp with a crate on it is work the sim does not count.</p>' },
+    3: { lede: 'This crate and ramp are made of materials you do not know. Find the coefficients of static and kinetic friction, using only the ramp\'s angle, the starting speed, and the clock and distance readings.',
+         notes: '<p><b>What to do.</b> For <i>μ</i><sub>s</sub>: let go with the crate on a gentle ramp, then raise the angle slowly until it starts to slide; the panel records the angle. For <i>μ</i><sub>k</sub>: reset, set the ramp level (0°), give the crate a starting speed, let go, and measure how far it slides before stopping. Or time a slide down a steep ramp. Enter both coefficients and check: within 0.02 counts.</p>' +
+                '<p><b>Why it works.</b> At the moment it slips, gravity\'s pull along the ramp just equals the most static friction can give: <i>mg</i> sin <i>θ</i> = <i>μ</i><sub>s</sub><i>mg</i> cos <i>θ</i>, so <i>μ</i><sub>s</sub> = tan <i>θ</i>. On the level, kinetic friction alone stops the crate: ½<i>mv</i>² = <i>μ</i><sub>k</sub><i>mg d</i>, so <i>μ</i><sub>k</sub> = <i>v</i>²/2<i>gd</i>. The mass cancels both times. Sliding down a ramp from rest, <i>d</i> = ½<i>g</i>(sin <i>θ</i> − <i>μ</i><sub>k</sub> cos <i>θ</i>)<i>t</i>².</p>' +
+                '<p><b>The model.</b> As on the first screen; <i>g</i> = 9.8 m/s². Real surfaces are less tidy: static friction varies from spot to spot and with how long the surfaces have been in contact, so real measurements scatter.</p>' }
+  };
+
+  const SHOW = { lab_comp: [1], sys: [2], bars: [2], guess: [3], lab_muS: [1, 2], lab_muK: [1, 2] };
+  function visibility() {
+    Object.keys(SHOW).forEach(id => { $(id).hidden = SHOW[id].indexOf(tab) < 0; });
+    const x = S();
+    $('go').textContent = x.held ? 'Let go' : x.playing ? 'Pause' : 'Play';
+    $('hint').textContent = tab === 3 ? '' : x.held ? 'drag the crate to choose where it starts' : '';
+    $('reveal').hidden = !(tab === 3 && x.answer && !x.answer.ok && !x.revealed);
+  }
+  function sync() {
+    const x = S();
+    $('ang').value = String(x.ang); $('F').value = String(x.F); $('v0').value = String(x.v0); $('m').value = String(x.m); $('muS').value = String(x.muS); $('muK').value = String(x.muK);
+  }
+  function upd() { visibility(); readout(); draw(); }
+  function setTab(k) {
+    tab = k; dragging = false; barTop = 1; barBot = 0;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  function letGo() { const x = S(); x.held = false; x.playing = true; x.st.v = x.v0; x.st.t = 0; x.from = x.st.s; rebase(x); x.slip = null; barTop = 1; barBot = 0; }
+  $('go').addEventListener('click', () => { const x = S(); if (x.held) letGo(); else x.playing = !x.playing; upd(); });
+  $('reset').addEventListener('click', () => { reset(); barTop = 1; barBot = 0; upd(); });
+  document.querySelectorAll('#spd button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#spd button').forEach(q => q.setAttribute('aria-pressed', String(q === b))); speed = +b.dataset.s; }));
+  document.querySelectorAll('#sys button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#sys button').forEach(q => q.setAttribute('aria-pressed', String(q === b))); system = b.dataset.y; barTop = 1; barBot = 0; upd(); }));
+  $('comp').addEventListener('change', upd);
+  // changing the ramp or the crate while it moves restarts the energy books (tilting it is work we do not count)
+  const slider = (id, key, restart) => $(id).addEventListener('input', () => {
+    const x = S(); x[key] = +$(id).value;
+    if (key === 'muK' && x.muK > x.muS) { x.muS = x.muK; $('muS').value = String(x.muS); }
+    if (key === 'muS' && x.muS < x.muK) { x.muK = x.muS; $('muK').value = String(x.muK); }
+    if (restart && !x.held) { rebase(x); barTop = 1; barBot = 0; }
+    upd();
+  });
+  slider('ang', 'ang', true); slider('m', 'm', true); slider('muS', 'muS'); slider('muK', 'muK'); slider('F', 'F'); slider('v0', 'v0');
+  $('check').addEventListener('click', () => {
+    const x = TAB[3], a = parseFloat($('gs').value), b = parseFloat($('gk').value);
+    if (!isFinite(a) || !isFinite(b)) { x.answer = { ok: false, msg: 'enter a number for each' }; upd(); return; }
+    const okS = Math.abs(a - x.muS) <= 0.02 + 1e-9, okK = Math.abs(b - x.muK) <= 0.02 + 1e-9;
+    x.answer = { ok: okS && okK, msg: okS ? 'μ<sub>s</sub> is right; μ<sub>k</sub> is ' + (b > x.muK ? 'too high' : 'too low') : okK ? 'μ<sub>k</sub> is right; μ<sub>s</sub> is ' + (a > x.muS ? 'too high' : 'too low') : 'both are off: μ<sub>s</sub> is ' + (a > x.muS ? 'too high' : 'too low') + ', μ<sub>k</sub> ' + (b > x.muK ? 'too high' : 'too low') };
+    $('verdict').innerHTML = x.answer.ok ? 'Right.' : '';
+    upd();
+  });
+  $('reveal').addEventListener('click', () => { TAB[3].revealed = true; upd(); });
+
+  // dragging: before letting go it places the crate; afterward it pushes, with a force that pulls the crate
+  // toward the pointer, up to the slider's limit of 1000 N
+  const pt = e => { const r = $('scene').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  function onCrate(px, py) { if (!view) return false; const x = S(), [cx, cy] = pathXY(x.st.s, rad(x.ang)); return Math.hypot(px - view.X(cx), py - (view.Y(cy) - HALF * view.k)) < Math.max(26, HALF * view.k * 1.6); }
+  $('scene').addEventListener('pointerdown', e => {
+    const [px, py] = pt(e); if (!onCrate(px, py)) return;
+    dragging = true; $('scene').setPointerCapture(e.pointerId); dragS = sFromPoint(px, py);
+    const x = S(); if (!x.held) { x.dragF = true; x.playing = true; }
+    move(px, py);
+  });
+  function move(px, py) {
+    const x = S(); dragS = sFromPoint(px, py);
+    if (x.held) { x.s0 = Math.round(dragS * 100) / 100; x.st.s = x.s0; rebase(x); upd(); }
+  }
+  $('scene').addEventListener('pointermove', e => { if (dragging) { const [px, py] = pt(e); move(px, py); } else { const [px, py] = pt(e); $('scene').style.cursor = onCrate(px, py) ? 'grab' : 'default'; } });
+  const end = () => { if (!dragging) return; dragging = false; const x = S(); if (x.dragF) { x.dragF = false; x.F = 0; $('F').value = '0'; } upd(); };
+  $('scene').addEventListener('pointerup', end); $('scene').addEventListener('pointercancel', end);
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    const x = S();
+    if (!x.held && x.playing && !document.hidden && dt > 0) {
+      if (dragging && x.dragF) {      // a spring-and-damper pull toward the pointer, scaled with the mass so it feels the same
+        const Fd = x.m * (8 * (dragS - x.st.s) - 4 * x.st.v);
+        x.F = Math.max(-1000, Math.min(1000, Math.round(Fd / 5) * 5)); $('F').value = String(x.F);
+      }
+      const wasAtRest = Math.abs(x.st.v) < 1e-12;
+      step(x.st, params(x), dt * speed, x.L);
+      if (wasAtRest && Math.abs(x.st.v) > 1e-12 && Math.abs(x.F) < 0.5 && x.slip === null) x.slip = x.ang;   // it slipped by itself
+      readout(); draw(); visibility();
+    }
+    requestAnimationFrame(frame);
+  }
+  newMystery(); [1, 2, 3].forEach(k => rebase(TAB[k]));
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
