@@ -404,6 +404,7 @@
   function drawScene() {
     const { ctx, W, H, compact } = fit($('scene'));
     ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing (mid-resize, or a docked console): nothing sensible to draw
     const x = S(), p = params(x), th = p.theta, v = layout(W, H, compact), k = v.k;
     // ground, floor and ramp
     const top = pathXY(RAMP_L, th);
@@ -503,6 +504,7 @@
   function drawBars() {
     const { ctx, W, H, compact } = fit($('bars'));
     ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing (mid-resize, or a docked console): nothing sensible to draw
     if (tab !== 2) return;
     const x = S(), p = params(x), L = x.L, base = x.base || { K: 0, U: 0 }, K = kinetic(x.st, p), U = potential(x.st, p);
     let bars, eqL, eqR;

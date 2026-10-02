@@ -373,6 +373,7 @@
   function draw() {
     const { ctx, W, H, compact } = fit($('c'));
     ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing (mid-resize, or a docked console): nothing sensible to draw
     ctx.font = '13px ' + C('--sans');
     const t = st.t, w = M.world, m = compact ? 12 : 26;
     const S = Math.min((W - 2 * m) / (w.xhi - w.xlo), (H - 2 * m) / (w.yhi - w.ylo));

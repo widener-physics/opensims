@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'exoplanets',
+    title: 'Finding exoplanets',
+    topic: 'astronomy',
+    tags: ['exoplanets', 'transit method', 'radial velocity', 'Doppler shift', "Kepler's third law", 'center of mass', 'density', 'light curve', 'limb darkening'],
+    blurb: "Watch a star dim as a planet crosses it and wobble as the planet tugs on it, with data as noisy as the real thing. Find out why Earth-size planets are so hard to see, then measure a mystery planet's orbit, size and mass from its light curve and Doppler shifts, and decide whether it is rocky or gas-rich.",
+    level: 'intro',
+    added: '2026-10-02',
+    status: 'ready'
+  },
+  {
     slug: 'ramp',
     title: 'A crate on a ramp',
     topic: 'dynamics',

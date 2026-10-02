@@ -581,6 +581,7 @@
   function drawScene() {
     const { ctx, W, H, compact } = fit($('scene'));
     ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing (mid-resize, or a docked console): nothing sensible to draw
     if (st.tab === 1) drawSoap(ctx, W, H, compact);
     else if (st.tab === 2) drawOil(ctx, W, H, compact);
     else if (st.tab === 3) drawCoat(ctx, W, H, compact);
@@ -591,6 +592,7 @@
   function drawWaves() {
     const { ctx, W, H, compact } = fit($('waves'));
     ctx.clearRect(0, 0, W, H); font(ctx, 12);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing (mid-resize, or a docked console): nothing sensible to draw
     const d = probeThick(), nm = names(st.tab), n = media(st.tab, st.lam);
     if (d === null) { ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('no film here: move the probe onto it', W / 2, H / 2); return; }
     const f = film(n[0], n[1], n[2], d, st.lam, sinA());
@@ -636,6 +638,7 @@
   function drawSpec() {
     const { ctx, W, H, compact } = fit($('spec'));
     ctx.clearRect(0, 0, W, H); font(ctx, 12);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing (mid-resize, or a docked console): nothing sensible to draw
     const d = probeThick(), ymax = RMAX[st.tab];
     const ml = 44, mr = 12, mt = 30, mb = 34, pw = W - ml - mr, ph = H - mt - mb;
     const X = l => ml + (l - 380) / 340 * pw, Y = r => mt + ph - Math.min(r, ymax) / ymax * ph;
