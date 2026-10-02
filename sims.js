@@ -16,6 +16,26 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'pulling-crate',
+    title: 'Pulling a crate',
+    topic: 'dynamics',
+    tags: ['vector components', 'normal force', 'friction', 'free-body diagram', 'angled pull', 'vector addition', 'net force', "Newton's second law"],
+    blurb: "Pull a crate with a rope at an angle and watch the pull split into components: one drags it forward, the other lifts on it and lightens the load on the floor. Find the angle that starts it moving with the least force, then add a second rope and combine the pulls as vectors.",
+    level: 'intro',
+    added: '2026-10-02',
+    status: 'ready'
+  },
+  {
+    slug: 'driven-oscillator',
+    title: 'Damped, driven oscillator',
+    topic: 'oscillations',
+    tags: ['damping', 'critical damping', 'driven oscillator', 'resonance', 'phase lag', 'Q factor', 'transient', 'steady state', 'mass on a spring'],
+    blurb: "A mass on a spring, slowed by a paddle in liquid and shaken by a motor. Watch swings die away and find critical damping, see the mass move with the motor, lag it by a quarter cycle, then oppose it, and build the resonance curve point by point as the motion settles.",
+    level: 'intro',
+    added: '2026-10-02',
+    status: 'ready'
+  },
+  {
     slug: 'exoplanets',
     title: 'Finding exoplanets',
     topic: 'astronomy',

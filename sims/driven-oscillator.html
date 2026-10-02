@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<!--
+  Damped, driven oscillator - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Its exact solution
+  agrees with a Runge-Kutta integration to better than a nanometer in all three damping regimes (including
+  exactly critical), with the drive on, off, and changed mid-run; free swings have the damped period and
+  decay; the amplitude and lag measured from the motion match the textbook formulas; the resonance peak
+  sits at sqrt(w0^2 - g^2/2) with the expected height and width; and the motor's work minus the paddle's
+  equals the change in the oscillator's energy.
+  Credit: stands in for PhET's "Resonance", which PhET published only in the retired Flash format.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Damped, driven oscillator</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32; --mass: #1D4F73; --motor: #2E7D32; --liquid: #9FC3D8; --metal: #8C979E;
+    --s1: #1D4F73; --s2: #C8321E; --s3: #2E7D32; --s4: #B5306D;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 360; touch-action: none; }
+  #graph { aspect-ratio: 900 / 300; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  select { font: inherit; font-family: var(--sans); font-size: 14px; padding: 5px 6px; border: 1px solid var(--ink); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 10px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls select { width: 100%; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .nudge { display: flex; gap: 4px; margin-top: 4px; justify-content: space-between; }
+  .nudge button { padding: 2px 7px; font-size: 13px; background: transparent; color: var(--ink); border-color: var(--rule); font-variant-numeric: tabular-nums; }
+  .nudge button:hover { border-color: var(--ink); }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.1; }
+    #graph { aspect-ratio: 3 / 4; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 6px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Damped, driven oscillator</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Damping</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Driving</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Resonance curve</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="A mass on a spring, hung from a motor-driven support, with a paddle in liquid; and a graph of its motion"></canvas>
+  <div class="row2">
+    <button id="go">Play</button>
+    <button id="pull" class="secondary">Pull down 10 cm and let go</button>
+    <button id="rest" class="secondary">Stop it</button>
+    <div class="seg" id="spd" role="group" aria-label="Speed">
+      <button data-s="0.25">¼×</button><button data-s="1">1×</button><button data-s="4">4×</button><button data-s="16">16×</button>
+    </div>
+    <label id="lab_ys">scale <select id="ys"><option value="2">±2 cm</option><option value="5">±5 cm</option><option value="10">±10 cm</option><option value="20">±20 cm</option><option value="40">±40 cm</option></select></label>
+    <label id="lab_mag"><input type="checkbox" id="mag"> motor ×10</label>
+    <button id="clear" class="secondary">Clear points</button>
+    <label id="lab_theory"><input type="checkbox" id="theory"> theory curves</label>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Amplitude and lag, measured at each driving frequency"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div id="lab_f"><label><div class="row"><span>Motor's frequency</span><span class="val" id="f_v"></span></div>
+      <input type="range" id="f" min="0.1" max="3" step="0.001"></label>
+      <div class="nudge" role="group" aria-label="Fine adjustment of the motor's frequency">
+        <button data-d="-0.1">−0.1 Hz</button><button data-d="-0.01">−0.01</button><button data-d="0.01">+0.01</button><button data-d="0.1">+0.1 Hz</button>
+      </div></div>
+    <label><div class="row"><span>Damping (paddle and liquid), <i>b</i></span><span class="val" id="b_v"></span></div>
+      <input type="range" id="b" min="0" max="1000" step="1"></label>
+    <label><div class="row"><span>Mass</span><span class="val" id="m_v"></span></div>
+      <input type="range" id="m" min="0.2" max="2" step="0.01"></label>
+    <label><div class="row"><span>Spring stiffness</span><span class="val" id="k_v"></span></div>
+      <input type="range" id="k" min="5" max="50" step="0.5"></label>
+    <label id="lab_A"><div class="row"><span>Motor's stroke (amplitude)</span><span class="val" id="A_v"></span></div>
+      <input type="range" id="A" min="0.2" max="1.5" step="0.05"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against a Runge-Kutta integration, the textbook
+  //    formulas for the steady motion, and energy conservation. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: a damped, driven mass on a spring ----
+  // A mass m hangs from a spring (stiffness k) whose top is moved up and down by a motor, y(t) = A cos(theta),
+  // with theta advancing at the drive's angular frequency w. A paddle in a liquid gives a drag -b v. With x the
+  // mass's displacement from where it would hang if the motor stood still:
+  //     m x'' + b x' + k x = k y(t) = k A cos(theta).
+  // Write w0^2 = k/m (natural frequency) and g = b/m. The motion is the steady response plus a transient:
+  //     steady:    x_p = X cos(theta - delta),  X = A w0^2 / sqrt((w0^2 - w^2)^2 + (g w)^2),  tan(delta) = g w / (w0^2 - w^2)
+  //     transient: the free damped motion u'' + g u' + w0^2 u = 0, which dies away as e^(-g t / 2).
+  // step() moves both exactly over any time interval (no time-step error), in all three damping regimes, and
+  // keeps the motion smooth when the drive frequency is changed: the transient absorbs the difference.
+  // delta is how far the mass lags behind the motor: 0 when driven slowly, 90 deg at w = w0, 180 deg when fast.
+
+  const TAU = 2 * Math.PI;
+
+  function derived(p) {
+    const w0 = Math.sqrt(p.k / p.m), g = p.b / p.m;
+    return { w0, g, f0: w0 / TAU, Q: w0 / g, zeta: g / (2 * w0) };
+  }
+  // steady (particular) response to the drive A cos(theta) at angular frequency w
+  function steady(p, w) {
+    const { w0, g } = derived(p), D = Math.hypot(w0 * w0 - w * w, g * w);
+    return { X: p.A * w0 * w0 / D, delta: Math.atan2(g * w, w0 * w0 - w * w) };
+  }
+  function particular(p, w, th) {
+    if (!p.A) return { x: 0, v: 0 };
+    const s = steady(p, w);
+    return { x: s.X * Math.cos(th - s.delta), v: -s.X * w * Math.sin(th - s.delta) };
+  }
+  // free damped motion of (u, u') over time t, exact in every regime; near critical damping the
+  // sinh(q t)/q and sin(q t)/q forms go smoothly to t, so nothing is lost there
+  function free(u, du, p, t) {
+    const { w0, g } = derived(p), a = g / 2, d = a * a - w0 * w0, e = Math.exp(-a * t), B = du + a * u;
+    let c, sq, qs;                                   // cosh/cos, sinh(qt)/q or sin(qt)/q, and q*sinh or -q*sin
+    if (d > 0) { const q = Math.sqrt(d); c = Math.cosh(q * t); sq = q * t < 1e-8 ? t : Math.sinh(q * t) / q; qs = q * Math.sinh(q * t); }
+    else if (d < 0) { const q = Math.sqrt(-d); c = Math.cos(q * t); sq = q * t < 1e-8 ? t : Math.sin(q * t) / q; qs = -q * Math.sin(q * t); }
+    else { c = 1; sq = t; qs = 0; }
+    const U = e * (u * c + B * sq);
+    return { u: U, du: -a * U + e * (u * qs + B * c) };
+  }
+  // advance the state { x, v, th, t } by dt at drive angular frequency w
+  function step(st, p, w, dt) {
+    const p0 = particular(p, w, st.th), f = free(st.x - p0.x, st.v - p0.v, p, dt);
+    st.th += w * dt; st.t += dt;
+    const p1 = particular(p, w, st.th);
+    st.x = p1.x + f.u; st.v = p1.v + f.du;
+  }
+  // how big the transient still is, as an amplitude (it decays as e^(-g t/2))
+  function transientSize(st, p, w) {
+    const p0 = particular(p, w, st.th), u = st.x - p0.x, du = st.v - p0.v, { w0, g } = derived(p);
+    return Math.sqrt(u * u + Math.pow((du + g * u / 2) / w0, 2));
+  }
+
+  // Measuring, the way an experimenter would: over each full cycle of the drive, project the mass's motion
+  // onto cos(theta) and sin(theta). For x = X cos(theta - delta) the two integrals are pi X cos(delta) and
+  // pi X sin(delta). advance() steps in small pieces and accumulates them, with the trapezoid rule in theta.
+  function newMeter() { return { c: 0, s: 0, th0: null, last: null, cycles: 0, prev: null }; }
+  function advance(st, p, w, dt, meter) {
+    const n = Math.max(1, Math.ceil(dt * w / (TAU / 200)));          // at least 200 pieces per drive cycle
+    const h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const thA = st.th, xA = st.x;
+      step(st, p, w, h);
+      if (!meter || !p.A || w <= 0) continue;
+      if (meter.th0 === null) meter.th0 = Math.ceil(thA / TAU) * TAU;            // start at the next whole cycle
+      if (st.th <= meter.th0) continue;
+      const lo = Math.max(thA, meter.th0), frac = (lo - thA) / (st.th - thA), xlo = xA + (st.x - xA) * frac;
+      const end = meter.th0 + TAU;
+      if (st.th < end) {
+        meter.c += 0.5 * (xlo * Math.cos(lo) + st.x * Math.cos(st.th)) * (st.th - lo);
+        meter.s += 0.5 * (xlo * Math.sin(lo) + st.x * Math.sin(st.th)) * (st.th - lo);
+      } else {
+        const fe = (end - thA) / (st.th - thA), xe = xA + (st.x - xA) * fe;
+        meter.c += 0.5 * (xlo * Math.cos(lo) + xe * Math.cos(end)) * (end - lo);
+        meter.s += 0.5 * (xlo * Math.sin(lo) + xe * Math.sin(end)) * (end - lo);
+        meter.prev = meter.last;
+        meter.last = { X: Math.hypot(meter.c, meter.s) / Math.PI, delta: Math.atan2(meter.s, meter.c), t: st.t };
+        meter.cycles++; meter.c = 0; meter.s = 0; meter.th0 = end;
+        // the rest of this piece belongs to the next cycle
+        meter.c += 0.5 * (xe * Math.cos(end) + st.x * Math.cos(st.th)) * (st.th - end);
+        meter.s += 0.5 * (xe * Math.sin(end) + st.x * Math.sin(st.th)) * (st.th - end);
+      }
+    }
+  }
+  // energy of the mass and spring, with the spring's stretch measured from the moving support (gravity only
+  // shifts where the mass hangs). It changes at the rate  -k (x - y) y'  (the motor's power) minus  b v^2  (the paddle's).
+  function energy(st, p) { const y = p.A * Math.cos(st.th); return 0.5 * p.m * st.v * st.v + 0.5 * p.k * (st.x - y) * (st.x - y); }
+  // ---- end of core ----
+
+  const BLOG = [0.15, 15];                                          // damping slider is logarithmic
+  const bToS = b => Math.round(1000 * Math.log(b / BLOG[0]) / Math.log(BLOG[1] / BLOG[0]));
+  const sToB = s => BLOG[0] * Math.pow(BLOG[1] / BLOG[0], s / 1000);
+  const mk = (o) => Object.assign({ st: { x: 0, v: 0, th: 0, t: 0 }, playing: false, meter: newMeter(), hist: [], held: false }, o);
+  const TAB = {
+    1: mk({ m: 0.5, k: 20, b: 0.4, A: 0, f: 0.5, speed: 1, ys: 10 }),
+    2: mk({ m: 0.5, k: 20, b: 0.4, A: 0.01, f: 0.5, speed: 1, ys: 10 }),
+    3: mk({ m: 0.5, k: 20, b: 0.5, A: 0.01, f: 0.3, speed: 4, ys: 10, series: [], recorded: false, mag: false })
+  };
+  let tab = 1;
+  const S = () => TAB[tab];
+  const par = x => ({ m: x.m, k: x.k, b: x.b, A: tab === 1 ? 0 : x.A });
+  const w = x => (tab === 1 ? 0 : 2 * Math.PI * x.f);
+  // any change to the setup: start measuring afresh (the transient carries the motion on smoothly)
+  function retune(x) { x.meter = newMeter(); x.recorded = false; }
+
+  // tab 3: points recorded at each frequency once the motion has settled, one series per mass, spring and damping
+  const SERIES_COL = ['--s1', '--s2', '--s3', '--s4'];
+  function seriesFor(x) {
+    const key = [x.m, x.k, x.b.toFixed(4)].join('|');
+    let s = x.series.find(q => q.key === key);
+    if (!s) { s = { key, m: x.m, k: x.k, b: x.b, pts: [], col: SERIES_COL[x.series.length % 4] }; x.series.push(s); if (x.series.length > 4) x.series.shift(); }
+    return s;
+  }
+
+  // ---- running
+  function run(x, dt) {
+    const p = par(x), om = w(x), n = Math.max(1, Math.ceil(dt * Math.max(om, 2 * Math.PI) * 4 / (2 * Math.PI)));
+    for (let i = 0; i < n; i++) {           // several pieces per frame so the graph keeps every wiggle even at 16x
+      advance(x.st, p, om, dt / n, x.meter);
+      x.hist.push([x.st.t, x.st.x, p.A * Math.cos(x.st.th)]);
+    }
+    const keep = x.st.t - spanOf(x) - 1;
+    let cut = 0; while (cut < x.hist.length && x.hist[cut][0] < keep) cut++;
+    if (cut) x.hist.splice(0, cut);
+    if (tab === 3) maybeRecord(x);
+  }
+  const spanOf = x => 8 * Math.max(1, x.speed);       // seconds of motion shown: more when running faster
+  function settled(x) {
+    const p = par(x), om = w(x); if (!x.meter.last || x.meter.cycles < 2) return false;
+    return transientSize(x.st, p, om) <= Math.max(0.003 * x.meter.last.X, 2e-6);
+  }
+  function maybeRecord(x) {
+    if (x.recorded || !settled(x)) return;
+    const s = seriesFor(x), L = x.meter.last;
+    s.pts = s.pts.filter(q => Math.abs(q.f - x.f) > 1e-9);
+    s.pts.push({ f: x.f, r: L.X / x.A, d: L.delta * 180 / Math.PI });
+    x.recorded = true;
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const wd = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== wd || canvas.height !== h) { canvas.width = wd; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  const cm = v => v * 100;
+
+  // the apparatus: motor and crank, the moving support, spring, mass, and a paddle in a tall jar of liquid
+  let geo = null;
+  function apparatus(ctx, box, x) {
+    const p = par(x), y = p.A * Math.cos(x.st.th), DRAW = 20;                // the drawing shows +-20 cm
+    const s = box.h * 0.2 / DRAW, cx = box.x + box.w / 2;                   // pixels per cm
+    const xd = Math.max(-DRAW, Math.min(DRAW, cm(x.st.x))), off = Math.abs(cm(x.st.x)) > DRAW;
+    const supY = box.y + box.h * 0.14 - cm(y) * s, massY = box.y + box.h * 0.48 - xd * s, mh = box.h * 0.09, mw = Math.min(box.w * 0.34, 70);
+    geo = { cx, massY, s, mh, mw, box };
+    // motor: a wheel with a crank pin; the pin's height is the support's
+    const wy = box.y + box.h * 0.06, wr = Math.max(6, (tab === 1 ? 0.01 : p.A) * 100 * s);
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx + mw * 0.75, wy, wr + 4, 0, 2 * Math.PI); ctx.stroke();
+    const pinX = cx + mw * 0.75 + (tab === 1 ? 0 : wr * Math.sin(x.st.th)), pinY = wy - (tab === 1 ? 0 : wr * Math.cos(x.st.th));
+    ctx.fillStyle = tab === 1 ? C('--rule') : C('--motor'); ctx.beginPath(); ctx.arc(pinX, pinY, 3.5, 0, 2 * Math.PI); ctx.fill();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(tab === 1 ? 'motor off' : 'motor', cx + mw * 0.75 + wr + 8, wy + 4);
+    // support bar
+    ctx.fillStyle = tab === 1 ? C('--metal') : C('--motor'); ctx.fillRect(cx - mw * 0.6, supY - 4, mw * 1.2, 6);
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx + mw * 0.55, supY); ctx.lineTo(cx + mw * 0.75, wy); ctx.stroke();
+    // jar of liquid; its color deepens with the damping
+    const jy = box.y + box.h * 0.6, jw = mw * 1.25, deep = Math.min(1, Math.log(x.b / BLOG[0]) / Math.log(BLOG[1] / BLOG[0]));
+    ctx.fillStyle = 'rgba(' + Math.round(170 - 80 * deep) + ',' + Math.round(205 - 95 * deep) + ',' + Math.round(225 - 90 * deep) + ',0.85)';
+    ctx.fillRect(cx - jw / 2, jy, jw, box.y + box.h - 4 - jy);
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - jw / 2, jy - 10); ctx.lineTo(cx - jw / 2, box.y + box.h - 3); ctx.lineTo(cx + jw / 2, box.y + box.h - 3); ctx.lineTo(cx + jw / 2, jy - 10); ctx.stroke();
+    // spring: a zigzag from the support to the top of the mass
+    const top = supY + 2, bot = massY - mh / 2, turns = 14, sw = mw * 0.28;
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(cx, top); ctx.lineTo(cx, top + 6);
+    for (let i = 1; i <= turns; i++) ctx.lineTo(cx + (i % 2 ? sw : -sw), top + 6 + (bot - top - 12) * (i - 0.5) / turns);
+    ctx.lineTo(cx, bot - 6); ctx.lineTo(cx, bot); ctx.stroke();
+    // paddle rod and paddle
+    const padY = massY + box.h * 0.26;
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, massY + mh / 2); ctx.lineTo(cx, padY); ctx.stroke();
+    ctx.fillStyle = C('--ink'); ctx.fillRect(cx - jw * 0.36, padY - 2, jw * 0.72, 4);
+    // the mass
+    ctx.fillStyle = C('--mass'); ctx.fillRect(cx - mw / 2, massY - mh / 2, mw, mh);
+    font(ctx, 11, '600'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(x.m.toFixed(2) + ' kg', cx, massY + 4);
+    // where it hangs at rest, and a centimeter scale
+    const eqY = box.y + box.h * 0.48;
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - mw * 0.9, eqY); ctx.lineTo(cx + mw * 0.9, eqY); ctx.stroke(); ctx.setLineDash([]);
+    const rx = box.x + 8; font(ctx, 9); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    for (let c = -20; c <= 20; c += 5) { const yy = eqY - c * s; ctx.fillRect(rx, yy, c % 10 ? 4 : 7, 1); if (c % 10 === 0) ctx.fillText((c > 0 ? '+' : c < 0 ? '−' : '') + Math.abs(c), rx + 9, yy + 3); }
+    ctx.fillText('cm', rx, eqY - 20 * s - 6);
+    if (off) { font(ctx, 11, '600'); ctx.fillStyle = C('--hot'); ctx.textAlign = 'center'; ctx.fillText('beyond the drawing: ' + Math.round(Math.abs(cm(x.st.x))) + ' cm', cx, box.y + box.h - 8); }
+  }
+  // the motion against time, with the motor's for comparison
+  function trace(ctx, box, x, compact) {
+    const Y = x.ys, now = x.st.t, span = spanOf(x), t0 = now - span;
+    const X = t => box.x + (t - t0) / span * box.w, YY = v => box.y + box.h / 2 - v / Y * box.h / 2;
+    ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1; font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    [-Y, -Y / 2, 0, Y / 2, Y].forEach(v => { ctx.beginPath(); ctx.moveTo(box.x, YY(v) + 0.5); ctx.lineTo(box.x + box.w, YY(v) + 0.5); ctx.stroke(); ctx.fillText((v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v), box.x - 4, YY(v) + 3); });
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(box.x, box.y, box.w, box.h);
+    // seconds ticks
+    const step = span <= 10 ? 1 : span <= 40 ? 5 : 20; ctx.textAlign = 'center';
+    for (let t = Math.ceil(Math.max(0, t0) / step) * step; t <= now; t += step) { ctx.fillStyle = C('--muted'); ctx.fillRect(X(t), box.y + box.h, 1, 4); ctx.fillText(String(t), X(t), box.y + box.h + 13); }
+    ctx.save(); ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
+    if (tab > 1) { ctx.strokeStyle = C('--motor'); ctx.lineWidth = 1.5; ctx.beginPath(); const g = $('mag').checked ? 10 : 1; x.hist.forEach((h, i) => { const a = X(h[0]), b = YY(cm(h[2]) * g); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }); ctx.stroke(); }
+    ctx.strokeStyle = C('--mass'); ctx.lineWidth = 2; ctx.beginPath(); x.hist.forEach((h, i) => { const a = X(h[0]), b = YY(cm(h[1])); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }); ctx.stroke();
+    ctx.restore();
+    font(ctx, 12); ctx.textAlign = 'left'; ctx.fillStyle = C('--mass'); ctx.fillText('mass (cm)', box.x, box.y - 8);
+    if (tab > 1) { ctx.fillStyle = C('--motor'); ctx.fillText('motor' + ($('mag').checked ? ' ×10' : ''), box.x + 74, box.y - 8); }
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(compact ? 'time (s)' : 'time (s), the last ' + Math.round(span) + ' seconds', box.x + box.w, box.y - 8);
+  }
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    const x = S();
+    if (compact) { apparatus(ctx, { x: 0, y: 4, w: W, h: H * 0.58 }, x); trace(ctx, { x: 40, y: H * 0.64, w: W - 52, h: H * 0.36 - 22 }, x, true); }
+    else { apparatus(ctx, { x: 0, y: 4, w: W * 0.3, h: H - 8 }, x); trace(ctx, { x: W * 0.3 + 40, y: 26, w: W * 0.7 - 54, h: H - 26 - 24 }, x, false); }
+  }
+
+  // tab 3: amplitude (relative to the motor's stroke) and lag, against frequency
+  function drawCurves() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 100 || tab !== 3) return;
+    const x = TAB[3], ml = compact ? 44 : 56, mr = 14;
+    const two = compact ? [{ x: ml, y: 24, w: W - ml - mr, h: H / 2 - 56 }, { x: ml, y: H / 2 + 20, w: W - ml - mr, h: H / 2 - 56 }]
+      : [{ x: ml, y: 24, w: (W - ml - mr) / 2 - 40, h: H - 24 - 40 }, { x: ml + (W - ml - mr) / 2 + 30, y: 24, w: (W - ml - mr) / 2 - 30, h: H - 24 - 40 }];
+    const top = Math.max(2, ...x.series.flatMap(s => s.pts.map(q => q.r))) , ymax = [2, 5, 10, 20, 50, 100].find(v => v >= top * 1.1) || 100;
+    const axes = (b, ymaxv, yt, ylab, title) => {
+      const X = f => b.x + f / 3 * b.w, Y = v => b.y + b.h - v / ymaxv * b.h;
+      ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1; font(ctx, 10); ctx.fillStyle = C('--muted');
+      [0, 0.5, 1, 1.5, 2, 2.5, 3].forEach(f => { ctx.beginPath(); ctx.moveTo(X(f) + 0.5, b.y); ctx.lineTo(X(f) + 0.5, b.y + b.h); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(String(f), X(f), b.y + b.h + 13); });
+      yt.forEach(v => { ctx.beginPath(); ctx.moveTo(b.x, Y(v) + 0.5); ctx.lineTo(b.x + b.w, Y(v) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(String(v), b.x - 4, Y(v) + 3); });
+      ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText('motor\'s frequency (Hz)', b.x + b.w / 2, b.y + b.h + 28);
+      ctx.textAlign = 'left'; font(ctx, 12); ctx.fillText(title, b.x, b.y - 8); font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(ylab, b.x + b.w, b.y - 8);
+      // where the motor is set now
+      ctx.strokeStyle = C('--hot'); ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(x.f) + 0.5, b.y); ctx.lineTo(X(x.f) + 0.5, b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+      return { X, Y, b };
+    };
+    const ytA = [0, 1, 2, 5, 10, 20, 50, 100].filter(v => v <= ymax && (ymax <= 10 || v !== 1) && (ymax <= 20 || v !== 2)).concat(ymax <= 2 ? [0.5, 1.5] : []);
+    const A1 = axes(two[0], ymax, ytA, 'times the motor\'s stroke', 'amplitude of the mass');
+    const A2 = axes(two[1], 180, [0, 45, 90, 135, 180], 'degrees behind the motor', 'lag');
+    // theory, if asked for (dashed), for every series
+    if ($('theory').checked) x.series.forEach(s => {
+      const p = { m: s.m, k: s.k, b: s.b, A: 1 };
+      [[A1, q => steady(p, 2 * Math.PI * q).X], [A2, q => steady(p, 2 * Math.PI * q).delta * 180 / Math.PI]].forEach(([Ax, fn]) => {
+        ctx.save(); ctx.beginPath(); ctx.rect(Ax.b.x, Ax.b.y, Ax.b.w, Ax.b.h); ctx.clip();
+        ctx.strokeStyle = C(s.col); ctx.globalAlpha = 0.6; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.beginPath();
+        for (let i = 0; i <= 600; i++) { const q = 0.005 + i * 3 / 600, v = fn(q); i ? ctx.lineTo(Ax.X(q), Ax.Y(v)) : ctx.moveTo(Ax.X(q), Ax.Y(v)); }
+        ctx.stroke(); ctx.restore();
+      });
+    });
+    x.series.forEach(s => s.pts.forEach(q => {
+      ctx.fillStyle = C(s.col);
+      [[A1, q.r], [A2, q.d]].forEach(([Ax, v]) => { ctx.beginPath(); ctx.arc(Ax.X(q.f), Ax.Y(Math.min(v, Ax === A1 ? ymax : 180)), 3.5, 0, 2 * Math.PI); ctx.fill(); });
+    }));
+    // legend
+    font(ctx, 10); ctx.textAlign = 'right';
+    x.series.forEach((s, i) => { ctx.fillStyle = C(s.col); ctx.fillText('b = ' + s.b.toFixed(2) + ' kg/s, m = ' + s.m.toFixed(2) + ' kg, k = ' + s.k + ' N/m', A1.b.x + A1.b.w - 4, A1.b.y + 14 + 13 * i); });
+    if (!x.series.some(s => s.pts.length)) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('no points yet: each frequency is recorded once the motion settles', A1.b.x + A1.b.w / 2, A1.b.y + A1.b.h / 2); }
+  }
+  function draw() { drawScene(); drawCurves(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const sg = (v, d) => (v > 0.5 * Math.pow(10, -d) ? '+' : v < -0.5 * Math.pow(10, -d) ? '−' : '') + Math.abs(v).toFixed(d);
+  function readout() {
+    const x = S(), d = derived(par(x)), L = x.meter.last;
+    let html = '';
+    html += card('Natural frequency', d.f0.toFixed(3) + ' Hz', 'f<sub>0</sub> = (1/2π)√(<i>k</i>/<i>m</i>), how fast it would swing with no damping; period ' + (1 / d.f0).toFixed(3) + ' s');
+    if (tab === 1) {
+      html += card('Damping', 'b = ' + x.b.toFixed(2) + ' kg/s', 'the paddle\'s drag is <i>b</i> times the speed; quality factor Q = √(<i>km</i>)/<i>b</i> = ' + d.Q.toFixed(2));
+      html += card('The mass now', sg(cm(x.st.x), 1) + ' cm', x.held ? 'held: let go to release it' : 'from where it hangs at rest; ' + x.st.t.toFixed(1) + ' s on the clock');
+    } else if (tab === 2) {
+      html += card('The motor', x.f.toFixed(3) + ' Hz', 'stroke ±' + cm(x.A).toFixed(2) + ' cm; damping b = ' + x.b.toFixed(2) + ' kg/s, Q = ' + d.Q.toFixed(2));
+      html += card('The mass, last full cycle', L ? '±' + cm(L.X).toFixed(2) + ' cm, ' + (L.delta * 180 / Math.PI).toFixed(0) + '° behind' : '—',
+        L ? 'that is ' + (L.X / x.A).toFixed(2) + ' times the motor\'s stroke' + (settled(x) ? '; it has settled into a steady motion' : '; still settling: the start-up wobble has not died away') : 'measured over each full turn of the motor');
+    } else {
+      html += card('Now', x.f.toFixed(3) + ' Hz', !L ? 'waiting for a full turn of the motor' : x.recorded ? 'recorded: ' + (L.X / x.A).toFixed(2) + ' times the stroke, ' + (L.delta * 180 / Math.PI).toFixed(0) + '° behind. Pick another frequency.' : 'settling… the point is recorded once the start-up wobble dies away (try 16×)');
+      const n = x.series.reduce((a, s) => a + s.pts.length, 0);
+      html += card('Points', String(n), 'damping b = ' + x.b.toFixed(2) + ' kg/s, Q = ' + d.Q.toFixed(2) + '; change the damping, mass or spring to start a new set in a new color');
+    }
+    $('readout').innerHTML = html;
+    $('f_v').textContent = x.f.toFixed(3) + ' Hz'; $('b_v').textContent = x.b.toFixed(2) + ' kg/s'; $('m_v').textContent = x.m.toFixed(2) + ' kg';
+    $('k_v').textContent = x.k.toFixed(1) + ' N/m'; $('A_v').textContent = '±' + cm(x.A).toFixed(2) + ' cm';
+  }
+
+  const TEXT = {
+    1: { lede: 'A mass hangs on a spring, with a paddle in a jar of liquid to slow it down. Pull it down and let go. Predict: if you make the liquid thicker, does the mass come to rest sooner, or later? Find the damping that brings it back to the middle fastest.',
+         notes: '<p><b>What to try.</b> Pull and release with light damping and count the swings as they shrink. Each swing is the same fraction of the one before, so the motion dies away exponentially, and the period is just a little longer than with no damping at all. Turn the damping up: past a certain point the mass no longer swings through the middle, but creeps back. Turn it up further and it creeps more slowly still. The damping in between, the least that stops it overshooting, brings it home fastest. You can also drag the mass to any height and let go.</p>' +
+                '<p><b>Why.</b> The spring pulls back with −<i>kx</i> and the paddle drags with −<i>bv</i>, so <i>m</i>x″ + <i>b</i>x′ + <i>k</i>x = 0. With little damping the mass swings at nearly <i>f</i><sub>0</sub> = (1/2π)√(<i>k</i>/<i>m</i>), its swings shrinking as e<sup>−<i>bt</i>/2<i>m</i></sup>. When <i>b</i> reaches 2√(<i>km</i>), critical damping, the swinging stops altogether. A car\'s suspension is damped heavily for the same reason: so a bump does not leave the car bouncing. The quality factor Q = √(<i>km</i>)/<i>b</i> says how lightly damped it is: in about Q swings the swinging shrinks to 4% of where it started. A tuning fork\'s Q runs to thousands; critical damping is Q = ½.</p>' +
+                '<p><b>The model.</b> A frictionless spring that obeys Hooke\'s law exactly, and a paddle whose drag is exactly proportional to its speed (true for slow motion through a thick liquid). Gravity only sets where the mass hangs; positions are measured from there. The motion is calculated exactly, not step by step.</p>' },
+    2: { lede: 'Now a motor moves the top of the spring up and down by a centimeter. Predict: when the motor runs slowly, does the mass move with it, or against it? What about when it runs fast? And near the natural frequency?',
+         notes: '<p><b>What to try.</b> Start slow: the mass rides along with the motor, in step and with the same stroke. Raise the frequency toward <i>f</i><sub>0</sub>: the motion grows far bigger than the motor\'s, and the mass falls behind by a quarter cycle. Above <i>f</i><sub>0</sub> the motion shrinks again and the mass moves opposite the motor. Watch the start: the motion is irregular at first, a mix of the mass\'s own swinging and the motor\'s rhythm, and settles only as the mass\'s own swinging dies away. With light damping that takes a long time. Tick "motor ×10" to compare the two traces by eye.</p>' +
+                '<p><b>Why.</b> The motor shakes the spring\'s top by <i>A</i> cos <i>ωt</i>, which pushes on the mass with force <i>kA</i> cos <i>ωt</i>. After the start-up wobble dies away, the mass moves at the motor\'s frequency with amplitude <i>X</i> = <i>A</i>ω<sub>0</sub>²/√((ω<sub>0</sub>² − ω²)² + (<i>b</i>ω/<i>m</i>)²), lagging by an angle δ with tan δ = (<i>b</i>ω/<i>m</i>)/(ω<sub>0</sub>² − ω²). Slowly driven, the spring just carries the mass along. Fast, the mass\'s inertia wins and it barely moves, opposite the push. At ω<sub>0</sub>, the spring and the mass\'s inertia cancel, only the damping limits the motion, and the mass lags exactly 90°, moving fastest just as the motor pushes hardest: that is when the motor does the most work on it.</p>' +
+                '<p><b>The model.</b> As on the first screen. The amplitude and lag shown are measured from the motion over each full turn of the motor, the way you would with a stopwatch and ruler; they settle to the formulas above once the start-up wobble has gone. Changing a slider mid-run never jerks the mass: its motion carries on smoothly from where it was.</p>' },
+    3: { lede: 'Map the response: set a frequency, wait for the motion to settle, and the amplitude and lag are recorded. Predict the shape before you start. Then change the damping and map it again.',
+         notes: '<p><b>What to do.</b> Sweep from 0.1 Hz to 3 Hz, putting more points near the natural frequency, where things change fast. Each point is recorded only once the motion has settled; use 16× to wait less. Then change the damping and sweep again; each setting gets its own color. "Theory curves" draws the formulas, dashed, for every set you have measured.</p>' +
+                '<p><b>What to look for.</b> The peak is tall and narrow when the damping is light, low and broad when heavy. With light damping its height is about Q times the motor\'s stroke, and its width (where the energy is at least half the peak\'s) is <i>f</i><sub>0</sub>/Q. The lag always passes through 90° at <i>f</i><sub>0</sub>, sharply when Q is high. The peak itself sits slightly below <i>f</i><sub>0</sub>, at √(<i>f</i><sub>0</sub>² − (<i>b</i>/4π<i>m</i>)²·2), noticeably so only with heavy damping. Light damping also means long settling times: sharp resonance and slow response go together, which is why a radio\'s sharp tuning and a fast-settling instrument pull against each other.</p>' +
+                '<p><b>The model.</b> As before. Recorded amplitudes are the mass\'s motion divided by the motor\'s stroke, so the curve does not depend on the stroke.</p>' }
+  };
+
+  const SHOW = { pull: [1], rest: [1], lab_f: [2, 3], lab_A: [2, 3], lab_mag: [2, 3], clear: [3], lab_theory: [3], graph: [3] };
+  function visibility() {
+    Object.keys(SHOW).forEach(id => { $(id).hidden = SHOW[id].indexOf(tab) < 0; });
+    const x = S();
+    $('go').textContent = x.playing ? 'Pause' : 'Play';
+    document.querySelectorAll('#spd button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.s === x.speed)));
+    $('hint').textContent = tab === 1 ? 'or drag the mass' : '';
+  }
+  function sync() {
+    const x = S();
+    $('f').value = String(x.f); $('b').value = String(bToS(x.b)); $('m').value = String(x.m); $('k').value = String(x.k); $('A').value = String(cm(x.A || 0.01)); $('ys').value = String(x.ys);
+    $('mag').checked = !!x.mag;
+  }
+  function upd() { visibility(); readout(); draw(); }
+  function setTab(k) {
+    tab = k;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  const slider = (id, fn) => $(id).addEventListener('input', () => { const x = S(); fn(x, +$(id).value); retune(x); upd(); });
+  slider('f', (x, v) => { x.f = v; });
+  slider('b', (x, v) => { x.b = sToB(v); });
+  slider('m', (x, v) => { x.m = v; });
+  slider('k', (x, v) => { x.k = v; });
+  slider('A', (x, v) => { x.A = v / 100; });
+  document.querySelectorAll('.nudge button').forEach(b => b.addEventListener('click', () => { const x = S(); x.f = Math.round(Math.max(0.1, Math.min(3, x.f + (+b.dataset.d))) * 1000) / 1000; $('f').value = String(x.f); retune(x); upd(); }));
+  $('ys').addEventListener('change', () => { S().ys = +$('ys').value; drawScene(); });
+  $('mag').addEventListener('change', () => { S().mag = $('mag').checked; drawScene(); });
+  $('theory').addEventListener('change', drawCurves);
+  $('clear').addEventListener('click', () => { TAB[3].series = []; TAB[3].recorded = false; upd(); });
+  $('go').addEventListener('click', () => { const x = S(); x.playing = !x.playing; x.held = false; upd(); });
+  $('pull').addEventListener('click', () => { const x = S(); x.st.x = -0.10; x.st.v = 0; x.held = false; x.playing = true; upd(); });
+  $('rest').addEventListener('click', () => { const x = S(); x.st.x = 0; x.st.v = 0; x.hist = []; upd(); });
+  document.querySelectorAll('#spd button').forEach(b => b.addEventListener('click', () => { S().speed = +b.dataset.s; visibility(); }));
+
+  // drag the mass (first screen): hold it where you like, let go to release it
+  let dragging = false;
+  const pt = e => { const r = $('scene').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  const onMass = ([px, py]) => geo && Math.abs(px - geo.cx) < geo.mw / 2 + 8 && Math.abs(py - geo.massY) < geo.mh / 2 + 8;
+  $('scene').addEventListener('pointerdown', e => { if (tab !== 1 || !onMass(pt(e))) return; dragging = true; $('scene').setPointerCapture(e.pointerId); S().held = true; });
+  $('scene').addEventListener('pointermove', e => {
+    const q = pt(e);
+    if (!dragging) { $('scene').style.cursor = tab === 1 && onMass(q) ? 'grab' : 'default'; return; }
+    const x = S(), eqY = geo.box.y + geo.box.h * 0.48; x.st.x = Math.max(-0.2, Math.min(0.2, (eqY - q[1]) / geo.s / 100)); x.st.v = 0; upd();
+  });
+  const release = () => { if (!dragging) return; dragging = false; const x = S(); x.held = false; x.playing = true; upd(); };
+  $('scene').addEventListener('pointerup', release); $('scene').addEventListener('pointercancel', release);
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null, since = 0;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    const x = S();
+    if (x.playing && !x.held && !document.hidden && dt > 0) {
+      run(x, dt * x.speed); drawScene(); since += dt;
+      if (since > 0.15) { since = 0; readout(); if (tab === 3) drawCurves(); }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
