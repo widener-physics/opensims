@@ -16,6 +16,36 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'polarization',
+    title: 'Polarized light',
+    topic: 'optics',
+    tags: ['polarization', "Malus's law", 'polarizer', "Brewster's angle", 'glare', 'wave plate', 'circular polarization', 'LCD'],
+    blurb: "Watch the electric field of a light wave as it passes through polarizers, reflects off water as glare, and goes through quarter- and half-wave plates. Record a light meter to find Malus's law, the three-polarizer surprise, Brewster's angle, and why many small turns pass almost all the light.",
+    level: 'intro',
+    added: '2026-10-05',
+    status: 'ready'
+  },
+  {
+    slug: 'rotational-inertia',
+    title: 'Torque and rotational inertia',
+    topic: 'rotation',
+    tags: ['torque', 'rotational inertia', 'moment of inertia', 'angular acceleration', 'parallel-axis theorem', 'tension', 'lab'],
+    blurb: "A cross with four sliding masses, spun by a hanging weight on a step pulley, like the classic lab apparatus. Change the pulley to change the torque, slide the masses to change the rotational inertia, race two wheels with the same mass in different places, and measure I from the slope of angular acceleration against torque.",
+    level: 'intro',
+    added: '2026-10-05',
+    status: 'ready'
+  },
+  {
+    slug: 'brachistochrone',
+    title: 'The fastest slide',
+    topic: 'dynamics',
+    tags: ['brachistochrone', 'cycloid', 'energy conservation', 'calculus of variations', 'Bernoulli', 'Galileo', 'tautochrone', 'frictionless'],
+    blurb: "Bend a wire and race a bead down it against the straight line and your own best try: the shortest path is not the fastest. Then drag the end point and watch the cycloid, traced by a rolling circle, fit between the two points and beat every rival, Galileo's circular arc included.",
+    level: 'intro',
+    added: '2026-10-05',
+    status: 'ready'
+  },
+  {
     slug: 'pulling-crate',
     title: 'Pulling a crate',
     topic: 'dynamics',

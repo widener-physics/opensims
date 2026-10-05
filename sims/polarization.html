@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<!--
+  Polarized light - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. It gives Malus's law
+  exactly; its treatment of unpolarized light agrees with an average over 200,000 random polarized beams;
+  crossed polarizers block everything and a third at 45 deg passes 1/8; a quarter-wave plate makes circular
+  light, whose turning direction was checked against the field itself in time; a half-wave plate rotates
+  the polarization by twice its angle; Fresnel reflection conserves energy and vanishes for p light at
+  Brewster's angle; and N polarizers in equal steps pass cos^2N(90 deg/N).
+  Credit: fills a gap - to our knowledge PhET has no polarization simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polarized light</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --beam: #E9B949; --field: #C8321E; --rand: #8A969D; --pol: #2F4A5C; --plate: #2E7D32; --water: #9FC3D8;
+    --s1: #1D4F73; --s2: #C8321E; --s3: #2E7D32; --s4: #B5306D;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 330; }
+  #graph { aspect-ratio: 900 / 250; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.8; }
+    #graph { aspect-ratio: 4 / 3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Polarized light</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Polarizers</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Glare</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Wave plates</button>
+    <button role="tab" id="tab4" aria-selected="false"><span>4</span>Many steps</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="Light passing through polarizers and other elements to a light meter; arrows show the electric field"></canvas>
+  <div class="row2">
+    <button id="rec">Record the meter</button>
+    <button id="clear" class="secondary">Clear points</button>
+    <label><input type="checkbox" id="theory"> theory curve</label>
+    <button id="wave" class="secondary">Freeze the wave</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Recorded meter readings"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_src"><div>Light source</div>
+      <div class="seg" id="src" role="group" aria-label="Light source"><button data-v="lamp">lamp (unpolarized)</button><button data-v="laser">laser (vertical)</button></div></div>
+    <div class="grp" id="lab_np"><div>Polarizers in the beam</div>
+      <div class="seg" id="np" role="group" aria-label="Number of polarizers"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div></div>
+    <label id="lab_a1"><div class="row"><span>Polarizer 1's axis, from vertical</span><span class="val" id="a1_v"></span></div><input type="range" id="a1" min="-90" max="90" step="1"></label>
+    <label id="lab_a2"><div class="row"><span>Polarizer 2's axis</span><span class="val" id="a2_v"></span></div><input type="range" id="a2" min="-90" max="90" step="1"></label>
+    <label id="lab_a3"><div class="row"><span>Polarizer 3's axis</span><span class="val" id="a3_v"></span></div><input type="range" id="a3" min="-90" max="90" step="1"></label>
+    <div class="grp" id="lab_mat"><div>The surface</div>
+      <div class="seg" id="mat" role="group" aria-label="Surface"><button data-v="1.333">water</button><button data-v="1.52">glass</button><button data-v="2.42">diamond</button></div></div>
+    <label id="lab_inc"><div class="row"><span>Angle of incidence (from straight down)</span><span class="val" id="inc_v"></span></div><input type="range" id="inc" min="0" max="89" step="0.5"></label>
+    <label id="lab_glass"><div class="row"><span>Sunglasses' axis, from vertical</span><span class="val" id="glass_v"></span></div><input type="range" id="glass" min="-90" max="90" step="1"></label>
+    <div class="grp" id="lab_plate"><div>Wave plate</div>
+      <div class="seg" id="plate" role="group" aria-label="Wave plate"><button data-v="0">none</button><button data-v="q">quarter-wave</button><button data-v="h">half-wave</button></div></div>
+    <label id="lab_pa"><div class="row"><span>Wave plate's fast axis, from vertical</span><span class="val" id="pa_v"></span></div><input type="range" id="pa" min="-90" max="90" step="1"></label>
+    <label id="lab_an"><div class="row"><span>Polarizer's axis, from vertical</span><span class="val" id="an_v"></span></div><input type="range" id="an" min="-90" max="90" step="1"></label>
+    <label id="lab_N"><div class="row"><span>Number of polarizers, turning 90° in equal steps</span><span class="val" id="N_v"></span></div><input type="range" id="N" min="1" max="30" step="1"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against Malus's law, a Monte Carlo average of
+  //    random beams, the field traced in time, Fresnel's equations and energy conservation. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: polarized light ----
+  // Light travels along the bench toward a meter. Its electric field lies in the plane across the beam: u points
+  // to the right and v up, as seen from the meter looking back toward the source. A beam of definite polarization
+  // is a Jones vector E = (Eu, Ev) of complex amplitudes; the field at one place is Re(E e^(-i w t)).
+  // Light that is unpolarized or only partly polarized is described by its coherency matrix J = <E E^dagger>,
+  // a 2x2 Hermitian matrix (an average over the light's random changes); its trace is the intensity.
+  // An optical element with Jones matrix M turns J into M J M^dagger, which handles every kind of light exactly.
+  //   polarizer, axis at angle theta from vertical (counterclockwise as seen from the meter): M = n n^T, n = (-sin, cos)
+  //   wave plate, fast axis along n, retardance G: M = n n^T + e^(iG) s s^T, s = (cos, sin) the slow axis
+  //   reflection off a surface (plane of incidence vertical): s light (horizontal, u) and p light (vertical, v)
+  //       reflect with the Fresnel amplitudes rs and rp.
+  // Stokes numbers: S0 intensity, S1 = horizontal - vertical, S2 = diagonal, S3 = circular, positive when the field
+  // turns counterclockwise as seen from the meter.
+
+  const DEG = Math.PI / 180;
+  // complex numbers as [re, im]
+  const cx = (re, im) => [re, im || 0];
+  const cadd = (a, b) => [a[0] + b[0], a[1] + b[1]];
+  const cmul = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+  const conj = a => [a[0], -a[1]];
+  const cexp = th => [Math.cos(th), Math.sin(th)];
+  const abs2 = a => a[0] * a[0] + a[1] * a[1];
+  // 2x2 complex matrices as [[a, b], [c, d]]
+  function mmul(A, B) {
+    return [[cadd(cmul(A[0][0], B[0][0]), cmul(A[0][1], B[1][0])), cadd(cmul(A[0][0], B[0][1]), cmul(A[0][1], B[1][1]))],
+            [cadd(cmul(A[1][0], B[0][0]), cmul(A[1][1], B[1][0])), cadd(cmul(A[1][0], B[0][1]), cmul(A[1][1], B[1][1]))]];
+  }
+  const dagger = A => [[conj(A[0][0]), conj(A[1][0])], [conj(A[0][1]), conj(A[1][1])]];
+  const transform = (M, J) => mmul(mmul(M, J), dagger(M));          // J -> M J M^dagger
+
+  // light
+  const unpolarized = I => [[cx(I / 2), cx(0)], [cx(0), cx(I / 2)]];
+  function pure(E) { return [[cmul(E[0], conj(E[0])), cmul(E[0], conj(E[1]))], [cmul(E[1], conj(E[0])), cmul(E[1], conj(E[1]))]]; }
+  const linear = (I, thDeg) => { const a = Math.sqrt(I); return pure([cx(-a * Math.sin(thDeg * DEG)), cx(a * Math.cos(thDeg * DEG))]); };
+  const intensity = J => J[0][0][0] + J[1][1][0];
+
+  // elements
+  function polarizer(thDeg) {
+    const n = [-Math.sin(thDeg * DEG), Math.cos(thDeg * DEG)];
+    return [[cx(n[0] * n[0]), cx(n[0] * n[1])], [cx(n[1] * n[0]), cx(n[1] * n[1])]];
+  }
+  function wavePlate(thDeg, retard) {
+    const f = [-Math.sin(thDeg * DEG), Math.cos(thDeg * DEG)], s = [Math.cos(thDeg * DEG), Math.sin(thDeg * DEG)], e = cexp(retard);
+    const el = (i, j) => cadd(cx(f[i] * f[j]), cmul(e, cx(s[i] * s[j])));
+    return [[el(0, 0), el(0, 1)], [el(1, 0), el(1, 1)]];
+  }
+  const QUARTER = Math.PI / 2, HALF = Math.PI;
+  // Fresnel amplitude reflection, from air onto a surface of index n at incidence thetaI (degrees)
+  function fresnel(n, iDeg) {
+    const ci = Math.cos(iDeg * DEG), si = Math.sin(iDeg * DEG), st = si / n, ct = Math.sqrt(1 - st * st);
+    return { rs: (ci - n * ct) / (ci + n * ct), rp: (n * ci - ct) / (n * ci + ct), Rs: ((ci - n * ct) / (ci + n * ct)) ** 2, Rp: ((n * ci - ct) / (n * ci + ct)) ** 2 };
+  }
+  function reflector(n, iDeg) { const f = fresnel(n, iDeg); return [[cx(f.rs), cx(0)], [cx(0), cx(f.rp)]]; }
+  const brewster = n => Math.atan(n) / DEG;
+
+  // what the light is like: Stokes numbers, degree of polarization, and the ellipse its polarized part traces
+  function stokes(J) {
+    const S0 = intensity(J), S1 = J[0][0][0] - J[1][1][0], S2 = 2 * J[0][1][0], S3 = -2 * J[0][1][1];
+    const Ip = Math.hypot(S1, S2, S3);
+    return { S0, S1, S2, S3, p: S0 > 0 ? Math.min(1, Ip / S0) : 0, Ip,
+      psi: 0.5 * Math.atan2(S2, S1),                                  // tilt of the ellipse from the u (horizontal) axis
+      chi: Ip > 0 ? 0.5 * Math.asin(Math.max(-1, Math.min(1, S3 / Ip))) : 0 };   // 0 = straight line, +-45 deg = circle
+  }
+  // a Jones vector with the same polarized part (for drawing the field)
+  function polarizedPart(J) {
+    const s = stokes(J), a = Math.sqrt(s.Ip), c = Math.cos(s.chi), sn = Math.sin(s.chi), cp = Math.cos(s.psi), sp = Math.sin(s.psi);
+    return [cx(a * c * cp, -a * sn * sp), cx(a * c * sp, a * sn * cp)];
+  }
+  // the field at phase wt for a Jones vector: Re(E e^(-i w t))
+  const fieldAt = (E, wt) => [E[0][0] * Math.cos(wt) + E[0][1] * Math.sin(wt), E[1][0] * Math.cos(wt) + E[1][1] * Math.sin(wt)];
+  // angle of a straight-line polarization, from vertical, counterclockwise as seen from the meter, in (-90, 90]
+  function lineAngle(J) { const s = stokes(J); let a = s.psi / DEG - 90; while (a <= -90) a += 180; while (a > 90) a -= 180; return a; }
+
+  // a row of elements
+  const through = (J, Ms) => Ms.reduce((acc, M) => transform(M, acc), J);
+  // N polarizers turning the light from vertical to horizontal in equal steps
+  function manySteps(N) { const Ms = []; for (let k = 1; k <= N; k++) Ms.push(polarizer(90 * k / N)); return Ms; }
+  // ---- end of core ----
+
+  const TAB = {
+    1: { src: 'lamp', np: 2, a: [0, 60, 90], series: [] },
+    2: { n: 1.333, inc: 30, glass: 0, series: [] },
+    3: { plate: 'q', pa: 45, an: 0, series: [] },
+    4: { N: 1, series: [] }
+  };
+  let tab = 1, frozen = false, wt = 0;
+  const S = () => TAB[tab];
+  const fmtA = a => (a > 0 ? '+' : a < 0 ? '−' : '') + Math.abs(a) + '°';
+  const pc = v => (100 * v).toFixed(v < 0.001 && v > 0 ? 3 : v < 0.1 ? 2 : 1) + '%';
+  const pcShort = v => Math.abs(v) < 5e-5 ? '0%' : pc(v);
+
+  // the light at each stage, for the screen in use: [{ J, after: label }]
+  function stages(x) {
+    x = x || S();
+    if (tab === 1) {
+      const out = [{ J: x.src === 'lamp' ? unpolarized(1) : linear(1, 0), at: x.src === 'lamp' ? 'from the lamp' : 'from the laser' }];
+      for (let i = 0; i < x.np; i++) out.push({ J: transform(polarizer(x.a[i]), out[out.length - 1].J), at: 'after polarizer ' + (i + 1) });
+      return out;
+    }
+    if (tab === 2) {
+      const J0 = unpolarized(1), Jr = transform(reflector(x.n, x.inc), J0);
+      return [{ J: J0, at: 'from the lamp' }, { J: Jr, at: 'reflected glare' }, { J: transform(polarizer(x.glass), Jr), at: 'through the sunglasses' }];
+    }
+    if (tab === 3) {
+      const J0 = linear(1, 0), J1 = x.plate === '0' ? J0 : transform(wavePlate(x.pa, x.plate === 'q' ? QUARTER : HALF), J0);
+      return [{ J: J0, at: 'from the laser' }, { J: J1, at: x.plate === '0' ? 'no plate' : 'after the wave plate' }, { J: transform(polarizer(x.an), J1), at: 'after the polarizer' }];
+    }
+    const out = [{ J: linear(1, 0), at: 'from the laser' }];
+    manySteps(x.N).forEach((M, i) => out.push({ J: transform(M, out[out.length - 1].J), at: 'after ' + (i + 1) }));
+    return out;
+  }
+  const meterOf = x => intensity(stages(x).slice(-1)[0].J);
+  // describe the polarization in words
+  function describe(J) {
+    const s = stokes(J), I0 = s.S0;
+    if (I0 < 5e-5) return 'no light';
+    if (s.p < 0.02) return 'unpolarized';
+    const deg = Math.abs(s.chi) * 180 / Math.PI, ang = lineAngle(J), part = s.p < 0.98 ? Math.round(100 * s.p) + '% polarized, ' : '';
+    if (deg < 1) return part + 'a straight line at ' + fmtA(Math.round(ang)) + ' from vertical';
+    const turn = s.S3 > 0 ? 'counterclockwise' : 'clockwise';
+    if (deg > 44) return part + 'circular, turning ' + turn + ' as seen from the meter';
+    return part + 'elliptical, long axis at ' + fmtA(Math.round(ang)) + ', turning ' + turn;
+  }
+
+  // ---- recorded points: tab 1 against the last polarizer's angle, tab 2 against incidence, tab 3 against the
+  //      polarizer's angle, tab 4 against the number of polarizers; a new set (color) whenever anything else changes
+  const COLS = ['--s1', '--s2', '--s3', '--s4'];
+  function varOf(x) { return tab === 1 ? x.a[x.np - 1] : tab === 2 ? x.inc : tab === 3 ? x.an : x.N; }
+  function keyOf(x) { return tab === 1 ? [x.src, x.np, x.a.slice(0, x.np - 1).join(',')].join('|') : tab === 2 ? [x.n, x.glass].join('|') : tab === 3 ? [x.plate, x.pa].join('|') : 'N'; }
+  function labelOf(x) {
+    if (tab === 1) return (x.src === 'lamp' ? 'lamp' : 'laser') + (x.np > 1 ? ', polarizers before the last at ' + x.a.slice(0, x.np - 1).map(fmtA).join(', ') : ', one polarizer');
+    if (tab === 2) return ({ 1.333: 'water', 1.52: 'glass', 2.42: 'diamond' })[x.n] + ', sunglasses at ' + fmtA(x.glass);
+    if (tab === 3) return (x.plate === '0' ? 'no plate' : (x.plate === 'q' ? 'quarter' : 'half') + '-wave plate at ' + fmtA(x.pa));
+    return 'equal steps from vertical to horizontal';
+  }
+  function record() {
+    const x = S(), key = keyOf(x);
+    let s = x.series.find(q => q.key === key);
+    if (!s) { s = { key, label: labelOf(x), snap: JSON.parse(JSON.stringify(x, (k, v) => k === 'series' ? undefined : v)), pts: [], col: COLS[x.series.length % 4] }; x.series.push(s); if (x.series.length > 4) x.series.shift(); }
+    const v = varOf(x); s.pts = s.pts.filter(p => p[0] !== v); s.pts.push([v, meterOf(x)]);
+  }
+  // theory for a recorded set: sweep its variable with everything else as it was
+  function theory(s, v) {
+    const y = Object.assign({}, s.snap); y.a = s.snap.a ? s.snap.a.slice() : undefined;
+    if (tab === 1) y.a[y.np - 1] = v; else if (tab === 2) y.inc = v; else if (tab === 3) y.an = v; else y.N = v;
+    return meterOf(y);
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+  // The field across the beam has two parts: v, drawn perpendicular to the beam in the picture, and u, which
+  // points out of the screen toward you, drawn slanting down and to the left.
+  const U = [-0.5, 0.38];
+  const GLARE_MAG = 3;          // reflected light is drawn with its field this many times larger (the meter gives the true share)
+  function arrow(ctx, x0, y0, x1, y1, col, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(6, L * 0.4);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 1.6;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.5, y1 - uy * hd + ux * hd * 0.5); ctx.lineTo(x1 - ux * hd + uy * hd * 0.5, y1 - uy * hd - ux * hd * 0.5); ctx.closePath(); ctx.fill();
+  }
+  // the beam from A to B with its field: the polarized part as a wave, the unpolarized part as arrows that
+  // point every which way and keep changing
+  const hash = k => { const s = Math.sin(k * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  function beam(ctx, A, B, J, amp, vdir, n, mag) {
+    mag = mag || 1; const cap = (x0, y0, dx, dy) => { const L = Math.hypot(dx, dy), k = L > amp * 1.15 ? amp * 1.15 / L : 1; return [x0 + dx * k, y0 + dy * k]; };
+    const len = Math.hypot(B[0] - A[0], B[1] - A[1]), I0 = Math.max(0, intensity(J));
+    ctx.strokeStyle = 'rgba(233,185,73,' + (0.25 + 0.6 * Math.sqrt(Math.min(1, I0))) + ')'; ctx.lineWidth = 3 + 7 * Math.sqrt(Math.min(1, I0));
+    ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+    if (I0 < 1e-6) return;
+    const st = stokes(J), E = polarizedPart(J), Iu = Math.max(0, st.S0 - st.Ip), N = n || Math.max(4, Math.round(len / 16));
+    const vx = vdir[0], vy = vdir[1];
+    for (let k = 0; k < N; k++) {
+      const f = (k + 0.5) / N, px = A[0] + (B[0] - A[0]) * f, py = A[1] + (B[1] - A[1]) * f, kz = 2 * TAU * (len * f) / 90;
+      if (st.Ip > 1e-9) {
+        const e = fieldAt(E, wt - kz);
+        const q = cap(px, py, mag * amp * (e[0] * U[0] + e[1] * vx), mag * amp * (e[0] * U[1] + e[1] * vy));
+        arrow(ctx, px, py, q[0], q[1], C('--field'), 1.8);
+      }
+      if (Iu > 1e-4) {
+        const ang = TAU * hash(k + 7 * Math.floor(wt / 2.2 + hash(k) * 3)), c = Math.cos(wt * 1.0 - kz) * Math.sqrt(Iu * 2);
+        const ex = Math.cos(ang) * c, ey = Math.sin(ang) * c;
+        const q = cap(px, py, mag * amp * (ex * U[0] + ey * vx), mag * amp * (ex * U[1] + ey * vy));
+        arrow(ctx, px, py, q[0], q[1], C('--rand'), 1.4);
+      }
+    }
+  }
+  // a polarizer (or plate) seen at a slant: a disk across the beam with its axis marked
+  function disk(ctx, cx, cy, R, thDeg, col, label, vdir) {
+    vdir = vdir || [0, -1];
+    ctx.save(); ctx.globalAlpha = 0.85;
+    ctx.fillStyle = 'rgba(47,74,92,0.10)'; ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.beginPath(); for (let k = 0; k <= 48; k++) { const a = TAU * k / 48, u = Math.cos(a), v = Math.sin(a); const X = cx + R * (u * U[0] + v * vdir[0]), Y = cy + R * (u * U[1] + v * vdir[1]); k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); } ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (thDeg !== null) {
+      const nu = -Math.sin(thDeg * Math.PI / 180), nv = Math.cos(thDeg * Math.PI / 180);
+      ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx - R * (nu * U[0] + nv * vdir[0]), cy - R * (nu * U[1] + nv * vdir[1])); ctx.lineTo(cx + R * (nu * U[0] + nv * vdir[0]), cy + R * (nu * U[1] + nv * vdir[1])); ctx.stroke();
+    }
+    ctx.restore();
+    if (label) { font(ctx, 11); ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.fillText(label, cx, cy + R + 16); }
+  }
+  // end-on picture of the light, as seen from the meter: u to the right, v up
+  function endOn(ctx, cx, cy, r, J, label, mag) {
+    ctx.fillStyle = '#F7F9FA'; ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = C('--soft'); ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy); ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r); ctx.stroke();
+    const st = stokes(J), I0 = st.S0, sc = r * 0.8 * Math.min(mag || 1, I0 > 0 ? 1 / Math.sqrt(I0) : 1);
+    if (I0 > 1e-6) {
+      const Iu = Math.max(0, st.S0 - st.Ip);
+      if (Iu > 1e-4) { ctx.strokeStyle = C('--rand'); ctx.lineWidth = 1.3; const L = sc * Math.sqrt(Iu); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(cx - L * Math.cos(a), cy + L * Math.sin(a)); ctx.lineTo(cx + L * Math.cos(a), cy - L * Math.sin(a)); ctx.stroke(); } }
+      if (st.Ip > 1e-6) {
+        const E = polarizedPart(J);
+        ctx.strokeStyle = C('--field'); ctx.lineWidth = 1.8; ctx.beginPath();
+        for (let k = 0; k <= 64; k++) { const e = fieldAt(E, TAU * k / 64); const X = cx + sc * e[0], Y = cy - sc * e[1]; k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); } ctx.stroke();
+        const e = fieldAt(E, wt); ctx.fillStyle = C('--field'); ctx.beginPath(); ctx.arc(cx + sc * e[0], cy - sc * e[1], 3, 0, TAU); ctx.fill();
+      }
+    }
+    if (label) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText(label, cx, cy + r + 12); }
+  }
+  function source(ctx, x, y, kind) {
+    ctx.fillStyle = '#39444B'; ctx.fillRect(x - 26, y - 14, 30, 28);
+    ctx.fillStyle = C('--beam'); ctx.beginPath(); ctx.arc(x + 4, y, 6, 0, TAU); ctx.fill();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText(kind, x - 10, y + 28);
+  }
+  function meter(ctx, x, y, I) {
+    ctx.fillStyle = '#39444B'; ctx.fillRect(x, y - 22, 64, 44);
+    font(ctx, 13, '600'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(pcShort(I), x + 32, y + 5);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.fillText('light meter', x + 32, y + 36);
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    const x = S(), st = stages(x), amp = Math.min(H * 0.17, 46);
+    if (tab === 2) { drawGlare(ctx, W, H, compact, x, st, amp); return; }
+    const y = H * (compact ? 0.6 : 0.62), x0 = 46, x1 = W - 80;
+    // where the elements go along the bench
+    const nEl = st.length - 1, kind = tab === 1 ? (x.src === 'lamp' ? 'lamp' : 'laser') : 'laser';
+    const xs = []; for (let i = 0; i <= nEl + 1; i++) xs.push(x0 + (x1 - x0) * i / (nEl + 1));
+    source(ctx, x0, y, kind);
+    for (let i = 0; i <= nEl; i++) beam(ctx, [xs[i] + (i ? 0 : 8), y], [xs[i + 1], y], st[i].J, amp, [0, -1], tab === 4 && nEl > 15 ? 1 : tab === 4 && nEl > 8 ? 2 : undefined);
+    const R = Math.min(amp * 1.2, H * 0.22);
+    for (let i = 1; i <= nEl; i++) {
+      let th, col = C('--pol'), lab;
+      if (tab === 1) { th = x.a[i - 1]; lab = compact ? 'P' + i : 'polarizer ' + i; }
+      else if (tab === 3) { if (i === 1) { th = x.plate === '0' ? null : x.pa; col = C('--plate'); lab = x.plate === '0' ? '(no plate)' : (x.plate === 'q' ? 'λ/4' : 'λ/2') + ' plate'; } else { th = x.an; lab = 'polarizer'; } }
+      else { th = 90 * i / nEl; lab = nEl <= 6 ? fmtA(Math.round(th * 10) / 10) : (i === 1 || i === nEl ? fmtA(Math.round(th)) : ''); }
+      disk(ctx, xs[i], y, tab === 4 && nEl > 15 ? R * 0.62 : tab === 4 && nEl > 8 ? R * 0.8 : R, th, col, lab);
+    }
+    meter(ctx, x1 + 6, y, intensity(st[nEl].J));
+    // end-on pictures above each stretch of beam (all of them, or the first and last on the many-step screen)
+    const r = Math.min(26, H * 0.09), show = tab === 4 && nEl > 4 ? [0, nEl] : st.map((s, i) => i);
+    show.forEach(i => { const cx = (xs[i] + xs[i + 1]) / 2; endOn(ctx, cx, r + 8, r, st[i].J, compact ? '' : st[i].at); });
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    if (!compact) ctx.fillText('red: the electric field; gray: unpolarized light, its direction changing at random', 10, H - 8);
+  }
+  // the glare screen: lamp shining down on a surface; the reflection goes up through sunglasses to a meter
+  function drawGlare(ctx, W, H, compact, x, st, amp) {
+    const sy = H * 0.74, hit = [W * (compact ? 0.42 : 0.4), sy], L = Math.min(W * 0.36, sy - (compact ? 50 : 95)), i = x.inc * Math.PI / 180;
+    ctx.fillStyle = C('--water'); ctx.globalAlpha = x.n > 2 ? 0.45 : x.n > 1.4 ? 0.6 : 0.75; ctx.fillRect(0, sy, W, H - sy); ctx.globalAlpha = 1;
+    font(ctx, 11); ctx.fillStyle = C('--pol'); ctx.textAlign = 'left'; ctx.fillText(({ 1.333: 'water', 1.52: 'glass', 2.42: 'diamond' })[x.n] + ', n = ' + x.n, 10, sy + 18);
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hit[0], sy - L * 0.9); ctx.lineTo(hit[0], sy + 30); ctx.stroke(); ctx.setLineDash([]);
+    const src = [hit[0] - L * Math.sin(i), sy - L * Math.cos(i)], out = [hit[0] + L * Math.sin(i), sy - L * Math.cos(i)];
+    const dir = [Math.sin(i), -Math.cos(i)], vIn = [Math.cos(i), -Math.sin(i)], vOut = [-Math.cos(i), -Math.sin(i)];   // v: in the plane of incidence, across each beam
+    beam(ctx, src, hit, st[0].J, amp * 0.8, vIn, 7);
+    const mid = [hit[0] + (out[0] - hit[0]) * 0.62, hit[1] + (out[1] - hit[1]) * 0.62];
+    beam(ctx, hit, mid, st[1].J, amp * 0.8, vOut, 5, GLARE_MAG);
+    beam(ctx, mid, out, st[2].J, amp * 0.8, vOut, 3, GLARE_MAG);
+    // refracted beam into the surface, faint
+    const sinT = Math.sin(i) / x.n, t = Math.asin(sinT);
+    ctx.strokeStyle = 'rgba(233,185,73,0.35)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(hit[0], hit[1]); ctx.lineTo(hit[0] + 60 * Math.sin(t), hit[1] + 60 * Math.cos(t)); ctx.stroke();
+    // lamp, sunglasses (a polarizer across the reflected beam), meter
+    ctx.save(); ctx.translate(src[0], src[1]); ctx.rotate(Math.atan2(hit[1] - src[1], hit[0] - src[0])); ctx.fillStyle = '#39444B'; ctx.fillRect(-26, -12, 26, 24); ctx.restore();
+    disk(ctx, mid[0], mid[1], Math.min(amp * 1.05, 40), x.glass, C('--pol'), compact || x.inc < 20 ? '' : 'sunglasses', vOut);
+    ctx.save(); ctx.translate(out[0], out[1]); ctx.rotate(Math.atan2(dir[1], dir[0])); ctx.fillStyle = '#39444B'; ctx.fillRect(0, -16, 44, 32); ctx.restore();
+    { const lab = 'meter: ' + pcShort(intensity(st[2].J)); font(ctx, 13, '600'); const tw = ctx.measureText(lab).width, end = [out[0] + 44 * dir[0], out[1] + 44 * dir[1]];
+      ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; const fits = end[0] + 14 + tw < W - 6; ctx.fillText(lab, fits ? end[0] + 14 : W - tw - 6, fits ? end[1] + 5 : Math.max(out[1], end[1]) + 34); }
+    // angle mark
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(hit[0], hit[1], 34, -Math.PI / 2 - i, -Math.PI / 2); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(x.inc + '°', hit[0] - 6, hit[1] - 38);
+    // end-on views of the glare before and after the sunglasses
+    if (compact) {
+      const r = Math.min(20, (H - sy) * 0.3), cy = sy + r + 6;
+      endOn(ctx, W - 48, cy, r, st[2].J, 'through glasses', GLARE_MAG); endOn(ctx, W - 48 - 2 * r - 56, cy, r, st[1].J, 'the glare', GLARE_MAG);
+    } else {
+      const r = Math.min(26, H * 0.09), ex = W - 3 * r - 30;
+      endOn(ctx, ex, r + 10, r, st[1].J, 'the glare', GLARE_MAG);
+      endOn(ctx, ex, 3 * r + 34, r, st[2].J, 'through glasses', GLARE_MAG);
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+      ctx.fillText('arrows out of the screen: the field along the surface (s); across the beam in the screen: the field in the plane of incidence (p)', 10, 16);
+      ctx.fillText('the reflected light is dim, so its field is drawn ' + GLARE_MAG + '× larger', 10, 31);
+    }
+  }
+
+  // graphs of recorded meter readings
+  function drawGraph() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 100) return;
+    const x = S(), ml = compact ? 46 : 56, b = { x: ml, y: 24, w: W - ml - 14, h: H - 24 - 40 };
+    const xr = tab === 2 ? [0, 90] : tab === 4 ? [0, 30] : [-90, 90];
+    const top = tab === 2 ? 0.5 : 1;
+    const X = v => b.x + (v - xr[0]) / (xr[1] - xr[0]) * b.w, Y = v => b.y + b.h - v / top * b.h;
+    ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1; font(ctx, 10); ctx.fillStyle = C('--muted');
+    const xt = tab === 2 ? [0, 15, 30, 45, 60, 75, 90] : tab === 4 ? [0, 5, 10, 15, 20, 25, 30] : [-90, -60, -30, 0, 30, 60, 90];
+    xt.forEach(v => { ctx.beginPath(); ctx.moveTo(X(v) + 0.5, b.y); ctx.lineTo(X(v) + 0.5, b.y + b.h); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(tab === 4 ? String(v) : fmtA(v), X(v), b.y + b.h + 13); });
+    const nt = top < 1 ? 5 : 4; for (let k = 0; k <= nt; k++) { const v = top * k / nt; ctx.beginPath(); ctx.moveTo(b.x, Y(v) + 0.5); ctx.lineTo(b.x + b.w, Y(v) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(Math.round(v * 100) + '%', b.x - 4, Y(v) + 3); }
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+    ctx.fillText(tab === 1 ? 'angle of the last polarizer, from vertical' : tab === 2 ? 'angle of incidence' : tab === 3 ? 'polarizer\'s angle, from vertical' : 'number of polarizers', b.x + b.w / 2, b.y + b.h + 28);
+    ctx.textAlign = 'left'; font(ctx, 12); ctx.fillText('meter reading, as a share of the ' + (tab === 1 && x.src === 'lamp' || tab === 2 ? 'lamp\'s' : 'laser\'s') + ' light', b.x, b.y - 8);
+    // where the variable is now
+    const vnow = varOf(x); ctx.strokeStyle = C('--hot'); ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(vnow) + 0.5, b.y); ctx.lineTo(X(vnow) + 0.5, b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+    x.series.forEach((s, i) => {
+      if ($('theory').checked) {
+        ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip(); ctx.strokeStyle = C(s.col); ctx.globalAlpha = 0.6; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.beginPath();
+        if (tab === 4) { for (let N = 1; N <= 30; N++) { const v = theory(s, N); N > 1 ? ctx.lineTo(X(N), Y(v)) : ctx.moveTo(X(N), Y(v)); } }
+        else { const n = 360; for (let k = 0; k <= n; k++) { const v = xr[0] + (xr[1] - xr[0]) * k / n, t = theory(s, tab === 2 ? Math.min(89.9, v) : v); k ? ctx.lineTo(X(v), Y(t)) : ctx.moveTo(X(v), Y(t)); } }
+        ctx.stroke(); ctx.restore();
+      }
+      ctx.fillStyle = C(s.col); s.pts.forEach(([v, I]) => { ctx.beginPath(); ctx.arc(X(v), Y(Math.min(I, top)), 4, 0, TAU); ctx.fill(); });
+      // legend: top right, except where the curves usually run (top right on the glare and many-step screens)
+      font(ctx, 10); const tw = ctx.measureText(s.label).width, n = x.series.length;
+      const lx = tab === 2 ? b.x + 6 : b.x + b.w - 6 - tw, ly = tab === 4 ? b.y + b.h - 8 - 13 * (n - 1 - i) : b.y + 14 + 13 * i;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(lx - 3, ly - 10, tw + 6, 13);
+      ctx.fillStyle = C(s.col); ctx.textAlign = 'left'; ctx.fillText(s.label, lx, ly);
+    });
+    if (!x.series.length) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('no points yet: set things up, then "Record the meter"', b.x + b.w / 2, b.y + b.h / 2); }
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  function readout() {
+    const x = S(), st = stages(x), last = st[st.length - 1].J;
+    let html = card('Light meter', pcShort(intensity(last)), 'of the ' + (tab === 1 && x.src === 'lamp' || tab === 2 ? 'lamp\'s' : 'laser\'s') + ' light; the light reaching it is ' + describe(last));
+    if (tab === 1) html += card('Stage by stage', st.slice(1).map((s, i) => 'P' + (i + 1) + ': ' + pcShort(intensity(s.J))).join(', '), 'what is left after each polarizer, each one keeping only the part of the field along its axis');
+    if (tab === 2) {
+      const f = fresnel(x.n, x.inc), Rtot = (f.Rs + f.Rp) / 2, s = stokes(st[1].J);
+      html += card('The glare', pc(Rtot) + ' of the lamp\'s light', 'reflected; it is ' + Math.round(100 * s.p) + '% polarized. Of the light polarized along the surface, ' + pc(f.Rs) + ' reflects; of the light polarized in the plane of incidence, ' + pc(f.Rp));
+    }
+    if (tab === 3) html += card('After the wave plate', describe(st[1].J).replace(/^./, c => c.toUpperCase()), 'the plate does not absorb any light; it only changes how the field turns');
+    if (tab === 4) {
+      const n = x.N, t = intensity(last);
+      html += card('Each step', n === 1 ? 'one turn of 90°' : (90 / n).toFixed(n > 12 ? 2 : 1) + '° per polarizer', n === 1 ? 'a single horizontal polarizer blocks vertical light completely' : 'each polarizer passes cos²(' + (90 / n).toFixed(1) + '°) = ' + pc(Math.cos(Math.PI / 2 / n) ** 2) + ' of what reaches it; ' + n + ' of them pass ' + pc(t));
+    }
+    $('readout').innerHTML = html;
+    if (tab === 1) { [0, 1, 2].forEach(i => { $('a' + (i + 1) + '_v').textContent = fmtA(x.a[i]); }); }
+    if (tab === 2) { $('inc_v').textContent = x.inc + '°'; $('glass_v').textContent = fmtA(x.glass) + (x.glass === 0 ? ' (vertical)' : Math.abs(x.glass) === 90 ? ' (horizontal)' : ''); }
+    if (tab === 3) { $('pa_v').textContent = fmtA(x.pa); $('an_v').textContent = fmtA(x.an); }
+    if (tab === 4) $('N_v').textContent = String(x.N);
+  }
+
+  const TEXT = {
+    1: { lede: 'Light from a lamp passes through a polarizer and then a second one, to a light meter. Predict: as you turn the second polarizer, how does the reading change? Then set two polarizers at right angles, so no light gets through, and predict what happens if you slip a third one between them.',
+         notes: '<p><b>What to try.</b> With one polarizer, turn it all the way round: half the lamp\'s light always gets through. Add a second and turn it, recording the meter every 10° or so; the readings trace a smooth curve, highest when the two axes line up, zero when they are at right angles. Then cross the first and last at 0° and 90°, add a third in the middle, and turn it. Switch to the laser, whose light starts out polarized vertically.</p>' +
+                '<p><b>Why.</b> Light is a wave in the electric field, which shakes across the beam. Light from a lamp is a jumble of every direction of shaking, changing all the time; a polarizer passes only the part of the field along its axis. A field <i>E</i> at an angle <i>θ</i> to the axis has a part <i>E</i> cos <i>θ</i> along it, and since intensity goes as the square of the field, the light that gets through is <i>I</i> = <i>I</i><sub>0</sub> cos² <i>θ</i>: Malus\'s law (1809). Crossed polarizers pass nothing. A third one at 45° between them does not add light: it turns the polarization part of the way, so the last polarizer no longer meets light at right angles to it. What gets through is ½ × cos² 45° × cos² 45° = 1/8.</p>' +
+                '<p><b>The model.</b> Ideal polarizers: they pass all of the light along their axis and none across it (real ones pass 80 to 90% and leak a little). The red arrows show the field\'s direction and size along the beam, slowed down by about 10<sup>15</sup>; the circles above show the field as seen from the meter, looking back at the source. Angles are measured from vertical, counterclockwise as seen from the meter.</p>' },
+    2: { lede: 'Sunlight reflected off water or a road is glare. Polarized sunglasses cut it, but only when you hold your head upright. Predict: at what angle does the glare become completely polarized? Turn the sunglasses and change the angle of the light to find out.',
+         notes: '<p><b>What to try.</b> Hold the sunglasses vertical (0°) and sweep the angle of incidence, recording the meter as you go; then do the same with them horizontal (90°). With them vertical, the glare dips to nothing at one angle: Brewster\'s angle, about 53° for water and 57° for glass. Turn your sunglasses sideways and the glare comes back. Try diamond.</p>' +
+                '<p><b>Why.</b> Light polarized along the surface (s) and light polarized in the plane of incidence (p) reflect by different amounts, given by Fresnel\'s equations. At Brewster\'s angle, tan <i>θ</i><sub>B</sub> = <i>n</i>, the reflected and refracted beams are at right angles, and the p light cannot reflect at all: the glare is completely polarized along the surface, which is horizontal for a lake or a road. Polarized sunglasses have their axis vertical, so they block it. Photographers use polarizing filters the same way, to cut reflections from water and windows.</p>' +
+                '<p><b>The model.</b> Light from the lamp is unpolarized and falls on a flat, clean surface of a transparent material (water 1.333, crown glass 1.52, diamond 2.42; indices for yellow light). Only the reflection from the top surface is counted. The sunglasses are an ideal polarizer; "vertical" means in the plane of incidence.</p>' },
+    3: { lede: 'A wave plate does not block light; it delays the part of the field along one axis behind the other. Vertically polarized laser light goes through a quarter-wave plate. Predict: if its axis is at 45°, what does the polarizer after it see as you turn it?',
+         notes: '<p><b>What to try.</b> With the quarter-wave plate at 45°, turn the polarizer and record the meter: it reads 50% at every angle, as if the light were unpolarized, yet the circle shows the field going round and round in a perfect circle. Turn the plate to −45° and it goes round the other way. At other plate angles the light is elliptical, and the meter swings between a maximum and a minimum. Switch to the half-wave plate: the light stays a straight line, but turned by twice the plate\'s angle. With the plate at 0° or 90° it does nothing at all.</p>' +
+                '<p><b>Why.</b> In a wave plate (a slice of a crystal such as quartz or mica, or a stretched plastic film) light polarized along one axis travels slower than along the other. The plate\'s thickness is chosen so the slow part falls a quarter or a half of a wave behind. Split vertical light into two equal parts along axes at ±45°, delay one by a quarter wave, and they add up to a field that turns in a circle: circular polarization. Delay it by half a wave and they add up to a straight line again, mirrored across the plate\'s axis. 3D cinema glasses use circular polarization, so the picture does not fade when you tilt your head.</p>' +
+                '<p><b>The model.</b> Ideal plates of exactly a quarter or a half wave for the laser\'s color, which do not absorb. The direction of turning is given as seen from the meter, looking back toward the laser.</p>' },
+    4: { lede: 'A vertical polarizer and a horizontal one block all light. Now turn vertical light to horizontal in steps, with many polarizers each turned a little further. Predict: with 30 polarizers, how much of the light gets through?',
+         notes: '<p><b>What to try.</b> Start with one polarizer at 90°: nothing gets through. Two, at 45° and 90°: a quarter. Then increase the number, recording the meter each time. More polarizers let more light through, approaching all of it.</p>' +
+                '<p><b>Why.</b> Each polarizer is turned by 90°/<i>N</i> from the one before, so each passes cos²(90°/<i>N</i>) of what reaches it, and <i>N</i> of them pass cos<sup>2<i>N</i></sup>(90°/<i>N</i>). For small steps each loss is tiny, about (90°/<i>N</i>)² in radians, and the total loss, about <i>N</i> × (π/2<i>N</i>)², shrinks like 1/<i>N</i>. With enough steps the polarizers turn the light rather than block it. A twisted stack of molecules in a liquid-crystal display does exactly this, turning the light 90° between crossed polarizers; switch on a voltage and the twist straightens, the turning stops, and the pixel goes dark. In quantum mechanics the same arithmetic, applied to single photons, is the quantum Zeno effect.</p>' +
+                '<p><b>The model.</b> Ideal polarizers, as on the first screen. Real ones each absorb some of the light along their axis too, so a real stack of 30 would let through much less.</p>' }
+  };
+
+  const SHOW = { lab_src: [1], lab_np: [1], lab_a1: [1], lab_a2: [1], lab_a3: [1], lab_mat: [2], lab_inc: [2], lab_glass: [2], lab_plate: [3], lab_pa: [3], lab_an: [3], lab_N: [4] };
+  function visibility() {
+    Object.keys(SHOW).forEach(id => { $(id).hidden = SHOW[id].indexOf(tab) < 0; });
+    const x = S();
+    if (tab === 1) { $('lab_a2').hidden = x.np < 2; $('lab_a3').hidden = x.np < 3; }
+    if (tab === 3) $('lab_pa').hidden = x.plate === '0';
+    const pr = (id, v) => document.querySelectorAll('#' + id + ' button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v))));
+    pr('src', TAB[1].src); pr('np', TAB[1].np); pr('mat', TAB[2].n); pr('plate', TAB[3].plate);
+    $('wave').textContent = frozen ? 'Let the wave move' : 'Freeze the wave';
+  }
+  function sync() {
+    const x = S();
+    if (tab === 1) [0, 1, 2].forEach(i => { $('a' + (i + 1)).value = String(x.a[i]); });
+    if (tab === 2) { $('inc').value = String(x.inc); $('glass').value = String(x.glass); }
+    if (tab === 3) { $('pa').value = String(x.pa); $('an').value = String(x.an); }
+    if (tab === 4) $('N').value = String(x.N);
+  }
+  function upd() { visibility(); readout(); draw(); }
+  function setTab(k) {
+    tab = k;
+    [1, 2, 3, 4].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  [1, 2, 3, 4].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  const seg = (id, fn) => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => { fn(b.dataset.v); upd(); }));
+  seg('src', v => { TAB[1].src = v; });
+  seg('np', v => { TAB[1].np = +v; });
+  seg('mat', v => { TAB[2].n = +v; });
+  seg('plate', v => { TAB[3].plate = v; });
+  const slider = (id, fn) => $(id).addEventListener('input', () => { fn(+$(id).value); upd(); });
+  [1, 2, 3].forEach(i => slider('a' + i, v => { TAB[1].a[i - 1] = v; }));
+  slider('inc', v => { TAB[2].inc = v; });
+  slider('glass', v => { TAB[2].glass = v; });
+  slider('pa', v => { TAB[3].pa = v; });
+  slider('an', v => { TAB[3].an = v; });
+  slider('N', v => { TAB[4].N = v; });
+  $('rec').addEventListener('click', () => { record(); upd(); });
+  $('clear').addEventListener('click', () => { S().series = []; upd(); });
+  $('theory').addEventListener('change', drawGraph);
+  $('wave').addEventListener('click', () => { frozen = !frozen; visibility(); });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP: the wave moves along the beam, slowed down enormously
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (!frozen && !document.hidden && dt > 0) { wt += dt * 2.5; drawScene(); }
+    requestAnimationFrame(frame);
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) frozen = true;
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<!--
+  Torque and rotational inertia - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction, modeled on the rotational-inertia
+  apparatus used in Widener's physics labs. The physics block below was tested on its own before the
+  interface existed, and is included here unchanged. Its inertia formulas match brute-force sums over the
+  arms and the sliding cylinders (the parallel-axis theorem); the fall matches an independent integration
+  with a stiff, stretchy string; the weight's work equals the kinetic energy at landing; and a simulated lab,
+  timed with a stopwatch, recovers the rotational inertia from the slope of angular acceleration against torque.
+  Credit: stands in for PhET's "Torque", which PhET publishes only in the retired Java format.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torque and rotational inertia</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --arm: #8C979E; --mass: #1D4F73; --hang: #C8321E; --string: #8C6239; --table: #CBD5DB;
+    --A: #1D4F73; --B: #C8321E; --s3: #2E7D32; --s4: #B5306D;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 340; }
+  #graph { aspect-ratio: 900 / 260; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 12px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  .controls .tagA { color: var(--A); font-weight: 600; } .controls .tagB { color: var(--B); font-weight: 600; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.05; }
+    #graph { aspect-ratio: 4 / 3.4; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 6px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Torque and rotational inertia</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Explore</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Race</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Measure</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="The apparatus: a cross of four arms with sliding masses, seen from above, and from the side with the string, pulley and hanging mass"></canvas>
+  <div class="row2">
+    <button id="go">Release</button>
+    <button id="reset" class="secondary">Wind it back up</button>
+    <div class="seg" id="spd" role="group" aria-label="Speed">
+      <button data-s="0.25">¼×</button><button data-s="1">1×</button><button data-s="4">4×</button>
+    </div>
+    <label id="lab_fit"><input type="checkbox" id="fit"> fit lines</label>
+    <button id="clear" class="secondary">Clear</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Graphs of the motion"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp"><div>Pulley the string is wound on</div>
+      <div class="seg" id="pulley" role="group" aria-label="Pulley diameter">
+        <button data-i="0">2 cm</button><button data-i="1">4 cm</button><button data-i="2">6 cm</button>
+      </div></div>
+    <label><div class="row"><span>Hanging mass</span><span class="val" id="m_v"></span></div>
+      <input type="range" id="m" min="20" max="250" step="5"></label>
+    <label id="lab_d"><div class="row"><span>Where the sliding masses sit (from the axle)</span><span class="val" id="d_v"></span></div>
+      <input type="range" id="d" min="4" max="23" step="0.5"></label>
+    <label id="lab_dA"><div class="row"><span><span class="tagA">Wheel A</span>: masses sit at</span><span class="val" id="dA_v"></span></div>
+      <input type="range" id="dA" min="4" max="23" step="0.5"></label>
+    <label id="lab_dB"><div class="row"><span><span class="tagB">Wheel B</span>: masses sit at</span><span class="val" id="dB_v"></span></div>
+      <input type="range" id="dB" min="4" max="23" step="0.5"></label>
+    <label><div class="row"><span>Each sliding mass</span><span class="val" id="M_v"></span></div>
+      <input type="range" id="M" min="50" max="250" step="10"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against brute-force inertia sums, an independent
+  //    integration with a stretchy string, energy conservation and a simulated lab. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: a rotational-inertia apparatus ----
+  // A cross of four thin arms turns on a vertical axle with a frictionless bearing. A small mass slides on each
+  // arm and is clamped at distance d from the axle; all four move together. A string wound on one step of a
+  // pulley on the axle (radius r) runs over a light, frictionless idler at the table's edge to a hanging mass m.
+  //
+  // Rotational inertia about the axle: the hub and pulley, plus four uniform rods (each (1/3) m_rod L^2), plus
+  // four short solid cylinders standing on the arms (each (1/2) M rc^2 about its own axis, plus M d^2 by the
+  // parallel-axis theorem):     I = I_HUB + 4 (1/3) m_rod L^2 + 4 M (rc^2 / 2 + d^2).
+  // Released from rest, the hanging mass and the wheel move together (a = alpha r) until the mass reaches
+  // the floor:   m g - T = m a,   T r = I alpha    =>   a = g m r^2 / (I + m r^2),   T = m (g - a).
+  // The torque on the wheel is T r, a little less than m g r, because the string's tension is less than the
+  // hanging weight while the mass speeds up. After the mass lands the string goes slack and the wheel spins on
+  // at constant speed (no friction).
+
+  const G = 9.8;
+  const ARM = { L: 0.25, m: 0.03 };                   // each arm: length from the axle (m), mass (kg)
+  const I_HUB = 0.0003;                                // hub and pulley, kg m^2
+  const RC = 0.015;                                    // radius of each sliding cylinder, m
+  const PULLEYS = [0.010, 0.020, 0.030];               // pulley radii, m
+  const DROP = 0.6;                                    // the hanging mass falls this far to the floor, m
+  const D_MIN = 0.04, D_MAX = 0.23;                    // where the sliding masses can be clamped, m
+
+  const frameInertia = () => I_HUB + 4 * ARM.m * ARM.L * ARM.L / 3;
+  const massInertia = (M, d) => 4 * M * (RC * RC / 2 + d * d);
+  const inertia = (M, d) => frameInertia() + massInertia(M, d);
+
+  // everything about a run: p = { M, d, r, m }
+  function run(p) {
+    const I = inertia(p.M, p.d), a = G * p.m * p.r * p.r / (I + p.m * p.r * p.r), alpha = a / p.r, T = p.m * (G - a);
+    const tLand = Math.sqrt(2 * DROP / a), wLand = alpha * tLand;
+    return { I, a, alpha, T, tau: T * p.r, tauNaive: p.m * G * p.r, tLand, wLand, vLand: a * tLand };
+  }
+  // state at time t after release: wheel angle and spin rate, how far the mass has fallen
+  function at(R, t) {
+    if (t <= R.tLand) return { theta: 0.5 * R.alpha * t * t, omega: R.alpha * t, fall: 0.5 * R.a * t * t, v: R.a * t, landed: false };
+    const thL = 0.5 * R.alpha * R.tLand * R.tLand;
+    return { theta: thL + R.wLand * (t - R.tLand), omega: R.wLand, fall: DROP, v: 0, landed: true };
+  }
+  // what an experimenter works out from a stopwatch reading of the fall time
+  function fromFallTime(tFall, r, m) {
+    const a = 2 * DROP / (tFall * tFall), alpha = a / r, T = m * (G - a);
+    return { a, alpha, tau: T * r, tauNaive: m * G * r };
+  }
+  // best straight line through the origin, y = s x
+  function slopeThroughOrigin(pts) { let sxy = 0, sxx = 0; pts.forEach(([x, y]) => { sxy += x * y; sxx += x * x; }); return sxx > 0 ? sxy / sxx : NaN; }
+  // ---- end of core ----
+
+  const TAB = {
+    1: { pi: 1, m: 0.1, M: 0.1, d: 0.15, run: null, t: 0, playing: false, history: [] },
+    2: { pi: 1, m: 0.1, M: 0.1, dA: 0.05, dB: 0.22, runA: null, runB: null, t: 0, playing: false, done: false },
+    3: { pi: 1, m: 0.1, M: 0.1, d: 0.15, run: null, t: 0, playing: false, series: [], recorded: false }
+  };
+  let tab = 1, speed = 1;
+  const S = () => TAB[tab];
+  const R_ = x => PULLEYS[x.pi];
+  const cm = v => (v * 100).toFixed(v * 100 % 1 ? 1 : 0) + ' cm';
+  const g_ = v => Math.round(v * 1000) + ' g';
+  const SER_COL = ['--A', '--B', '--s3', '--s4'];
+
+  function release() {
+    const x = S();
+    if (tab === 2) { x.runA = run({ M: x.M, d: x.dA, r: R_(x), m: x.m }); x.runB = run({ M: x.M, d: x.dB, r: R_(x), m: x.m }); x.done = false; }
+    else { x.run = run({ M: x.M, d: x.d, r: R_(x), m: x.m }); x.recorded = false; x.label = 'masses at ' + cm(x.d) + ', ' + (2 * R_(x) * 100) + ' cm pulley, ' + g_(x.m) + ' hanging'; }
+    x.t = 0; x.playing = true;
+  }
+  function windUp() { const x = S(); x.t = 0; x.playing = false; x.run = null; x.runA = x.runB = null; x.done = false; }
+  // tab 3: when the mass lands, the stopwatch time (to 0.01 s) gives alpha and the torque T r
+  function record(x) {
+    const tw = Math.round(x.run.tLand * 100) / 100, q = fromFallTime(tw, R_(x), x.m), key = x.M + '|' + x.d;
+    let s = x.series.find(z => z.key === key);
+    if (!s) { s = { key, M: x.M, d: x.d, pts: [], col: SER_COL[x.series.length % 4] }; x.series.push(s); if (x.series.length > 4) x.series.shift(); }
+    s.pts.push({ tau: q.tau, alpha: q.alpha, tw, r: R_(x), m: x.m });
+    x.recorded = true; x.last = { tw, q };
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+
+  // the cross seen from above, turned by theta; masses at distance d
+  function topView(ctx, b, d, theta, pi, label, col, omega) {
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2 + 4, k = Math.min(b.w, b.h - 30) / 2 / (ARM.L + 0.03);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(-theta);
+    ctx.strokeStyle = C('--arm'); ctx.lineWidth = 5; ctx.lineCap = 'round';
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * ARM.L * k, Math.sin(a) * ARM.L * k); ctx.stroke(); }
+    // tick marks every 5 cm along one arm, so positions can be read
+    ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; for (let s = 0.05; s < ARM.L; s += 0.05) { ctx.beginPath(); ctx.moveTo(s * k, -2.5); ctx.lineTo(s * k, 2.5); ctx.stroke(); }
+    for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; ctx.fillStyle = C(col || '--mass'); ctx.beginPath(); ctx.arc(Math.cos(a) * d * k, Math.sin(a) * d * k, Math.max(5, RC * k), 0, TAU); ctx.fill(); }
+    // the hub and the three pulley steps, the one in use darker; a stripe shows the turning
+    PULLEYS.slice().reverse().forEach((r, j) => { const on = PULLEYS.indexOf(r) === pi; ctx.fillStyle = on ? '#5C6B73' : '#C9D2D8'; ctx.beginPath(); ctx.arc(0, 0, Math.max(3, r * k * 1.6), 0, TAU); ctx.fill(); });
+    ctx.fillStyle = C('--hot'); ctx.fillRect(0, -1.5, ARM.L * k * 0.98, 3);
+    ctx.restore();
+    font(ctx, 12, '600'); ctx.fillStyle = C(col || '--ink'); ctx.textAlign = 'left'; ctx.fillText(label, b.x + 8, b.y + 16);
+    if (omega !== undefined) { font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText((omega / TAU).toFixed(2) + ' turns/s', b.x + b.w - 8, b.y + 16); }
+  }
+  // the side view: table, axle, cross edge-on, string to the idler at the table's edge, hanging mass, floor
+  function sideView(ctx, b, x, st, R, compact) {
+    const k = Math.min(b.w / 0.92, (b.h - 20) / 1.0), ax = b.x + b.w * 0.36, ty = b.y + b.h * 0.3;   // axle x; table top y
+    const X = m => ax + m * k, Y = m => ty - m * k, r = R_(x), d = x.d;
+    // table and floor
+    ctx.fillStyle = C('--table'); ctx.fillRect(b.x, ty, X(0.42) - b.x, 8);
+    const floor = Y(-DROP - 0.06); ctx.fillRect(b.x, floor, b.w, 4);
+    // axle and cross, edge-on: the masses at +-d, foreshortened as the cross turns
+    const th = st ? st.theta : 0;
+    ctx.fillStyle = C('--ink'); ctx.fillRect(X(-0.006), Y(0.16), 0.012 * k, 0.16 * k);
+    ctx.strokeStyle = C('--arm'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(X(-ARM.L), Y(0.12)); ctx.lineTo(X(ARM.L), Y(0.12)); ctx.stroke();
+    for (let i = 0; i < 4; i++) { const a = th + i * Math.PI / 2, px = Math.cos(a) * d, front = Math.sin(a) > 0; ctx.fillStyle = front ? C('--mass') : 'rgba(29,79,115,0.45)'; ctx.fillRect(X(px - RC), Y(0.12 + 0.02), 2 * RC * k, 0.04 * k); }
+    // pulley steps, the one in use darker, and the string from it to the idler and down
+    PULLEYS.forEach((rr, i) => { ctx.fillStyle = i === x.pi ? '#5C6B73' : '#C9D2D8'; ctx.fillRect(X(-rr), Y(0.06 - i * 0.018), 2 * rr * k, 0.016 * k); });
+    const sy = Y(0.06 - x.pi * 0.018 - 0.008), idx = X(0.42), idy = sy, fall = st ? st.fall : 0;
+    ctx.strokeStyle = C('--string'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(r), sy); ctx.lineTo(idx, idy); ctx.stroke();
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(idx, idy + 6, 6, 0, TAU); ctx.stroke();
+    const hy = idy + 12 + (0.02 + fall) * k, hw = Math.max(16, 0.05 * k), hh = Math.max(14, 0.05 * k * (0.4 + x.m * 3));
+    ctx.strokeStyle = st && st.landed ? 'rgba(140,98,57,0.5)' : C('--string'); ctx.beginPath(); ctx.moveTo(idx + 6, idy + 6); ctx.lineTo(idx + 6, hy); ctx.stroke();
+    ctx.fillStyle = C('--hang'); ctx.fillRect(idx + 6 - hw / 2, Math.min(hy, floor - hh), hw, hh);
+    font(ctx, 11, '600'); ctx.fillStyle = C('--hang'); ctx.textAlign = 'right'; ctx.fillText(g_(x.m), idx + 6 - hw / 2 - 5, Math.min(hy, floor - hh) + hh / 2 + 4);
+    // drop scale
+    ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; font(ctx, 10);
+    const top = idy + 12 + 0.02 * k + hh;
+    for (let s = 0; s <= DROP + 1e-9; s += 0.1) { const yy = top + s * k; ctx.fillRect(idx + hw / 2 + 12, Math.min(yy, floor), 6, 1); if (Math.round(s * 10) % 2 === 0) ctx.fillText((s * 100).toFixed(0), idx + hw / 2 + 22, Math.min(yy, floor) + 3); }
+    ctx.fillText('cm fallen', idx + hw / 2 + 12, top - 6);
+    font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'side view' : 'from the side', b.x + 8, b.y + 16);
+  }
+  function stopwatch(ctx, x0, y0, t, done, col) {
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(done ? 'fall time' : 'stopwatch', x0, y0);
+    font(ctx, 20, '600'); ctx.fillStyle = C(col || '--ink'); ctx.fillText(t.toFixed(2) + ' s', x0, y0 + 22);
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    const x = S();
+    if (tab === 2) {
+      const half = W / 2;
+      [['A', x.runA, x.dA, '--A'], ['B', x.runB, x.dB, '--B']].forEach(([n, R, d, col], i) => {
+        const st = R ? at(R, x.t) : null, b = { x: i * half + 6, y: 4, w: half - 12, h: compact ? H * 0.62 : H - 60 };
+        topView(ctx, b, d, st ? st.theta : 0, x.pi, 'wheel ' + n + ': masses at ' + cm(d), col, st ? st.omega : undefined);
+        const tt = R ? Math.min(x.t, R.tLand) : 0;
+        stopwatch(ctx, i * half + 14, (compact ? H * 0.62 : H - 60) + 22, tt, R && x.t >= R.tLand, col);
+        if (R) { const frac = Math.min(1, st.fall / DROP); ctx.fillStyle = C('--soft'); ctx.fillRect(i * half + half * 0.45, (compact ? H * 0.62 : H - 60) + 18, half * 0.48, 8); ctx.fillStyle = C(col); ctx.fillRect(i * half + half * 0.45, (compact ? H * 0.62 : H - 60) + 18, half * 0.48 * frac, 8);
+          font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText('mass fallen ' + Math.round(st.fall * 100) + ' of 60 cm', i * half + half * 0.45, (compact ? H * 0.62 : H - 60) + 40); }
+      });
+      return;
+    }
+    const st = x.run ? at(x.run, x.t) : null;
+    const left = compact ? { x: 0, y: 0, w: W, h: H * 0.5 } : { x: 0, y: 0, w: W * 0.42, h: H };
+    const right = compact ? { x: 0, y: H * 0.5, w: W, h: H * 0.5 } : { x: W * 0.42, y: 0, w: W * 0.58, h: H };
+    topView(ctx, left, x.d, st ? st.theta : 0, x.pi, 'from above', null, st ? st.omega : undefined);
+    sideView(ctx, right, x, st, x.run, compact);
+    stopwatch(ctx, right.x + right.w - (compact ? 100 : 120), right.y + (compact ? 24 : 40), x.run ? Math.min(x.t, x.run.tLand) : 0, x.run && x.t >= x.run.tLand);
+  }
+
+  // graphs: tab 1 angle and spin rate against time (this run and the last few); tab 2 spin rate for A and B;
+  // tab 3 angular acceleration against torque
+  let wTop = 2, tTop = 10;
+  function axes(ctx, b, xr, yr, xt, yt, xl, yl, title) {
+    const X = v => b.x + (v - xr[0]) / (xr[1] - xr[0]) * b.w, Y = v => b.y + b.h - (v - yr[0]) / (yr[1] - yr[0]) * b.h;
+    ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1; font(ctx, 10); ctx.fillStyle = C('--muted');
+    xt.forEach(v => { ctx.beginPath(); ctx.moveTo(X(v) + 0.5, b.y); ctx.lineTo(X(v) + 0.5, b.y + b.h); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(String(+v.toFixed(4)), X(v), b.y + b.h + 13); });
+    yt.forEach(v => { ctx.beginPath(); ctx.moveTo(b.x, Y(v) + 0.5); ctx.lineTo(b.x + b.w, Y(v) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(String(+v.toFixed(4)), b.x - 4, Y(v) + 3); });
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText(xl, b.x + b.w / 2, b.y + b.h + 27);
+    ctx.textAlign = 'left'; font(ctx, 12); ctx.fillText(title, b.x, b.y - 8); font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(yl, b.x + b.w, b.y - 8);
+    return { X, Y, b };
+  }
+  const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))), r = v / p; return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * p; };
+  const ticks = (top, n) => { const s = nice(top / n), o = []; for (let v = 0; v <= top + 1e-12; v += s) o.push(v); return o; };
+  function curve(ctx, A, R, tEnd, fn, col, w, alpha) {
+    ctx.save(); ctx.beginPath(); ctx.rect(A.b.x, A.b.y, A.b.w, A.b.h); ctx.clip(); ctx.globalAlpha = alpha || 1;
+    ctx.strokeStyle = C(col); ctx.lineWidth = w; ctx.beginPath();
+    const n = 200; for (let i = 0; i <= n; i++) { const t = tEnd * i / n, v = fn(at(R, t)); i ? ctx.lineTo(A.X(t), A.Y(v)) : ctx.moveTo(A.X(t), A.Y(v)); } ctx.stroke(); ctx.restore();
+  }
+  function drawGraph() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 100) return;
+    const x = S(), ml = compact ? 46 : 56;
+    if (tab === 1 || tab === 2) {
+      const runs = tab === 1 ? x.history.concat(x.run ? [{ R: x.run, label: x.label, now: true }] : []) : [x.runA, x.runB].filter(Boolean).map((R, i) => ({ R, col: i ? '--B' : '--A', now: true }));
+      runs.forEach(q => { const tE = q.now ? x.t : q.R.tLand + 2; tTop = Math.max(tTop, Math.min(tE, q.R.tLand + 2)); wTop = Math.max(wTop, at(q.R, Math.min(tE, q.R.tLand)).omega * 1.1); });
+      const tt = nice(tTop / 5) * Math.ceil(tTop / nice(tTop / 5)), wt = nice(wTop / 4) * Math.ceil(wTop / nice(wTop / 4));
+      const two = tab === 1 ? (compact ? [{ x: ml, y: 22, w: W - ml - 12, h: H / 2 - 52 }, { x: ml, y: H / 2 + 22, w: W - ml - 12, h: H / 2 - 52 }] : [{ x: ml, y: 22, w: (W - ml) / 2 - 36, h: H - 22 - 40 }, { x: ml + (W - ml) / 2 + 14, y: 22, w: (W - ml) / 2 - 26, h: H - 22 - 40 }])
+        : [{ x: ml, y: 22, w: W - ml - 12, h: H - 22 - 40 }];
+      const panels = [];
+      if (tab === 1) {
+        const thTop = Math.max(1, ...runs.map(q => at(q.R, q.now ? x.t : q.R.tLand + 2).theta / TAU)) * 1.1;
+        const tht = nice(thTop / 4) * Math.ceil(thTop / nice(thTop / 4));
+        panels.push([axes(ctx, two[0], [0, tt], [0, tht], ticks(tt, 5), ticks(tht, 4), 'time (s)', 'turns', 'angle turned'), s => s.theta / TAU]);
+        panels.push([axes(ctx, two[1], [0, tt], [0, wt], ticks(tt, 5), ticks(wt, 4), 'time (s)', 'radians per second', 'spin rate'), s => s.omega]);
+      } else panels.push([axes(ctx, two[0], [0, tt], [0, wt], ticks(tt, 5), ticks(wt, 4), 'time (s)', 'radians per second', 'spin rate of each wheel'), s => s.omega]);
+      runs.forEach((q, i) => panels.forEach(([A, fn]) => curve(ctx, A, q.R, q.now ? x.t : q.R.tLand + 2, fn, q.col || (q.now ? '--A' : '--muted'), q.now ? 2.2 : 1.4, q.now ? 1 : 0.55)));
+      if (tab === 1 && runs.length) { font(ctx, 10); ctx.textAlign = 'left'; runs.slice().reverse().slice(0, 4).forEach((q, i) => { ctx.fillStyle = q.now ? C('--A') : C('--muted'); ctx.fillText((q.now ? 'this run: ' : 'earlier: ') + q.label, panels[1][0].b.x + 6, panels[1][0].b.y + 14 + 12 * i); }); }
+      if (!runs.length) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('press Release', W / 2, H / 2); }
+      return;
+    }
+    // tab 3
+    const pts = x.series.flatMap(s => s.pts), tauTop = Math.max(0.02, ...pts.map(p => p.tau)) * 1.15, alTop = Math.max(2, ...pts.map(p => p.alpha)) * 1.15;
+    const tx = nice(tauTop / 5) * Math.ceil(tauTop / nice(tauTop / 5)), ay = nice(alTop / 4) * Math.ceil(alTop / nice(alTop / 4));
+    const A = axes(ctx, { x: ml + 4, y: 22, w: W - ml - 16, h: H - 22 - 40 }, [0, tx], [0, ay], ticks(tx, 5), ticks(ay, 4), 'torque from the string, T r (N m)', 'rad/s²', 'angular acceleration');
+    x.series.forEach((s, i) => {
+      ctx.fillStyle = C(s.col); s.pts.forEach(p => { ctx.beginPath(); ctx.arc(A.X(p.tau), A.Y(p.alpha), 4, 0, TAU); ctx.fill(); });
+      if ($('fit').checked && s.pts.length >= 2) {
+        const sl = slopeThroughOrigin(s.pts.map(p => [p.tau, p.alpha]));
+        ctx.save(); ctx.beginPath(); ctx.rect(A.b.x, A.b.y, A.b.w, A.b.h); ctx.clip(); ctx.strokeStyle = C(s.col); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(A.X(0), A.Y(0)); ctx.lineTo(A.X(tx), A.Y(sl * tx)); ctx.stroke(); ctx.restore();
+      }
+      font(ctx, 10); ctx.fillStyle = C(s.col); ctx.textAlign = 'left';
+      const sl = s.pts.length >= 2 ? slopeThroughOrigin(s.pts.map(p => [p.tau, p.alpha])) : null;
+      ctx.fillText('masses at ' + cm(s.d) + ', ' + g_(s.M) + ' each' + ($('fit').checked && sl ? ': slope ' + sl.toFixed(1) + ', so I = ' + (1 / sl).toFixed(4) + ' kg m²' : ''), A.b.x + 8, A.b.y + 14 + 13 * i);
+    });
+    if (!pts.length) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('no points yet: each fall you time adds one', A.b.x + A.b.w / 2, A.b.y + A.b.h / 2); }
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const I_ = I => I.toFixed(4) + ' kg m²';
+  function readout() {
+    const x = S(), r = R_(x);
+    let html = '';
+    if (tab === 1 || tab === 3) {
+      const I = inertia(x.M, x.d), R = x.run, st = R ? at(R, x.t) : null;
+      html += card('Rotational inertia', I_(I), 'frame ' + frameInertia().toFixed(4) + ' + four masses ' + massInertia(x.M, x.d).toFixed(4) + ' kg m²; the masses\' share grows as the square of their distance');
+      html += card('The twist', 'up to ' + (x.m * G * r).toFixed(4) + ' N m', 'the hanging weight, ' + (x.m * G).toFixed(3) + ' N, acting ' + (r * 100) + ' cm from the axle' + (R && x.t > 0 ? '; while it falls the string pulls with ' + R.T.toFixed(3) + ' N, so the torque is ' + R.tau.toFixed(4) + ' N m' : ''));
+      if (tab === 1) html += card('The wheel', st ? (st.omega / TAU).toFixed(2) + ' turns/s' : 'at rest', st ? (st.landed ? 'the mass landed after ' + R.tLand.toFixed(2) + ' s; with no friction the wheel now spins on at a steady rate' : 'speeding up; ' + (st.theta / TAU).toFixed(2) + ' turns so far') : 'press Release');
+      else {
+        const n = x.series.reduce((a, s) => a + s.pts.length, 0);
+        html += card('Last measurement', x.last ? x.last.tw.toFixed(2) + ' s to fall 60 cm' : '—', x.last ? 'so a = 2h/t² = ' + x.last.q.a.toFixed(4) + ' m/s², α = a/r = ' + x.last.q.alpha.toFixed(3) + ' rad/s², and T r = m(g − a) r = ' + x.last.q.tau.toFixed(4) + ' N m (' + n + ' points)' : 'each fall is timed and turned into one point on the graph');
+      }
+    } else {
+      const done = x.runA && x.t >= Math.max(x.runA.tLand, x.runB.tLand);
+      html += card('The same for both', g_(x.m) + ' on a ' + (2 * r * 100) + ' cm pulley', 'four ' + g_(x.M) + ' masses on each wheel; only where the masses sit is different');
+      html += card('Wheel A: masses at ' + cm(x.dA), x.runA && x.t >= x.runA.tLand ? x.runA.tLand.toFixed(2) + ' s' : '—', done ? 'rotational inertia ' + I_(x.runA.I) : 'time for its mass to fall 60 cm');
+      html += card('Wheel B: masses at ' + cm(x.dB), x.runB && x.t >= x.runB.tLand ? x.runB.tLand.toFixed(2) + ' s' : '—', done ? 'rotational inertia ' + I_(x.runB.I) + ': ' + (x.runB.I / x.runA.I).toFixed(1) + ' times A\'s' : 'time for its mass to fall 60 cm');
+    }
+    $('readout').innerHTML = html;
+    $('m_v').textContent = g_(x.m); $('M_v').textContent = g_(x.M);
+    if (x.d !== undefined) $('d_v').textContent = cm(x.d);
+    if (x.dA !== undefined) { $('dA_v').textContent = cm(x.dA); $('dB_v').textContent = cm(x.dB); }
+  }
+
+  const TEXT = {
+    1: { lede: 'Four masses can slide along the arms of a cross that turns on an axle. A string wound on a pulley under the cross runs over the table\'s edge to a hanging mass. Predict: if you slide the four masses out toward the ends, does the wheel spin up faster, slower, or the same? Then try a bigger pulley.',
+         notes: '<p><b>What to try.</b> Release with the masses halfway out and watch both graphs: the spin rate climbs in a straight line while the mass falls (steady angular acceleration), then levels off when it lands. Now slide the masses out to the ends and release again: the earlier run stays on the graph, faded, for comparison. Move them all the way in. Then keep the masses where they are and change the pulley: the same hanging weight on a bigger pulley twists harder.</p>' +
+                '<p><b>Why.</b> Torque is how hard something twists: the force times how far from the axle it acts, so the same weight on a pulley of twice the radius gives twice the torque. Rotational inertia, <i>I</i>, is how hard a thing is to spin up: for each bit of mass, its mass times the <i>square</i> of its distance from the axle, all added up. It is not just how much mass there is, but where it is. Moving the four masses from 5 cm to 22 cm does not change the total mass at all, yet it makes their contribution about 19 times bigger. Torque and inertia go together like force and mass: <i>τ</i> = <i>I α</i>.</p>' +
+                '<p><b>The model.</b> A frictionless bearing; a massless string that does not stretch; a light, frictionless idler pulley. Each sliding mass is a short solid cylinder 3 cm across, so it adds ½<i>M</i><i>r</i><sub>c</sub>² + <i>M</i><i>d</i>² (the parallel-axis theorem); the arms are thin uniform rods 25 cm long. The hanging mass falls 60 cm. <i>g</i> = 9.8 m/s². The motion is calculated exactly.</p>' },
+    2: { lede: 'Two identical wheels carry the same four masses and get the same twist from the same hanging weight. The only difference: on wheel A the masses sit close to the axle, on B near the ends. Predict which hanging mass reaches the floor first, and by how much. Then release both.',
+         notes: '<p><b>What to try.</b> Race them, then move B\'s masses in a little at a time and race again. How close do they have to be before the race is close? Make the sliding masses heavier on both: it matters far more on B. Then put A\'s masses at 12 cm and B\'s at 23 cm, about twice as far out: B\'s masses add almost four times the inertia.</p>' +
+                '<p><b>Why.</b> Both wheels weigh the same, so if you hung them on a scale you could not tell them apart. But to spin a wheel, each bit of mass has to be set moving in a circle, and the farther out it is, the faster it must move for the same spin rate, and the less leverage the twist has on it. Both effects grow with distance, which is why rotational inertia goes as the square of the distance: <i>I</i> = Σ<i>m r</i>². This is why a figure skater spins faster with her arms pulled in, and why flywheels put their mass in the rim.</p>' +
+                '<p><b>The model.</b> As on the first screen. The time to fall is √(2<i>h</i>/<i>a</i>) with <i>a</i> = <i>g m r</i>²/(<i>I</i> + <i>m r</i>²), so the ratio of the two times is √((<i>I</i><sub>B</sub> + <i>m r</i>²)/(<i>I</i><sub>A</sub> + <i>m r</i>²)).</p>' },
+    3: { lede: 'Measure the wheel\'s rotational inertia the way a lab does. Each time you release it, the fall is timed and becomes one point: angular acceleration against torque. Change the pulley and the hanging mass to get points with different torques. Predict the shape of the graph first.',
+         notes: '<p><b>What to do.</b> Leave the sliding masses in one place and release several times, with each pulley and a few hanging masses. The points fall on a straight line through the origin. Tick "fit lines": the slope is 1/<i>I</i>. Then move the masses and do it again: the new points make a new line, in a new color, and its slope tells you the new inertia. Compare with the value shown for the current setting.</p>' +
+                '<p><b>How each point is worked out.</b> The mass falls <i>h</i> = 60 cm from rest in time <i>t</i>, so its acceleration is <i>a</i> = 2<i>h</i>/<i>t</i>². The string unwinds from a pulley of radius <i>r</i>, so the wheel\'s angular acceleration is <i>α</i> = <i>a</i>/<i>r</i>. The string\'s tension is not the hanging weight: the mass is speeding up, so <i>T</i> = <i>m</i>(<i>g</i> − <i>a</i>), and the torque is <i>T r</i>. Then <i>τ</i> = <i>I α</i> says the points lie on a line of slope 1/<i>I</i>. Using <i>m g r</i> for the torque instead is a common shortcut; it gets the inertia a few percent too large.</p>' +
+                '<p><b>The model.</b> As on the first screen. The stopwatch reads to a hundredth of a second, which limits the precision a little, as it would in the lab.</p>' }
+  };
+
+  const SHOW = { lab_d: [1, 3], lab_dA: [2], lab_dB: [2], lab_fit: [3], clear: [1, 3] };
+  function visibility() {
+    Object.keys(SHOW).forEach(id => { $(id).hidden = SHOW[id].indexOf(tab) < 0; });
+    const x = S();
+    const finished = (tab === 3 && x.recorded) || (tab === 2 && x.done) || (tab === 1 && x.run && x.t >= x.run.tLand + 2);
+    $('go').textContent = x.playing ? 'Pause' : finished ? 'Release again' : (x.run || x.runA) && x.t > 0 ? 'Resume' : 'Release';
+    $('clear').textContent = tab === 1 ? 'Clear earlier runs' : 'Clear points';
+    document.querySelectorAll('#spd button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.s === speed)));
+    document.querySelectorAll('#pulley button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.i === x.pi)));
+  }
+  function sync() {
+    const x = S();
+    $('m').value = String(Math.round(x.m * 1000)); $('M').value = String(Math.round(x.M * 1000));
+    if (x.d !== undefined) $('d').value = String(x.d * 100);
+    if (x.dA !== undefined) { $('dA').value = String(x.dA * 100); $('dB').value = String(x.dB * 100); }
+  }
+  function upd() { visibility(); readout(); draw(); }
+  function setTab(k) {
+    tab = k; wTop = 2; tTop = 10;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  // changing the setup winds the wheel back up; on the first screen the run just finished joins the faded history
+  function changed(x) {
+    if (tab === 1 && x.run && x.t > 0) { x.history.push({ R: x.run, label: x.label }); if (x.history.length > 3) x.history.shift(); }
+    windUp();
+  }
+  const slider = (id, fn) => $(id).addEventListener('input', () => { const x = S(); fn(x, +$(id).value); changed(x); upd(); });
+  slider('m', (x, v) => { x.m = v / 1000; });
+  slider('M', (x, v) => { x.M = v / 1000; });
+  slider('d', (x, v) => { x.d = v / 100; });
+  slider('dA', (x, v) => { x.dA = v / 100; });
+  slider('dB', (x, v) => { x.dB = v / 100; });
+  document.querySelectorAll('#pulley button').forEach(b => b.addEventListener('click', () => { const x = S(); x.pi = +b.dataset.i; changed(x); upd(); }));
+  $('go').addEventListener('click', () => {
+    const x = S();
+    if (x.playing) x.playing = false;
+    else if ((x.run || x.runA) && x.t > 0 && !(tab === 3 && x.recorded) && !(tab === 2 && x.done) && !(tab === 1 && x.t >= x.run.tLand + 2)) x.playing = true;
+    else { if (tab === 1 && x.run && x.t > 0) { x.history.push({ R: x.run, label: x.label }); if (x.history.length > 3) x.history.shift(); } release(); }
+    upd();
+  });
+  $('reset').addEventListener('click', () => { const x = S(); if (tab === 1 && x.run && x.t > 0) { x.history.push({ R: x.run, label: x.label }); if (x.history.length > 3) x.history.shift(); } windUp(); upd(); });
+  document.querySelectorAll('#spd button').forEach(b => b.addEventListener('click', () => { speed = +b.dataset.s; visibility(); }));
+  $('fit').addEventListener('change', drawGraph);
+  $('clear').addEventListener('click', () => { const x = S(); if (tab === 1) x.history = []; else { x.series = []; x.last = null; } wTop = 2; tTop = 10; upd(); });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null, since = 0;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    const x = S();
+    if (x.playing && !document.hidden && dt > 0) {
+      x.t += dt * speed;
+      if (tab === 3 && x.run && x.t >= x.run.tLand && !x.recorded) { record(x); x.t = x.run.tLand; x.playing = false; upd(); }
+      if (tab === 2 && x.runA && x.t >= Math.max(x.runA.tLand, x.runB.tLand) + 1) { x.done = true; x.playing = false; upd(); }
+      if (tab === 1 && x.run && x.t >= x.run.tLand + 2) { x.playing = false; upd(); }
+      drawScene(); since += dt;
+      if (since > 0.1) { since = 0; drawGraph(); readout(); visibility(); }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

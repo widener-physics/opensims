@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<!--
+  The fastest slide (brachistochrone) - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Path times match the
+  exact results for a straight chute, for the cycloid (phi sqrt(R/g), to 1e-9), and for a quarter circle
+  (a pendulum released from horizontal, sqrt(R/g) K(1/sqrt 2), to 1e-5); beads released anywhere on a
+  cycloid reach the bottom together; 417 rival paths all lose to the cycloid, and bending the cycloid
+  slows it; a bead that would have to climb above its start turns back exactly at that height.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The fastest slide</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --mine: #1D4F73; --straight: #5C6B73; --best: #D9822B; --cyc: #1D4F73; --arc: #B5306D; --wheel: #8A969D;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 470; touch-action: none; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 12px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+  .readout .sw { display: inline-block; width: 18px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .toggles { display: flex; gap: 20px; flex-wrap: wrap; font-family: var(--sans); font-size: 14px; align-items: center; }
+  .toggles label { display: inline-flex; gap: 6px; align-items: center; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.85; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 6px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>The fastest slide</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Design a path</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>The cycloid</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="Paths from A to B; drag the round handles to reshape your path, or drag B on the second screen"></canvas>
+  <div class="row2">
+    <button id="go">Release the beads</button>
+    <div class="seg" id="spd" role="group" aria-label="Speed">
+      <button data-s="1">real speed</button><button data-s="0.25">¼ speed</button><button data-s="0.1">⅒ speed</button>
+    </div>
+    <button id="straighten" class="secondary">Straighten my path</button>
+    <button id="forget" class="secondary">Forget my best</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="toggles" id="tog1">
+      <label><input type="checkbox" id="showBest" checked> show my best path</label>
+      <label><input type="checkbox" id="showStraight" checked> show the straight line</label>
+    </div>
+    <div class="toggles" id="tog2">
+      <label><input type="checkbox" id="showWheel" checked> the rolling circle</label>
+      <label><input type="checkbox" id="showArc" checked> Galileo's circular arc</label>
+      <label><input type="checkbox" id="showArch"> the whole arch</label>
+    </div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against exact results for straight, cycloidal
+  //    and circular paths, the tautochrone property, and hundreds of rival paths. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: the brachistochrone ----
+  // A bead slides without friction along a wire from rest at A. Energy conservation fixes its speed at every
+  // point by how far it has dropped below A:  v = sqrt(2 g h).  So the time along any path is
+  //     T = integral ds / sqrt(2 g h).
+  // A path is handled as a fine chain of straight pieces. On a straight piece the acceleration along the wire
+  // is constant, g (h2 - h1) / length, so the time on each piece is exact: (v2 - v1) / a, or length / v when it is
+  // level. Sampling a smooth curve finely enough makes the total converge to the integral (error ~ 1/N^2).
+  // If the path climbs back above A's height, the bead stops where h = 0, slides back, and never arrives.
+  //
+  // The fastest path between A and a lower point B is a cycloid, the curve traced by a point on a circle of
+  // radius R rolling along the horizontal line through A:  x = R(phi - sin phi),  y = -R(1 - cos phi).
+  // It passes through B when (phi - sin phi)/(1 - cos phi) = dx/dh, and the time to get there is phi sqrt(R/g).
+
+  const G = 9.8;
+
+  // --- a chain of points into a path: arc length s, depth h below the start, and the time to reach each point
+  function makePath(pts) {
+    const y0 = pts[0][1], n = [];
+    let s = 0;
+    pts.forEach((p, i) => { if (i) s += Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]); n.push({ x: p[0], y: p[1], s, h: y0 - p[1] }); });
+    // time along it; stop where the bead would have to climb above its start
+    n[0].t = 0; n[0].v = 0;
+    let turn = null;
+    for (let i = 1; i < n.length; i++) {
+      const a0 = n[i - 1], a1 = n[i], L = a1.s - a0.s;
+      if (L <= 0) { a1.t = a0.t; a1.v = a0.v; continue; }
+      if (a1.h <= 1e-12 && !(a0.h <= 1e-12 && a1.h > a0.h)) {
+        // the bead cannot get to a1: find where on this piece its speed runs out (h = 0), unless it never started
+        const f = a0.h > 0 ? a0.h / (a0.h - a1.h) : 0;
+        const acc = G * (a1.h - a0.h) / L, sTurn = a0.s + f * L, tTurn = a0.t + (a0.v > 0 ? -a0.v / acc : 0);
+        turn = { i, s: sTurn, t: tTurn, x: a0.x + f * (a1.x - a0.x), y: a0.y + f * (a1.y - a0.y) };
+        break;
+      }
+      a1.v = Math.sqrt(2 * G * Math.max(0, a1.h));
+      const dh = a1.h - a0.h;
+      a1.t = a0.t + (Math.abs(dh) > 1e-12 * L ? (a1.v - a0.v) / (G * dh / L) : L / a0.v);
+    }
+    return { n, turn, T: turn ? Infinity : n[n.length - 1].t, length: n[n.length - 1].s };
+  }
+  // where the bead is at time t (it stays at the end once it arrives; one that turns back swings to and fro forever)
+  function locate(path, t) {
+    const n = path.n;
+    if (path.turn) {
+      const P = 2 * path.turn.t; if (!(P > 0)) return { x: n[0].x, y: n[0].y, v: 0, s: 0 };
+      let q = t % P; if (q > path.turn.t) q = P - q;        // out and back along the same wire
+      const r = locateUpTo(path, q, path.turn.i);
+      return r;
+    }
+    if (t >= path.T) { const e = n[n.length - 1]; return { x: e.x, y: e.y, v: e.v, s: e.s, done: true }; }
+    return locateUpTo(path, t, n.length - 1);
+  }
+  function locateUpTo(path, t, last) {
+    const n = path.n;
+    let lo = 0, hi = last;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (n[m].t !== undefined && n[m].t <= t) lo = m; else hi = m; }
+    const a0 = n[lo], a1 = n[Math.min(lo + 1, n.length - 1)], L = a1.s - a0.s;
+    if (L <= 0) return { x: a0.x, y: a0.y, v: a0.v, s: a0.s };
+    const acc = G * ((a1.h - a0.h) / L), tau = t - a0.t;
+    let ds = a0.v * tau + 0.5 * acc * tau * tau; ds = Math.max(0, Math.min(L, ds));
+    const f = ds / L, h = a0.h + f * (a1.h - a0.h);
+    return { x: a0.x + f * (a1.x - a0.x), y: a0.y + f * (a1.y - a0.y), v: Math.sqrt(2 * G * Math.max(0, h)), s: a0.s + ds };
+  }
+
+  // --- a smooth curve through the control points (centripetal Catmull-Rom), sampled finely
+  function smoothThrough(ctrl, per) {
+    const P = ctrl, m = P.length, out = [];
+    const ext = (a, b) => [2 * a[0] - b[0], 2 * a[1] - b[1]];
+    const Q = [ext(P[0], P[1])].concat(P, [ext(P[m - 1], P[m - 2])]);
+    const tj = (ti, a, b) => ti + Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), 0.5) + 1e-9;
+    for (let i = 1; i < Q.length - 2; i++) {
+      const p0 = Q[i - 1], p1 = Q[i], p2 = Q[i + 1], p3 = Q[i + 2];
+      const t0 = 0, t1 = tj(t0, p0, p1), t2 = tj(t1, p1, p2), t3 = tj(t2, p2, p3);
+      for (let k = 0; k < per; k++) {
+        const t = t1 + (t2 - t1) * k / per, L = (a, b, ta, tb) => [0, 1].map(j => (tb - t) / (tb - ta) * a[j] + (t - ta) / (tb - ta) * b[j]);
+        const A1 = L(p0, p1, t0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3);
+        const B1 = L(A1, A2, t0, t2), B2 = L(A2, A3, t1, t3);
+        out.push(L(B1, B2, t1, t2));
+      }
+    }
+    out.push(P[m - 1].slice());
+    return out;
+  }
+
+  // --- the cycloid from A = (0, 0) through B = (dx, -dh), dh > 0
+  function cycloidThrough(dx, dh) {
+    const r = dx / dh, f = p => (p - Math.sin(p)) / (1 - Math.cos(p)) - r;
+    let lo = 1e-9, hi = 2 * Math.PI - 1e-12;                          // f rises from 0 to infinity on (0, 2 pi)
+    for (let k = 0; k < 200; k++) { const mid = (lo + hi) / 2; if (f(mid) > 0) hi = mid; else lo = mid; }
+    const phi = (lo + hi) / 2, R = dh / (1 - Math.cos(phi));
+    return { phi, R, T: phi * Math.sqrt(R / G), dipsBelow: phi > Math.PI };
+  }
+  function cycloidPoints(R, phi, n, x0, y0) {
+    const pts = []; for (let k = 0; k <= n; k++) { const p = phi * k / n; pts.push([(x0 || 0) + R * (p - Math.sin(p)), (y0 || 0) - R * (1 - Math.cos(p))]); }
+    return pts;
+  }
+  // the straight chute, and the circular arc that leaves A going straight down (Galileo's candidate)
+  const straightTime = (dx, dh) => 2 * Math.hypot(dx, dh) / Math.sqrt(2 * G * dh);
+  function arcPoints(dx, dh, n, x0, y0) {
+    const c = (dx * dx + dh * dh) / (2 * dx), a1 = Math.atan2(-dh, dx - c), pts = [];        // center (c, 0), radius c
+    for (let k = 0; k <= n; k++) { const a = Math.PI + (a1 + 2 * Math.PI - Math.PI) * k / n; pts.push([(x0 || 0) + c + c * Math.cos(a), (y0 || 0) + c * Math.sin(a)]); }
+    return pts;
+  }
+  // ---- end of core ----
+
+  const BOX = { x0: -0.3, x1: 2.9, y0: -1.85, y1: 0.4 };          // the world shown, meters
+  const A = [0, 0], B1 = [2.4, -1];
+  const PER = 60;                                                   // samples per span of the smooth curve
+  const straightCtrl = () => [1, 2, 3, 4, 5].map(j => [B1[0] * j / 6, B1[1] * j / 6]);
+  const T1 = { ctrl: straightCtrl(), best: null, bestT: null, tries: 0, race: null, result: null };
+  const T2 = { B: [1.6, -1.2], race: null, result: null };          // a B where the cycloid does not dip, so the lede's question stays open
+  let tab = 1, speed = 0.25, drag = null;
+
+  const myPts = () => smoothThrough([A].concat(T1.ctrl, [B1]), PER);
+  function racers() {
+    if (tab === 1) {
+      const r = [{ key: 'mine', name: 'your path', col: '--mine', path: makePath(myPts()) }];
+      if ($('showStraight').checked) r.push({ key: 'straight', name: 'straight line', col: '--straight', path: makePath([A, B1]) });
+      if (T1.best && $('showBest').checked) r.push({ key: 'best', name: 'your best so far', col: '--best', path: makePath(T1.best) });
+      return r;
+    }
+    const [bx, by] = T2.B, cy = cycloidThrough(bx, -by);
+    const r = [{ key: 'cyc', name: 'cycloid', col: '--cyc', path: makePath(cycloidPoints(cy.R, cy.phi, 1200)), cy }];
+    r.push({ key: 'straight', name: 'straight line', col: '--straight', path: makePath([A, T2.B]) });
+    if ($('showArc').checked) r.push({ key: 'arc', name: 'circular arc', col: '--arc', path: makePath(arcPoints(bx, -by, 1200)) });
+    return r;
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+  let view = null;
+  function line(ctx, pts, col, w, dash, alpha) {
+    ctx.save(); ctx.globalAlpha = alpha || 1; ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.lineJoin = 'round';
+    ctx.beginPath(); pts.forEach((p, i) => { const X = view.X(p[0]), Y = view.Y(p[1]); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke(); ctx.restore();
+  }
+  function bead(ctx, q, col) { ctx.fillStyle = C(col); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(view.X(q.x), view.Y(q.y), 7, 0, TAU); ctx.fill(); ctx.stroke(); }
+  function point(ctx, p, label, col, ring) {
+    const X = view.X(p[0]), Y = view.Y(p[1]);
+    ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(X, Y, 5, 0, TAU); ctx.fill();
+    if (ring) { ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X, Y, 11, 0, TAU); ctx.stroke(); }
+    font(ctx, 13, '700'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(label, X + (label === 'A' ? -18 : 12), Y + (label === 'A' ? -8 : 18));
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    const k = Math.min((W - 20) / (BOX.x1 - BOX.x0), (H - 20) / (BOX.y1 - BOX.y0));
+    const ox = (W - (BOX.x1 - BOX.x0) * k) / 2 - BOX.x0 * k, oy = (H - (BOX.y1 - BOX.y0) * k) / 2 + BOX.y1 * k;
+    view = { k, X: x => ox + x * k, Y: y => oy - y * k, x: X => (X - ox) / k, y: Y => (oy - Y) / k };
+    // a faint half-meter grid, and A's height (nothing can rise above it)
+    ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1;
+    for (let x = Math.ceil(BOX.x0 * 2) / 2; x <= BOX.x1; x += 0.5) { ctx.beginPath(); ctx.moveTo(view.X(x) + 0.5, view.Y(BOX.y0)); ctx.lineTo(view.X(x) + 0.5, view.Y(BOX.y1)); ctx.stroke(); }
+    for (let y = Math.ceil(BOX.y0 * 2) / 2; y <= BOX.y1; y += 0.5) { ctx.beginPath(); ctx.moveTo(view.X(BOX.x0), view.Y(y) + 0.5); ctx.lineTo(view.X(BOX.x1), view.Y(y) + 0.5); ctx.stroke(); }
+    ctx.strokeStyle = C('--rule'); ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.moveTo(view.X(BOX.x0), view.Y(0)); ctx.lineTo(view.X(BOX.x1), view.Y(0)); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText('A\'s height', view.X(BOX.x1) - 6, view.Y(0) - 5);
+    ctx.textAlign = 'left'; ctx.fillText('grid: 0.5 m', view.X(BOX.x0) + 6, view.Y(BOX.y0) - 6);
+    const rs = racers(), race = tab === 1 ? T1.race : T2.race;
+    if (tab === 1) {
+      if (T1.best && $('showBest').checked) line(ctx, T1.best, C('--best'), 3, [], 0.55);
+      if ($('showStraight').checked) line(ctx, [A, B1], C('--straight'), 2, [6, 5]);
+      line(ctx, myPts(), C('--mine'), 3.5);
+      T1.ctrl.forEach((p, i) => { ctx.fillStyle = drag === i ? C('--hot') : '#fff'; ctx.strokeStyle = C('--mine'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(view.X(p[0]), view.Y(p[1]), 8, 0, TAU); ctx.fill(); ctx.stroke(); });
+      point(ctx, A, 'A'); point(ctx, B1, 'B');
+    } else {
+      const cy = rs[0].cy, [bx, by] = T2.B;
+      if ($('showArch').checked) line(ctx, cycloidPoints(cy.R, 2 * Math.PI, 400), C('--cyc'), 1.5, [3, 4], 0.5);
+      if ($('showArc').checked) line(ctx, arcPoints(bx, -by, 400), C('--arc'), 2.5);
+      line(ctx, [A, T2.B], C('--straight'), 2, [6, 5]);
+      line(ctx, cycloidPoints(cy.R, cy.phi, 400), C('--cyc'), 3.5);
+      if ($('showWheel').checked) {
+        // the circle that draws the cycloid, rolling along the underside of A's level line; while a race runs it
+        // turns at exactly the rate that keeps its marked point on the bead
+        let phi = cy.phi;
+        if (race && !race.done) phi = Math.min(cy.phi, race.t * Math.sqrt(G / cy.R));
+        const cx = cy.R * phi, cyy = -cy.R, mx = cx - cy.R * Math.sin(phi), my = cyy + cy.R * Math.cos(phi);
+        ctx.strokeStyle = C('--wheel'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(view.X(cx), view.Y(cyy), cy.R * k, 0, TAU); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(view.X(cx), view.Y(cyy)); ctx.lineTo(view.X(mx), view.Y(my)); ctx.stroke();
+        ctx.fillStyle = C('--wheel'); ctx.beginPath(); ctx.arc(view.X(cx), view.Y(cyy), 2.5, 0, TAU); ctx.fill();
+        if (!race || race.done) { ctx.beginPath(); ctx.arc(view.X(mx), view.Y(my), 3.5, 0, TAU); ctx.fill(); }
+      }
+      point(ctx, A, 'A'); point(ctx, T2.B, 'B', null, !race || race.done);
+      if (!race || race.done) { font(ctx, 11); ctx.fillStyle = C('--hot'); ctx.textAlign = 'left'; ctx.fillText('drag B', view.X(bx) + 14, view.Y(by) - 10); }
+    }
+    // beads: at A before a race, wherever they are during one; each racer's time appears once it arrives
+    rs.forEach((r, i) => {
+      const q = race ? locate(r.path, race.t) : { x: A[0], y: A[1] };
+      bead(ctx, q, r.col);
+    });
+    if (race) {
+      font(ctx, 12, '600'); ctx.textAlign = 'right';
+      rs.forEach((r, i) => {
+        // a time appears only when that bead arrives; one that turns back is only declared so once the race is over
+        const tt = race.t >= r.path.T ? r.path.T.toFixed(3) + ' s' : race.done ? 'never arrived' : '…';
+        ctx.fillStyle = C(r.col); ctx.fillText(r.name + ': ' + tt, W - 12, 20 + 17 * i);
+      });
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(race.done ? 'finished' : 'clock: ' + race.t.toFixed(2) + ' s' + (speed < 1 ? ' (slowed down)' : ''), 12, 20);
+    } else { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(tab === 1 ? (compact ? 'drag the round handles' : 'drag the round handles to bend your path') : '', 12, 20); }
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const sw = col => '<span class="sw" style="background:' + C(col) + '"></span>';
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const mine = makePath(myPts()), res = T1.result, str = makePath([A, B1]);
+      html += card(sw('--mine') + 'Your path', res ? (isFinite(res.mine) ? res.mine.toFixed(3) + ' s' : 'never arrives') : '—',
+        res && !isFinite(res.mine) ? 'it climbs above A\'s height somewhere, so the bead stops, slides back, and never reaches B' : (mine.length.toFixed(2) + ' m long' + (res ? '' : '; release the beads to time it')));
+      html += card(sw('--straight') + 'Straight line', res ? res.straight.toFixed(3) + ' s' : '—', str.length.toFixed(2) + ' m long, the shortest way from A to B');
+      html += card(sw('--best') + 'Your best', T1.bestT ? T1.bestT.toFixed(3) + ' s' : '—', T1.tries ? T1.tries + ' tr' + (T1.tries === 1 ? 'y' : 'ies') + ' so far' + (res && res.improved ? '; that one was your best yet' : '') : 'time a path to start');
+    } else {
+      const [bx, by] = T2.B, cy = cycloidThrough(bx, -by), res = T2.result;
+      html += card('The point B', bx.toFixed(2) + ' m across, ' + (-by).toFixed(2) + ' m down', cy.dipsBelow ? 'so far across and so shallow that the fastest path dips below B and climbs back up to it' : 'the cycloid reaches B before its lowest point');
+      html += card('The cycloid through B', 'circle radius ' + cy.R.toFixed(3) + ' m', 'the circle turns ' + (cy.phi * 180 / Math.PI).toFixed(0) + '° to draw the curve from A to B');
+      html += card('Times', res ? res.lines.join('<br>') : '—', res ? 'the cycloid wins every time, whatever B you choose' : 'release the beads to race the three paths');
+    }
+    $('readout').innerHTML = html;
+  }
+
+  const TEXT = {
+    1: { lede: 'A bead slides without friction along a wire from A down to B. Predict: which shape of wire gets it there soonest? The straight line is shortest, but is it fastest? Drag the handles to bend your wire, release the beads, and try to beat your best time.',
+         notes: '<p><b>What to try.</b> Sag the wire a little below the straight line and race again. Sag it more. Make it plunge almost straight down at the start, then run nearly level to B. Somewhere between "too shallow" and "too steep" is the fastest shape: keep bending toward it, and watch your best time fall. Try a wire that bulges above the straight line, and one that dips below B and climbs back up. Make part of it rise above A\'s height and see what happens to the bead.</p>' +
+                '<p><b>Why the shortest path is not the fastest.</b> The bead\'s speed at any point depends only on how far it has dropped: <i>v</i> = √(2<i>gh</i>), whatever the shape of the wire. A path that drops steeply at the start builds up speed early and then covers the rest of the distance fast, which more than makes up for being longer. Drop too steeply, though, and the extra length costs more than the speed gains. The best balance, found by Johann Bernoulli in 1696 as a challenge to the mathematicians of Europe, is a curve called the cycloid: the second screen shows it.</p>' +
+                '<p><b>The model.</b> A bead on a frictionless wire, so it can never leave the wire however sharply it curves. Your wire is a smooth curve through the handles. The time is calculated exactly from <i>v</i> = √(2<i>gh</i>) along the wire, not by stepping. Points higher than A cannot be reached: a bead that gets there has run out of speed. <i>g</i> = 9.8 m/s².</p>' },
+    2: { lede: 'The fastest path from A to B is a cycloid: the curve traced by a point on a circle as it rolls along a straight line. Drag B anywhere below A\'s level and watch the cycloid change to fit. Predict: if B is far away and only a little lower than A, what does the fastest path look like?',
+         notes: '<p><b>What to try.</b> Race the cycloid against the straight line and against Galileo\'s circular arc. The cycloid always wins, wherever you put B. Drag B far to the right and close to A\'s height: the cycloid now swoops below B and climbs back up to it, and that is still faster than any shallow path. Watch the rolling circle during a race: it turns at a steady rate, and its marked point stays on the bead the whole way.</p>' +
+                '<p><b>Why.</b> A circle of radius <i>R</i> rolling along the underside of A\'s level line traces <i>x</i> = <i>R</i>(<i>φ</i> − sin <i>φ</i>), <i>y</i> = −<i>R</i>(1 − cos <i>φ</i>). The cycloid through B is the one whose <i>R</i> and final angle <i>φ</i> land it on B, and the time to get there is just <i>φ</i>√(<i>R</i>/<i>g</i>): the rolling angle grows at a steady rate √(<i>g</i>/<i>R</i>). In 1638 Galileo argued that a circular arc beats the straight line, which is true, but it is not the fastest. Bernoulli\'s solution borrowed from light: a ray crossing layers of glass bends so as to take the quickest route (Fermat\'s principle), and a bead speeding up as it drops behaves like light slowing through ever-denser layers. The same curve has another property: a bead released anywhere on it reaches the bottom at the same moment (the tautochrone), which Huygens used to design a pendulum clock.</p>' +
+                '<p><b>The model.</b> As on the first screen. Galileo\'s arc is the circle that leaves A heading straight down and passes through B.</p>' }
+  };
+
+  function visibility() {
+    $('straighten').hidden = $('forget').hidden = tab !== 1;
+    $('tog1').hidden = tab !== 1; $('tog2').hidden = tab !== 2;
+    const race = tab === 1 ? T1.race : T2.race;
+    $('go').textContent = race && !race.done ? 'Stop' : race ? 'Release again' : 'Release the beads';
+    document.querySelectorAll('#spd button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.s === speed)));
+    $('hint').textContent = tab === 1 ? '' : 'drag B to move the end point';
+  }
+  function upd() { visibility(); readout(); drawScene(); }
+  function setTab(k) {
+    tab = k; drag = null;
+    [1, 2].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    upd();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  function finish() {
+    // a race is over once every bead has arrived (or turned back for good); record the times
+    const rs = racers(), get = key => { const r = rs.find(q => q.key === key); return r ? r.path.T : null; };
+    if (tab === 1) {
+      const mine = get('mine'), improved = isFinite(mine) && (T1.bestT === null || mine < T1.bestT - 1e-9);
+      T1.tries++; if (improved) { T1.best = myPts(); T1.bestT = mine; }
+      T1.result = { mine, straight: makePath([A, B1]).T, improved };
+    } else T2.result = { lines: rs.map(r => r.name + ': ' + r.path.T.toFixed(3) + ' s').sort((a, b) => parseFloat(a.split(': ')[1]) - parseFloat(b.split(': ')[1])) };
+  }
+  $('go').addEventListener('click', () => {
+    const x = tab === 1 ? T1 : T2;
+    if (x.race && !x.race.done) { x.race = null; upd(); return; }
+    x.result = null;
+    const rs = racers(), end = Math.max(...rs.map(r => isFinite(r.path.T) ? r.path.T : 0));
+    x.race = { t: 0, end: Math.max(end, 0.5) + 0.1, rs };
+    upd();
+  });
+  document.querySelectorAll('#spd button').forEach(b => b.addEventListener('click', () => { speed = +b.dataset.s; visibility(); }));
+  $('straighten').addEventListener('click', () => { T1.ctrl = straightCtrl(); T1.race = null; T1.result = null; upd(); });
+  $('forget').addEventListener('click', () => { T1.best = null; T1.bestT = null; T1.tries = 0; T1.result = null; upd(); });
+  ['showBest', 'showStraight', 'showWheel', 'showArc', 'showArch'].forEach(id => $(id).addEventListener('change', () => { (tab === 1 ? T1 : T2).race = null; upd(); }));
+
+  // dragging: the handles of your path (first screen), or the end point B (second)
+  const pt = e => { const r = $('scene').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  function grab([px, py]) {
+    if (!view) return null;
+    if (tab === 1) { let best = null, d = 16; T1.ctrl.forEach((p, i) => { const q = Math.hypot(px - view.X(p[0]), py - view.Y(p[1])); if (q < d) { d = q; best = i; } }); return best; }
+    return Math.hypot(px - view.X(T2.B[0]), py - view.Y(T2.B[1])) < 18 ? 'B' : null;
+  }
+  $('scene').addEventListener('pointerdown', e => { const g = grab(pt(e)); if (g === null) return; drag = g; $('scene').setPointerCapture(e.pointerId); (tab === 1 ? T1 : T2).race = null; (tab === 1 ? T1 : T2).result = null; upd(); });
+  $('scene').addEventListener('pointermove', e => {
+    const q = pt(e);
+    if (drag === null) { $('scene').style.cursor = grab(q) !== null ? 'grab' : 'default'; return; }
+    const x = Math.max(BOX.x0 + 0.05, Math.min(BOX.x1 - 0.05, view.x(q[0]))), y = Math.max(BOX.y0 + 0.05, Math.min(BOX.y1 - 0.05, view.y(q[1])));
+    if (tab === 1) T1.ctrl[drag] = [x, y];
+    else T2.B = [Math.max(0.15, x), Math.min(-0.03, y)];              // B stays to the right of A and below it
+    upd();
+  });
+  const endDrag = () => { drag = null; drawScene(); };
+  $('scene').addEventListener('pointerup', endDrag); $('scene').addEventListener('pointercancel', endDrag);
+  window.addEventListener('resize', drawScene);
+
+  // ================================================================
+  // 4. LOOP: the race clock
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    const x = tab === 1 ? T1 : T2;
+    if (x.race && !x.race.done && !document.hidden && dt > 0) {
+      x.race.t += dt * speed;
+      if (x.race.t >= x.race.end) { x.race.t = x.race.end; x.race.done = true; finish(); upd(); }   // the beads stay where they finished
+      else drawScene();
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
