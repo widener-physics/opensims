@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'induction',
+    title: 'Electromagnetic induction',
+    topic: 'em',
+    tags: ["Faraday's law", "Lenz's law", 'induction', 'flux', 'emf', 'motional emf', 'right-hand rule', 'magnet', 'coil', 'prediction'],
+    blurb: "Move a magnet through a coil and watch the flux and the emf graphed in real units, then measure how the peak emf depends on speed and turns. Pull a rod along rails in a magnetic field to find its terminal speed. Then predict which way the current in a loop will flow as you move a magnet or the loop, and check your reasoning against Lenz's law, step by step.",
+    level: 'intro',
+    added: '2026-10-06',
+    status: 'ready'
+  },
+  {
     slug: 'polarization',
     title: 'Polarized light',
     topic: 'optics',

@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<!--
+  Electromagnetic induction - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The magnet's flux through
+  a turn of wire matches a brute-force Biot-Savart sum and, far away, the point-dipole formula; the area under
+  the emf is the change in flux; the coil always pushes against the magnet's motion with exactly the power
+  dissipated in the circuit; the step-by-step Lenz's-law reasoning shown on the third screen agrees with the
+  computed current and force in every case, and the convention behind it (counterclockwise from above means a field
+  pointing up) was checked with Biot-Savart; and the sliding rod's exact solution matches a step-by-step
+  integration, heat included.
+  Credit: PhET's Faraday's Electromagnetic Lab (HTML5) shows the coil's current on a relative scale; this sim
+  graphs flux and emf in real units, adds the sliding rod, and asks for a prediction of the current's direction
+  before showing it, with the reasoning laid out step by step.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Electromagnetic induction</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --north: #C8321E; --south: #1D4F73; --copper: #B8733A; --copper-dark: #8A5226; --line: #8E9BA3; --cur: #E09A1A; --pull: #2E7D32;
+    --s1: #1D4F73; --s2: #C8321E; --s3: #2E7D32; --s4: #B5306D;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 330; touch-action: pan-y; }
+  #graph { aspect-ratio: 900 / 270; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 .pred { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.8; }
+    #graph { aspect-ratio: 1 / 0.85; }
+    body.t1 #graph { aspect-ratio: 1 / 1.45; }
+    body.t3 #scene { aspect-ratio: 1 / 1.3; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Electromagnetic induction</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Magnet and coil</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Sliding rod</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Lenz's law</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="The apparatus: a magnet and coil, a rod on rails, or a magnet falling through a ring"></canvas>
+  <div class="row2">
+    <span class="pred" id="predbox"><span>Your prediction, seen from above:</span>
+      <span class="seg" id="pred" role="group" aria-label="Predicted direction of the current, seen from above"><button data-v="ccw">↺ counterclockwise</button><button data-v="cw">↻ clockwise</button></span></span>
+    <button id="go">Push it through</button>
+    <button id="rec" class="secondary">Record the peak</button>
+    <button id="clear" class="secondary">Clear</button>
+    <label id="lab_theory"><input type="checkbox" id="theory"> <span id="theory_t">theory</span></label>
+    <label id="lab_lines"><input type="checkbox" id="lines" checked> field lines</label>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Graph of the measurements against time"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_N"><div>Turns of wire in the coil</div>
+      <div class="seg" id="N" role="group" aria-label="Turns"><button data-v="50">50</button><button data-v="100">100</button><button data-v="200">200</button><button data-v="400">400</button></div></div>
+    <label id="lab_R"><div class="row"><span>Resistor in the circuit</span><span class="val" id="R_v"></span></div><input type="range" id="R" min="1" max="100" step="1"></label>
+    <label id="lab_spd"><div class="row"><span>Pushing speed</span><span class="val" id="spd_v"></span></div><input type="range" id="spd" min="0.1" max="2" step="0.05"></label>
+    <div class="grp" id="lab_flip"><div>The magnet</div>
+      <div class="seg" id="flip" role="group" aria-label="Magnet direction"><button data-v="1">north end right</button><button data-v="-1">north end left</button></div></div>
+    <div class="grp" id="lab_slow"><div>Playback</div>
+      <div class="seg" id="slow" role="group" aria-label="Playback speed"><button data-v="1">real time</button><button data-v="5">1/5 speed</button><button data-v="20">1/20 speed</button></div></div>
+
+    <div class="grp" id="lab_mode"><div>What moves the rod</div>
+      <div class="seg" id="mode" role="group" aria-label="What moves the rod"><button data-v="pull">a steady pull</button><button data-v="kick">a kick, then let go</button></div></div>
+    <label id="lab_F"><div class="row"><span>Pulling force</span><span class="val" id="F_v"></span></div><input type="range" id="F" min="0.01" max="0.3" step="0.01"></label>
+    <label id="lab_v0"><div class="row"><span>Speed given by the kick</span><span class="val" id="v0_v"></span></div><input type="range" id="v0" min="0.2" max="3" step="0.1"></label>
+    <label id="lab_B"><div class="row"><span>Magnetic field</span><span class="val" id="B_v"></span></div><input type="range" id="B" min="0" max="1.5" step="0.05"></label>
+    <label id="lab_Rr"><div class="row"><span>Resistor</span><span class="val" id="Rr_v"></span></div><input type="range" id="Rr" min="0.1" max="5" step="0.1"></label>
+    <div class="grp" id="lab_circ"><div>The circuit</div>
+      <div class="seg" id="circ" role="group" aria-label="Circuit"><button data-v="1">closed</button><button data-v="0">open (resistor removed)</button></div></div>
+
+    <div class="grp" id="lab_mover"><div>What moves</div>
+      <div class="seg" id="mover" role="group" aria-label="What moves"><button data-v="magnet">drag the magnet</button><button data-v="loop">drag the loop</button><button data-v="drop">drop the magnet</button></div></div>
+    <div class="grp" id="lab_pole"><div>The magnet</div>
+      <div class="seg" id="pole" role="group" aria-label="Magnet direction"><button data-v="-1">north end down</button><button data-v="1">south end down</button></div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against a brute-force Biot-Savart sum, the
+  //    point-dipole limit, energy conservation and step-by-step integrations. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: electromagnetic induction ----
+  // SI units throughout. The magnet is a uniformly magnetized cylinder (radius b, length L, remanence Br), which
+  // is exactly a solenoid carrying a surface current Br/mu0 per meter of its length. The flux it sends through a
+  // circular turn of wire on its axis follows from the mutual inductance of two coaxial loops (elliptic integrals),
+  // summed over the magnet's length. A coil is N such turns spread evenly over a short length. Induced emf is
+  // -N dPhi/dt; with the coil closed through a resistor the current is emf / (coil + resistor), and the coil pushes
+  // back on the magnet with the force whose power is exactly the heat in the circuit. The coil's self-inductance
+  // (L/R about 0.2 ms here, against passes lasting 10 ms or more) is left out.
+  // The sliding rod: a rod of mass m on frictionless rails a distance l apart, in a uniform field B, closed
+  // through a resistor R: emf = B l v, current B l v / R, and a braking force B^2 l^2 v / R.
+  const MU0 = 4e-7 * Math.PI, G = 9.8;
+  // complete elliptic integrals K(m), E(m) with parameter m = k^2, by the arithmetic-geometric mean
+  function ellipKE(m) {
+    let a = 1, b = Math.sqrt(1 - m), c, sum = m / 2, p = 0.5;
+    for (let i = 0; i < 60; i++) {
+      c = (a - b) / 2; const an = (a + b) / 2; b = Math.sqrt(a * b); a = an; p *= 2; sum += p * c * c;
+      if (Math.abs(c) < 1e-17) break;
+    }
+    const K = Math.PI / (2 * a);
+    return [K, K * (1 - sum)];
+  }
+  // mutual inductance of two coaxial circular loops, radii r1 and r2, a distance s apart
+  function mutual(r1, r2, s) {
+    const m = 4 * r1 * r2 / ((r1 + r2) * (r1 + r2) + s * s), k = Math.sqrt(m);
+    let f;
+    if (m < 1e-3) f = Math.PI * k * m / 16 * (1 + 0.75 * m + 75 / 128 * m * m);   // series: avoids cancellation when far apart
+    else { const [K, E] = ellipKE(m); f = (2 / k - k) * K - (2 / k) * E; }
+    return MU0 * Math.sqrt(r1 * r2) * f;
+  }
+  // the magnet and the coils
+  const MAGNET = { b: 0.006, L: 0.025, Br: 1.2 };            // a neodymium cylinder 12 mm across and 25 mm long
+  MAGNET.mass = 7500 * Math.PI * MAGNET.b * MAGNET.b * MAGNET.L;   // 21 g
+  MAGNET.moment = MAGNET.Br * Math.PI * MAGNET.b * MAGNET.b * MAGNET.L / MU0;
+  const COIL = { a: 0.02, len: 0.012, ohmPerTurn: 2 * Math.PI * 0.02 * 0.213 };   // 2 cm radius, 28-gauge copper wire
+  const coilResistance = N => N * COIL.ohmPerTurn;
+
+  // Flux through one turn of radius a whose plane is a distance s from the magnet's center:
+  //   Phi1(s) = (Br/mu0) * integral over the magnet's length of mutual(a, b, s')
+  // Tabulated once as a running integral Q of the mutual inductance, so Phi1(s) = (Br/mu0)(Q(s + L/2) - Q(s - L/2)),
+  // and its slope is exactly (Br/mu0)(M(s + L/2) - M(s - L/2)) with no table at all.
+  function fluxTable(mag, a, S, n) {
+    S = S || 0.6; n = n || 12000;
+    const ds = 2 * S / n, Q = new Float64Array(n + 1); let prev = mutual(a, mag.b, -S);
+    for (let i = 1; i <= n; i++) { const cur = mutual(a, mag.b, -S + i * ds); Q[i] = Q[i - 1] + (prev + cur) / 2 * ds; prev = cur; }
+    return { S, ds, Q, mag, a };
+  }
+  function Qat(T, s) {
+    if (s <= -T.S) return 0; if (s >= T.S) return T.Q[T.Q.length - 1];
+    const f = (s + T.S) / T.ds, i = Math.min(Math.floor(f), T.Q.length - 2), t = f - i;
+    // cubic Hermite with the exact derivative (the mutual inductance itself) at both ends
+    const h = T.ds, y0 = T.Q[i], y1 = T.Q[i + 1], d0 = mutual(T.a, T.mag.b, -T.S + i * h), d1 = mutual(T.a, T.mag.b, -T.S + (i + 1) * h);
+    const t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * h * d0 + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * h * d1;
+  }
+  const phi1 = (T, s) => T.mag.Br / MU0 * (Qat(T, s + T.mag.L / 2) - Qat(T, s - T.mag.L / 2));
+  const dphi1 = (T, s) => T.mag.Br / MU0 * (mutual(T.a, T.mag.b, s + T.mag.L / 2) - mutual(T.a, T.mag.b, s - T.mag.L / 2));
+  // a coil: N turns spread evenly over its length, centered at 0; the magnet's center at x on the axis.
+  // Flux per turn (averaged over the turns) and its slope, by 6-point Gauss-Legendre across the winding.
+  const GLX = [-0.9324695142, -0.6612093865, -0.2386191861, 0.2386191861, 0.6612093865, 0.9324695142];
+  const GLW = [0.1713244924, 0.3607615730, 0.4679139346, 0.4679139346, 0.3607615730, 0.1713244924];
+  function coilFlux(T, x) { let s = 0; for (let j = 0; j < 6; j++) s += GLW[j] / 2 * phi1(T, x - COIL.len / 2 * GLX[j]); return s; }
+  function coilSlope(T, x) { let s = 0; for (let j = 0; j < 6; j++) s += GLW[j] / 2 * dphi1(T, x - COIL.len / 2 * GLX[j]); return s; }
+  // the circuit: emf, current and the force back on the magnet. sign = +1 with the magnet's north end toward +x.
+  // R = Infinity for an open circuit.
+  function coilState(T, N, R, x, v, sign) {
+    const k = N * coilSlope(T, x), emf = -sign * k * v, Rt = coilResistance(N) + R, I = isFinite(Rt) ? emf / Rt : 0;
+    return { flux: sign * coilFlux(T, x), emf, I, force: sign * k * I, power: emf * I };   // force on the magnet, along +x
+  }
+  // the flux function psi(r, z): the flux through a circle of radius r centered on the axis a distance z from the
+  // magnet's center. The field lines are its contour lines, with equal flux between neighbors.
+  function psiGrid(mag, rMax, zMax, nr, nz) {
+    const g = { rMax, zMax, nr, nz, v: [] };
+    for (let i = 0; i <= nr; i++) {
+      const r = Math.max(1e-6, rMax * i / nr) * (Math.abs(rMax * i / nr - mag.b) < 1e-7 ? 1.0001 : 1);
+      const T = fluxTable(mag, r, zMax + mag.L, 4 * nz), row = [];
+      for (let j = 0; j <= nz; j++) row.push(i === 0 ? 0 : phi1(T, -zMax + 2 * zMax * j / nz));
+      g.v.push(row);
+    }
+    return g;
+  }
+
+  // Lenz's law: a single loop of copper wire, 8 cm across, its ends joined through a current meter (0.1 ohm in all,
+  // so the loop's self-inductance delays the current by only about a microsecond). Heights y are measured along the
+  // vertical axis, up positive; the magnet's north end points up when sign = +1. Flux is counted positive upward,
+  // and current positive when it circulates counterclockwise as seen from above (by the right-hand rule, that current
+  // makes a field pointing up through the loop, so the loop's north side is on top).
+  const LOOP = { a: 0.04, R: 0.1 };
+  // the loop at height yl moving at vl, the magnet at ym moving at vm: only the relative motion matters
+  function loopState(T, ym, yl, vm, vl, sign) {
+    const s = ym - yl, v = vm - vl, d = dphi1(T, s), flux = sign * phi1(T, s), rate = sign * d * v;
+    const emf = -rate, I = emf / LOOP.R;
+    return { flux, rate, emf, I, force: sign * d * I };     // force on the magnet, up positive (the loop feels the opposite)
+  }
+  // The reasoning, step by step, for one instant: which way the magnet's field threads the loop, whether that flux is
+  // growing or shrinking, which way the loop's own field must point to oppose the change, which way the current
+  // circulates to make that field, and which side of the loop becomes its north pole, so whether loop and magnet
+  // push apart or pull together. Returns null when nothing is changing.
+  function lenzChain(st, ym, yl, vm, vl) {
+    if (Math.abs(st.rate) < 1e-12) return null;
+    const fluxUp = st.flux > 0, growing = st.flux * st.rate > 0, inducedUp = st.rate < 0;
+    const gap = Math.abs(ym - yl), closing = (ym - yl) * (vm - vl) < 0;
+    return {
+      flux: fluxUp ? 'up' : 'down', change: growing ? 'growing' : 'shrinking', induced: inducedUp ? 'up' : 'down',
+      current: inducedUp ? 'counterclockwise' : 'clockwise', north: inducedUp ? 'top' : 'bottom',
+      interaction: closing ? 'repel' : 'attract', gap
+    };
+  }
+  // tabulate the braking per unit speed k and current per unit speed c along the axis, from -Y to Y
+  function conductorTable(fn, Y, n) {
+    Y = Y || 0.2; n = n || 1600; const dy = 2 * Y / n, k = new Float64Array(n + 1), c = new Float64Array(n + 1);
+    for (let i = 0; i <= n; i++) { const q = fn(-Y + i * dy); k[i] = q.k; c[i] = q.c; }
+    return { Y, dy, k, c, n };
+  }
+  function tableAt(T, arr, y) {
+    if (y <= -T.Y || y >= T.Y) return 0;
+    const f = (y + T.Y) / T.dy, i = Math.min(Math.floor(f), T.n - 1), t = f - i;
+    return arr[i] * (1 - t) + arr[i + 1] * t;
+  }
+  const loopTable = T => conductorTable(y => { const d = dphi1(T, y); return { k: d * d / LOOP.R, c: -d / LOOP.R }; });
+  // A magnet dropped along the axis through the (fixed) loop: released from rest with its center h above the loop,
+  // M dv/dt = -M g - k(y) v, by RK4. The run ends when the magnet is yEnd below the loop. The heat in the loop is
+  // integrated alongside. (For a single loop the braking is tiny: the fall is very nearly free.)
+  function drop(C, h, opts) {
+    opts = opts || {}; const dt = opts.dt || 2e-5, yEnd = opts.yEnd || -0.12, sign = opts.sign || 1, M = MAGNET.mass;
+    const kk = y => C ? tableAt(C, C.k, y) : 0, acc = (y, v) => -G - kk(y) * v / M;
+    let y = h, v = 0, t = 0, heat = 0;
+    const every = Math.max(1, Math.round((opts.sample || 1e-3) / dt)), out = { t: [0], y: [y], v: [0], I: [0], heat: [0] };
+    for (let i = 1; i < 5e6; i++) {
+      const k1y = v, k1v = acc(y, v);
+      const k2y = v + dt / 2 * k1v, k2v = acc(y + dt / 2 * k1y, v + dt / 2 * k1v);
+      const k3y = v + dt / 2 * k2v, k3v = acc(y + dt / 2 * k2y, v + dt / 2 * k2v);
+      const k4y = v + dt * k3v, k4v = acc(y + dt * k3y, v + dt * k3v);
+      const q = (yy, vv) => kk(yy) * vv * vv;
+      heat += dt / 6 * (q(y, v) + 2 * q(y + dt / 2 * k1y, k2y) + 2 * q(y + dt / 2 * k2y, k3y) + q(y + dt * k3y, k4y));
+      y += dt / 6 * (k1y + 2 * k2y + 2 * k3y + k4y); v += dt / 6 * (k1v + 2 * k2v + 2 * k3v + k4v); t = i * dt;
+      if (i % every === 0 || y <= yEnd) { out.t.push(t); out.y.push(y); out.v.push(v); out.I.push(C ? sign * tableAt(C, C.c, y) * v : 0); out.heat.push(heat); }
+      if (y <= yEnd) break;
+    }
+    out.tEnd = t; out.vEnd = v; out.heatEnd = heat;
+    return out;
+  }
+
+  // The sliding rod, solved exactly. Pulled by a steady force F from rest, or kicked to speed v0 and let go (F = 0).
+  // tau = m R / (B l)^2; terminal speed F R / (B l)^2. With the circuit open (R infinite) nothing brakes it.
+  function rod(p, t) {
+    const { m, B, l, R, F, v0 } = p;
+    if (!isFinite(R) || B === 0) { const a = F / m; return { v: v0 + a * t, x: v0 * t + a * t * t / 2, heat: 0, work: F * (v0 * t + a * t * t / 2), emf: B * l * (v0 + a * t), I: 0, force: 0 }; }
+    const k = B * B * l * l / R, tau = m / k, vT = F / k, e = Math.exp(-t / tau);
+    const v = vT + (v0 - vT) * e, x = vT * t + (v0 - vT) * tau * (1 - e), work = F * x;
+    const heat = work + m * v0 * v0 / 2 - m * v * v / 2;      // energy books: what went in, less the kinetic energy left
+    return { v, x, heat, work, emf: B * l * v, I: B * l * v / R, force: -k * v, tau, vT };
+  }
+  // ---- end of core ----
+
+  const FT = fluxTable(MAGNET, COIL.a);                 // flux through one turn of the coil
+  let maxSlope = 0; for (let x = 0; x < 0.05; x += 0.0002) maxSlope = Math.max(maxSlope, Math.abs(coilSlope(FT, x)));
+  const FTL = fluxTable(MAGNET, LOOP.a), LT = loopTable(FTL);   // the Lenz screen's loop
+  const DROP_H = 0.065, DROP_END = -0.07, Y3 = 0.07, ITHR = 3e-4;  // a current under 0.3 mA counts as none
+  const ROD = { m: 0.04, l: 0.2, x0: 0.15, len: 2.2 };   // rod mass and rail spacing; start and end of the run along the rails
+
+  // the field-line picture: contours of the flux function around the magnet, found once by marching squares.
+  // Each segment is [r1, z1, r2, z2] in meters, z along the magnet's axis from its center.
+  const FIELD = (function () {
+    const g = psiGrid(MAGNET, 0.13, 0.22, 78, 176), nr = g.nr, nz = g.nz, dr = g.rMax / nr, dz = 2 * g.zMax / nz;
+    let top = 0; g.v.forEach(row => row.forEach(v => { top = Math.max(top, v); }));
+    const step = top / 9, levels = []; for (let k = 1; k <= 8; k++) levels.push(k * step);
+    const segs = [], marks = [];
+    levels.forEach(L => {
+      for (let i = 0; i < nr; i++) for (let j = 0; j < nz; j++) {
+        const v = [g.v[i][j], g.v[i + 1][j], g.v[i + 1][j + 1], g.v[i][j + 1]];
+        const P = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]], pts = [];
+        for (let e = 0; e < 4; e++) { const a = v[e], b = v[(e + 1) % 4]; if ((a < L) !== (b < L)) { const t = (L - a) / (b - a), p = P[e], q = P[(e + 1) % 4]; pts.push([(p[0] + t * (q[0] - p[0])) * dr, -g.zMax + (p[1] + t * (q[1] - p[1])) * dz]); } }
+        if (pts.length === 2) segs.push([pts[0][0], pts[0][1], pts[1][0], pts[1][1]]);
+        else if (pts.length === 4) { segs.push([pts[0][0], pts[0][1], pts[1][0], pts[1][1]]); segs.push([pts[2][0], pts[2][1], pts[3][0], pts[3][1]]); }
+      }
+      // where each line crosses the magnet's middle plane, and which way the field points there (along the
+      // magnet's north direction where the flux grows outward, against it where the flux falls)
+      const jm = nz / 2;
+      if (levels.indexOf(L) % 2 === 0) for (let i = 0; i < nr; i++) { const a = g.v[i][jm], b = g.v[i + 1][jm]; if ((a < L) !== (b < L) && b < a) marks.push([(i + (L - a) / (b - a)) * dr, -1]); }
+    });
+    return { segs, marks, step };
+  })();
+
+  const TAB = {
+    1: { N: 200, R: 10, spd: 1, sign: 1, slow: 5, x: -0.09, vx: 0, target: null, push: null, t: 0, still: 0, trace: [], peak: null, recorded: false, series: [] },
+    2: { mode: 'pull', F: 0.08, v0: 1.5, B: 1, R: 0.5, closed: true, run: null, series: [] },
+    3: { mover: 'magnet', sign: -1, slow: 20, ym: 0.055, yl: 0, vm: 0, vl: 0, tm: null, tl: null, drop: null, pred: null, revealed: false, ok: null, right: 0, total: 0, chain: null, last: null, now: null, still: 1, t: 0, trace: [], phase: 0, touched: false }
+  };
+  let tab = 1;
+  const S = () => TAB[tab];
+
+  // formatting
+  const fmtV = e => { const a = Math.abs(e); return a < 0.0995 ? (1000 * e).toFixed(1) + ' mV' : a < 0.9995 ? (1000 * e).toFixed(0) + ' mV' : e.toFixed(2) + ' V'; };
+  const fmtA = i => { const a = Math.abs(i); return a >= 1 ? (a >= 99.5 ? i.toFixed(0) : i.toFixed(1)) + ' A' : a >= 0.0995 ? (1000 * i).toFixed(0) + ' mA' : (1000 * i).toFixed(1) + ' mA'; };
+  const fmtN = f => { const a = Math.abs(f); return a >= 0.0995 ? f.toFixed(2) + ' N' : (1000 * f).toFixed(1) + ' mN'; };
+  const fmtJ = e => (1000 * e).toFixed(1) + ' mJ';
+  const minus = s => s.replace(/-/g, '−');
+
+  // ---- screen 1: the magnet moves along the coil's axis, in 1 ms steps of simulated time
+  const STEP = 0.001, XLIM = 0.11;
+  function state1(x, vx) { const s = TAB[1]; return coilState(FT, s.N, s.R, x, vx, s.sign); }
+  function advance1(dtWall) {
+    const s = TAB[1];
+    let simT = s.push ? dtWall / s.slow : dtWall;
+    simT = Math.min(simT, 0.05);
+    const n = Math.max(1, Math.round(simT / STEP)), h = simT / n;
+    for (let k = 0; k < n; k++) {
+      if (s.push) {
+        s.x += s.push.dir * s.spd * h; s.vx = s.push.dir * s.spd;
+        if ((s.push.dir > 0 && s.x >= s.push.end) || (s.push.dir < 0 && s.x <= s.push.end)) { s.x = s.push.end; s.vx = 0; s.peak = { v: s.spd, N: s.N, emf: s.push.peak }; s.recorded = false; s.push = null; }
+      } else if (s.target !== null) {
+        // the magnet follows your hand smoothly (a critically damped spring), no faster than 2.5 m/s
+        const w = 40, a = w * w * (s.target - s.x) - 2 * w * s.vx;
+        s.vx = Math.max(-2.5, Math.min(2.5, s.vx + a * h)); s.x = Math.max(-XLIM, Math.min(XLIM, s.x + s.vx * h));
+        if (Math.abs(s.target - s.x) < 1e-5 && Math.abs(s.vx) < 1e-4) { s.vx = 0; }
+      } else s.vx = 0;
+      const moving = Math.abs(s.vx) > 1e-5;
+      s.still = moving ? 0 : s.still + h;
+      if (s.still < 0.4) {                               // the chart runs while the magnet moves, and pauses when it is still
+        s.t += h; const c = state1(s.x, s.vx);
+        s.trace.push([s.t, c.flux, c.emf]);
+        if (s.push) s.push.peak = Math.max(s.push.peak, Math.abs(c.emf));
+      }
+    }
+    while (s.trace.length && s.trace[0][0] < s.t - 3.2) s.trace.shift();
+  }
+  function startPush() {
+    const s = TAB[1], dir = s.x <= 0 ? 1 : -1;
+    s.x = -dir * 0.1; s.target = null; s.vx = 0; s.peak = null; s.touched = true;
+    s.push = { dir, end: dir * 0.1, peak: 0 };
+  }
+  function record1() {
+    const s = TAB[1]; if (!s.peak || s.recorded) return;
+    const key = String(s.peak.N); let ser = s.series.find(q => q.key === key);
+    if (!ser) { ser = { key, label: s.peak.N + ' turns', N: s.peak.N, pts: [], col: COLS[s.series.length % 4] }; s.series.push(ser); if (s.series.length > 4) s.series.shift(); }
+    ser.pts = ser.pts.filter(p => Math.abs(p[0] - s.peak.v) > 1e-9); ser.pts.push([s.peak.v, s.peak.emf]); s.recorded = true;
+  }
+  const COLS = ['--s1', '--s2', '--s3', '--s4'];
+
+  // ---- screen 2: the rod, from the exact solution
+  function rodParams() { const s = TAB[2]; return { m: ROD.m, l: ROD.l, B: s.B, R: s.closed ? s.R : Infinity, F: s.mode === 'pull' ? s.F : 0, v0: s.mode === 'kick' ? s.v0 : 0 }; }
+  function rodLabel(p, mode) { return (mode === 'pull' ? 'pull ' + p.F.toFixed(2) + ' N' : 'kick ' + p.v0.toFixed(1) + ' m/s') + ', B ' + p.B.toFixed(2) + ' T, ' + (isFinite(p.R) ? 'R ' + p.R.toFixed(1) + ' Ω' : 'open'); }
+  function startRod() { const s = TAB[2], p = rodParams(); s.run = { p, mode: s.mode, t: 0, done: false, pts: [[0, p.v0]] }; }
+  function advance2(dt) {
+    const s = TAB[2], r = s.run; if (!r || r.done) return;
+    const n = Math.max(1, Math.ceil(dt / 0.01));
+    for (let k = 0; k < n; k++) {
+      r.t += dt / n; const q = rod(r.p, r.t);
+      if (ROD.x0 + q.x >= ROD.len - 0.04 || r.t >= 5 || (r.mode === 'kick' && q.v < 0.003)) { r.done = true; r.end = ROD.x0 + q.x >= ROD.len - 0.04 ? 'reached the end of the rails' : r.t >= 5 ? 'stopped the clock at 5 s' : 'came to rest'; }
+      r.pts.push([r.t, q.v]);
+      if (r.done) break;
+    }
+    if (r.done) {
+      const key = rodLabel(r.p, r.mode); s.series = s.series.filter(q => q.label !== key);
+      s.series.push({ label: key, pts: r.pts.slice(), p: r.p, mode: r.mode, col: '' }); if (s.series.length > 4) s.series.shift();
+      s.series.forEach((q, i) => { q.col = COLS[i]; });
+    }
+  }
+
+  // ---- screen 3: Lenz's law. The magnet or the loop follows your hand (or the magnet falls); the current stays
+  //      hidden until you have predicted its direction, then is shown along with the reasoning.
+  function startDrop() {
+    const s = TAB[3];
+    s.ym = DROP_H; s.yl = 0; s.vm = 0; s.vl = 0; s.tm = null; s.tl = null; s.touched = true;
+    s.drop = { d: drop(LT, DROP_H, { sign: s.sign, yEnd: DROP_END, sample: 5e-4 }), t: 0, done: false };
+  }
+  function dropAt(D, t) {
+    const d = D.d, j = Math.min(d.t.length - 2, Math.max(0, Math.floor(t / 5e-4))), f = Math.max(0, Math.min(1, (t - d.t[j]) / (d.t[j + 1] - d.t[j])));
+    return { y: d.y[j] + (d.y[j + 1] - d.y[j]) * f, v: d.v[j] + (d.v[j + 1] - d.v[j]) * f };
+  }
+  function follow(s, key, vkey, tkey, h) {
+    if (s[tkey] === null) { s[vkey] = 0; return; }
+    const w = 40, a = w * w * (s[tkey] - s[key]) - 2 * w * s[vkey];
+    s[vkey] = Math.max(-2.5, Math.min(2.5, s[vkey] + a * h)); s[key] = Math.max(-Y3, Math.min(Y3, s[key] + s[vkey] * h));
+  }
+  function advance3(dtWall) {
+    const s = TAB[3], D = s.drop, running = D && !D.done;
+    const simT = Math.min(0.05, running ? dtWall / s.slow : dtWall), n = Math.max(1, Math.round(simT / 0.001)), h = simT / n;
+    for (let k = 0; k < n; k++) {
+      if (running) {
+        D.t = Math.min(D.d.tEnd, D.t + h); const q = dropAt(D, D.t); s.ym = q.y; s.vm = q.v;
+        if (D.t >= D.d.tEnd) { D.done = true; s.vm = 0; }
+      } else { follow(s, 'ym', 'vm', 'tm', h); follow(s, 'yl', 'vl', 'tl', h); }
+      const st = loopState(FTL, s.ym, s.yl, s.vm, s.vl, s.sign), active = Math.abs(st.I) > ITHR;
+      s.now = st;
+      if (active) {
+        s.still = 0;
+        if (s.pred && !s.revealed) { s.revealed = true; s.first = st.I > 0 ? 'counterclockwise' : 'clockwise'; s.ok = (st.I > 0 ? 'ccw' : 'cw') === s.pred; s.total++; if (s.ok) s.right++; }
+        if (s.revealed) { s.chain = lenzChain(st, s.ym, s.yl, s.vm, s.vl); s.last = { chain: s.chain, pred: s.pred, ok: s.ok, first: s.first }; }
+        s.phase += (st.I > 0 ? 1 : -1) * Math.min(6, 0.6 + Math.abs(st.I) * 400) * h * (running ? s.slow : 1);
+      } else {
+        s.still += h;
+        if (s.still > 0.6 && s.revealed && !(D && !D.done)) { s.pred = null; s.revealed = false; s.ok = null; }   // that move is over
+      }
+      if (s.still < 0.4) { s.t += h; s.trace.push([s.t, st.flux, s.revealed ? st.I : NaN]); }
+    }
+    while (s.trace.length && s.trace[0][0] < s.t - 3.2) s.trace.shift();
+  }
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+  function arrow(ctx, x0, y0, x1, y1, col, w, head) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head || 8, L * 0.5);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.6, y1 - uy * hd * 0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.5, y1 - uy * hd + ux * hd * 0.5); ctx.lineTo(x1 - ux * hd + uy * hd * 0.5, y1 - uy * hd - ux * hd * 0.5); ctx.closePath(); ctx.fill();
+  }
+  // field lines around the magnet: map (r, z) to the screen with a function, drawn on both sides of the axis
+  function fieldLines(ctx, map, sign) {
+    ctx.save(); ctx.strokeStyle = C('--line'); ctx.globalAlpha = 0.55; ctx.lineWidth = 1; ctx.beginPath();
+    FIELD.segs.forEach(sg => { for (const side of [1, -1]) { const a = map(side * sg[0], sg[1]), b = map(side * sg[2], sg[3]); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); } });
+    ctx.stroke(); ctx.globalAlpha = 0.8; ctx.fillStyle = C('--line');
+    FIELD.marks.forEach(([r, d]) => { for (const side of [1, -1]) {
+      const a = map(side * r, 0), b = map(side * r, 0.001 * d), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+      ctx.beginPath(); ctx.moveTo(a[0] + ux * 4, a[1] + uy * 4); ctx.lineTo(a[0] - ux * 3 - uy * 3.5, a[1] - uy * 3 + ux * 3.5); ctx.lineTo(a[0] - ux * 3 + uy * 3.5, a[1] - uy * 3 - ux * 3.5); ctx.closePath(); ctx.fill(); } });
+    ctx.restore();
+  }
+  // the magnet as a rectangle along a direction (ux, uy) on screen, north half red
+  function magnet(ctx, cx, cy, len, wid, ux, uy, sign) {
+    const nx = -uy, ny = ux, hl = len / 2, hw = wid / 2;
+    const quad = (a0, a1, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx + ux * a0 + nx * hw, cy + uy * a0 + ny * hw); ctx.lineTo(cx + ux * a1 + nx * hw, cy + uy * a1 + ny * hw); ctx.lineTo(cx + ux * a1 - nx * hw, cy + uy * a1 - ny * hw); ctx.lineTo(cx + ux * a0 - nx * hw, cy + uy * a0 - ny * hw); ctx.closePath(); ctx.fill(); };
+    quad(0, sign * hl, C('--north')); quad(0, -sign * hl, C('--south'));
+    font(ctx, Math.max(10, Math.min(15, wid * 0.7)), '700'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('N', cx + ux * sign * hl * 0.55, cy + uy * sign * hl * 0.55); ctx.fillText('S', cx - ux * sign * hl * 0.55, cy - uy * sign * hl * 0.55);
+    ctx.textBaseline = 'alphabetic';
+  }
+  // a coil seen from the side, axis horizontal: back halves of the turns first, then (after the magnet) the front
+  function coilTurns(ctx, cx, cy, R, len, n, half, col) {
+    const ew = Math.max(5, R * 0.34);
+    ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.4, Math.min(2.6, len / n * 0.55));
+    for (let k = 0; k < n; k++) { const x = cx - len / 2 + len * (k + 0.5) / n; ctx.beginPath(); ctx.ellipse(x, cy, ew, R, 0, half === 'back' ? -Math.PI / 2 : Math.PI / 2, half === 'back' ? Math.PI / 2 : 3 * Math.PI / 2, half !== 'back'); ctx.stroke(); }
+  }
+  // the coil's own magnet, from its current: a faint N and S at its ends
+  function coilPoles(ctx, xa, ya, xb, yb, strength) {
+    if (strength < 0.04) return;
+    ctx.save(); ctx.globalAlpha = Math.min(1, 0.25 + strength); font(ctx, 13, '700'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = C('--north'); ctx.fillText('N', xa, ya); ctx.fillStyle = C('--south'); ctx.fillText('S', xb, yb); ctx.restore(); ctx.textBaseline = 'alphabetic';
+  }
+
+  function geom1(W, H, compact) { const s = Math.min(W / 0.235, H / 0.112), y0 = H * (compact ? 0.36 : 0.38); return { s, y0, X: x => W / 2 + x * s }; }
+  function drawScene1(ctx, W, H, compact) {
+    const st = TAB[1], g = geom1(W, H, compact), s = g.s, y0 = g.y0, X = g.X, c = state1(st.x, st.vx);
+    const mx = X(st.x), R = COIL.a * s, cl = COIL.len * s;
+    if ($('lines').checked) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip(); fieldLines(ctx, (r, z) => [mx + st.sign * z * s, y0 - r * s], st.sign); ctx.restore(); }
+    // axis
+    ctx.strokeStyle = C('--soft'); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(W, y0); ctx.stroke(); ctx.setLineDash([]);
+    // circuit under the coil: leads to a resistor and a center-zero meter
+    const yb = y0 + R + (compact ? 34 : 44), gx = W / 2 + (compact ? 52 : 78), rx = W / 2 - (compact ? 52 : 78), gr = compact ? 22 : 28;
+    ctx.strokeStyle = C('--copper-dark'); ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.moveTo(W / 2 - cl / 2, y0 + R); ctx.lineTo(W / 2 - cl / 2, yb); ctx.lineTo(rx + 22, yb);
+    ctx.moveTo(rx - 22, yb); ctx.lineTo(rx - 34, yb); ctx.lineTo(rx - 34, yb + gr + 14); ctx.lineTo(gx, yb + gr + 14); ctx.lineTo(gx, yb + gr * 0.2);
+    ctx.moveTo(W / 2 + cl / 2, y0 + R); ctx.lineTo(W / 2 + cl / 2, yb - 10); ctx.lineTo(gx, yb - 10); ctx.lineTo(gx, yb - gr * 0.6 + 4); ctx.stroke();
+    // resistor zigzag
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(rx - 22, yb);
+    for (let k = 0; k < 6; k++) ctx.lineTo(rx - 22 + (k + 0.5) * 44 / 6, yb + (k % 2 ? 6 : -6)); ctx.lineTo(rx + 22, yb); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText(st.R + ' Ω', rx, yb - 11);
+    // the meter: full scale +-50 mA
+    const full = 0.05, frac = Math.max(-1, Math.min(1, c.I / full));
+    ctx.fillStyle = '#F7F9FA'; ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(gx, yb + 4, gr, Math.PI, 2 * Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (let k = -5; k <= 5; k++) { const a = -Math.PI / 2 + k / 5 * 1.1; ctx.beginPath(); ctx.moveTo(gx + Math.cos(a) * gr * 0.82, yb + 4 + Math.sin(a) * gr * 0.82); ctx.lineTo(gx + Math.cos(a) * gr * (k % 5 ? 0.92 : 0.98), yb + 4 + Math.sin(a) * gr * (k % 5 ? 0.92 : 0.98)); ctx.strokeStyle = C('--muted'); ctx.stroke(); }
+    const na = -Math.PI / 2 + frac * 1.1; ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(gx, yb + 4); ctx.lineTo(gx + Math.cos(na) * gr * 0.9, yb + 4 + Math.sin(na) * gr * 0.9); ctx.stroke();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.fillText(Math.abs(c.I) > full ? 'off scale' : '±50 mA', gx, yb + 18);
+    // coil: back halves, magnet, front halves
+    const col = C('--copper'), nt = 7;
+    coilTurns(ctx, W / 2, y0, R, cl, nt, 'back', C('--copper-dark'));
+    magnet(ctx, mx, y0, MAGNET.L * s, 2 * MAGNET.b * s, 1, 0, st.sign);
+    coilTurns(ctx, W / 2, y0, R, cl, nt, 'front', col);
+    // the current's direction on the front of the coil, and the coil's own poles: I > 0 makes its north end point +x
+    if (Math.abs(c.I) > 2e-4) {
+      // on the near side of the coil, current that makes its north end point right (I > 0) runs downward
+      const dn = c.I > 0, xA = W / 2, ya = y0 - R * 0.88, yb2 = y0 - R * 0.38;
+      arrow(ctx, xA, dn ? ya : yb2, xA, dn ? yb2 : ya, C('--cur'), 2.5, 8);
+      const st8 = Math.min(1, Math.abs(c.I) / 0.03);
+      coilPoles(ctx, W / 2 + (c.I > 0 ? 1 : -1) * (cl / 2 + 14), y0 - R + 4, W / 2 - (c.I > 0 ? 1 : -1) * (cl / 2 + 14), y0 - R + 4, st8);
+    }
+    // the coil's push on the magnet
+    if (Math.abs(c.force) > 2e-4) {
+      const L = Math.min(110, Math.abs(c.force) * 3000), dir = Math.sign(c.force), ya = Math.max(14, y0 - R - 26);
+      arrow(ctx, mx, ya, mx + dir * L, ya, C('--hot'), 2.2, 8);
+      font(ctx, 11); ctx.fillStyle = C('--hot'); ctx.textAlign = dir > 0 ? 'left' : 'right'; const lab = 'coil pushes on the magnet: ' + fmtN(Math.abs(c.force)), lw = ctx.measureText(lab).width, lx = mx + dir * (L + 6); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(dir > 0 ? lx - 2 : lx - lw - 2, ya - 7, lw + 4, 14); ctx.fillStyle = C('--hot'); ctx.fillText(lab, lx, ya + 4);
+    }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.textAlign = 'right'; ctx.fillText('coil: ' + COIL.a * 200 + ' cm across, ' + st.N + ' turns', W - 10, H - 10); ctx.textAlign = 'left';
+    // a scale bar
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(10, H - 14); ctx.lineTo(10 + 0.05 * s, H - 14); ctx.moveTo(10, H - 18); ctx.lineTo(10, H - 10); ctx.moveTo(10 + 0.05 * s, H - 18); ctx.lineTo(10 + 0.05 * s, H - 10); ctx.stroke();
+    ctx.fillText('5 cm', 14 + 0.05 * s, H - 10);
+    if (!st.touched && !st.push) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('drag the magnet', mx, y0 + MAGNET.b * s + 18); }
+  }
+
+  function drawScene2(ctx, W, H, compact) {
+    const st = TAB[2], r = st.run, p = r ? r.p : rodParams(), q = r ? rod(p, r.t) : rod(p, 0);
+    const x0 = compact ? 24 : 40, x1 = W - (compact ? 14 : 30), s = (x1 - x0) / ROD.len, yT = H * 0.3, yB = yT + Math.max(70, Math.min(ROD.l * s, H * 0.42));
+    const xr = x0 + (ROD.x0 + q.x) * s;
+    // the field: crosses (into the screen), fainter for a weaker field
+    if (st.B > 0) {
+      ctx.save(); ctx.globalAlpha = 0.2 + 0.5 * Math.min(1, st.B / 1.5); ctx.strokeStyle = C('--body'); ctx.lineWidth = 1.2;
+      const gap = compact ? 26 : 32; for (let x = x0 + gap / 2; x < W; x += gap) for (let y = 18; y < H - 30; y += gap) { ctx.beginPath(); ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4); ctx.stroke(); }
+      ctx.restore();
+    }
+    // the circuit's area: the flux through it is B times this area
+    ctx.fillStyle = 'rgba(29,79,115,0.10)'; ctx.fillRect(x0, yT, xr - x0, yB - yT);
+    // rails and resistor
+    ctx.strokeStyle = '#6B7780'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x0, yT); ctx.lineTo(x1, yT); ctx.moveTo(x0, yB); ctx.lineTo(x1, yB); ctx.stroke();
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, yT); ctx.lineTo(x0, yT + (yB - yT) * 0.3);
+    if (r ? isFinite(r.p.R) : st.closed) { for (let k = 0; k < 6; k++) ctx.lineTo(x0 + (k % 2 ? 7 : -7), yT + (yB - yT) * (0.3 + 0.4 * (k + 0.5) / 6)); ctx.lineTo(x0, yT + (yB - yT) * 0.7); }
+    else { ctx.moveTo(x0, yT + (yB - yT) * 0.7); }
+    ctx.lineTo(x0, yB); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    ctx.fillText(isFinite(p.R) ? 'R = ' + p.R.toFixed(1) + ' Ω' : 'open', x0 + 12, (yT + yB) / 2 + 4);
+    // the rod
+    ctx.strokeStyle = '#39444B'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(xr, yT - 10); ctx.lineTo(xr, yB + 10); ctx.stroke();
+    // current: dots moving around the loop, counterclockwise on screen when the rod moves right
+    if (r && !r.done && Math.abs(q.I) > 1e-3) {
+      const per = 2 * (xr - x0) + 2 * (yB - yT), n = Math.max(6, Math.round(per / 40)), ph = (performance.now() / 1000 * Math.min(120, 40 + 60 * Math.abs(q.I))) % (per / n);
+      ctx.fillStyle = C('--cur');
+      for (let k = 0; k < n; k++) {
+        let d = (k * per / n + ph) % per; let px, py;
+        // path: up the rod, left along the top rail, down through the resistor, right along the bottom rail
+        if (d < yB - yT) { px = xr; py = yB - d; } else if ((d -= yB - yT) < xr - x0) { px = xr - d; py = yT; } else if ((d -= xr - x0) < yB - yT) { px = x0; py = yT + d; } else { d -= yB - yT; px = x0 + d; py = yB; }
+        ctx.beginPath(); ctx.arc(px, py, 3, 0, TAU); ctx.fill();
+      }
+      font(ctx, 11); ctx.fillStyle = C('--cur'); ctx.textAlign = 'left'; ctx.fillText('current ' + fmtA(Math.abs(q.I)), Math.min(xr + 12, W - 110), yB + 26);
+    }
+    // forces on the rod
+    const fs = 600, ym = (yT + yB) / 2;
+    if (p.F > 0 && r && !r.done) { const L = Math.min(120, p.F * fs); arrow(ctx, xr + 6, ym - 10, xr + 6 + L, ym - 10, C('--pull'), 2.5, 9); font(ctx, 11); ctx.fillStyle = C('--pull'); ctx.textAlign = 'left'; ctx.fillText('pull ' + fmtN(p.F), Math.min(xr + 10, W - 90), ym - 18); }
+    if (Math.abs(q.force) > 1e-4 && r && !r.done) { const L = Math.min(120, Math.abs(q.force) * fs); arrow(ctx, xr - 6, ym + 10, xr - 6 - L, ym + 10, C('--hot'), 2.5, 9); font(ctx, 11); ctx.fillStyle = C('--hot'); ctx.textAlign = 'right'; ctx.fillText('magnetic ' + fmtN(Math.abs(q.force)), Math.max(xr - 10, 100), ym + 28); }
+    font(ctx, 11);
+    const tag = (txt, x, y, align) => { const w = ctx.measureText(txt).width, lx = align === 'right' ? x - w : align === 'center' ? x - w / 2 : x; ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(lx - 3, y - 11, w + 6, 15); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(txt, lx, y); };
+    tag(st.B > 0 ? 'field ' + st.B.toFixed(2) + ' T, into the screen' : 'no field', x0, 14, 'left');
+    if (!compact) tag('rails ' + ROD.l * 100 + ' cm apart; rod 40 g', W - 10, 14, 'right');
+    // distance marks along the bottom
+    for (let d = 0; d <= 2; d += 0.5) { const x = x0 + d * s; if (!compact || d % 1 === 0) tag(d + ' m', x, yB + 58, 'center'); ctx.fillStyle = C('--muted'); ctx.fillRect(x, yB + 40, 1, 6); }
+    if (r) { font(ctx, 12, '600'); const txt = 't = ' + r.t.toFixed(2) + ' s    v = ' + q.v.toFixed(2) + ' m/s', w = ctx.measureText(txt).width; ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x0 - 3, H - 23, w + 6, 17); ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText(txt, x0, H - 10); }
+  }
+
+  // the apparatus on the left (on top on a phone); the view from above and the reasoning on the right (underneath)
+  function geom3(W, H, compact) {
+    const Ha = compact ? H * 0.56 : H, s = Ha / 0.168, cx = compact ? W * 0.3 : W * 0.17;
+    return { s, cx, Ha, Y: y => Ha * 0.5 - y * s };
+  }
+  function wrap(ctx, text, maxW) {
+    const words = text.split(' '), out = []; let line = '';
+    words.forEach(w => { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; });
+    if (line) out.push(line); return out;
+  }
+  function chainText(c, mover) {
+    const opp = c.flux === 'up' ? 'down' : 'up';
+    return [
+      'The magnet\'s field passes through the loop pointing ' + c.flux + '.',
+      'That flux is ' + c.change + ': the magnet and the loop are ' + (c.change === 'growing' ? 'getting closer.' : 'moving apart.'),
+      c.change === 'growing' ? 'To oppose the change, the loop\'s current makes a field pointing ' + c.induced + ' inside it, against the magnet\'s.' : 'To oppose the change, the loop\'s current makes a field pointing ' + c.induced + ' inside it, propping up the fading flux.',
+      'By the right-hand rule, that takes current flowing ' + c.current + ', seen from above.',
+      'The loop becomes a magnet, north side on the ' + c.north + ', so loop and magnet ' + (c.interaction === 'repel' ? 'repel: the loop resists their approach.' : 'attract: the loop resists their parting.')
+    ];
+  }
+  function drawScene3(ctx, W, H, compact) {
+    const st = TAB[3], g = geom3(W, H, compact), s = g.s, cx = g.cx, Y = g.Y, Ha = g.Ha;
+    const now = st.now || loopState(FTL, st.ym, st.yl, st.vm, st.vl, st.sign), show = st.revealed && Math.abs(now.I) > ITHR, hidden = !st.revealed && Math.abs(now.I) > ITHR;
+    const cur = st.revealed ? st.last : st.last && !st.pred && !hidden ? st.last : null;   // this move (even while your hand pauses), or the last one
+    const my = Y(st.ym), ly = Y(st.yl), R = LOOP.a * s, ew = R * 0.3;
+    if ($('lines').checked) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, compact ? W * 0.56 : W * 0.36, Ha); ctx.clip(); fieldLines(ctx, (rr, z) => [cx + rr * s, my - st.sign * z * s], st.sign); ctx.restore(); }
+    ctx.strokeStyle = C('--soft'); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, Ha); ctx.stroke(); ctx.setLineDash([]);
+    // the loop's current: dots running round it. A point at angle t is (cx + R cos t, ly - ew sin t); counterclockwise
+    // as seen from above means t increasing (the near side, at the bottom of the ellipse, moves to the right).
+    const dots = part => { if (!show) return; ctx.fillStyle = C('--cur'); for (let k = 0; k < 12; k++) { const t = st.phase + k * TAU / 12, front = Math.sin(t) < 0; if (front !== (part === 'front')) continue; ctx.beginPath(); ctx.arc(cx + R * Math.cos(t), ly - ew * Math.sin(t), 3.2, 0, TAU); ctx.fill(); } };
+    ctx.strokeStyle = C('--copper-dark'); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(cx, ly, R, ew, 0, Math.PI, 2 * Math.PI); ctx.stroke();
+    dots('back');
+    magnet(ctx, cx, my, MAGNET.L * s, 2 * MAGNET.b * s, 0, -1, st.sign);
+    ctx.strokeStyle = C('--copper'); ctx.lineWidth = 3.5; ctx.beginPath(); ctx.ellipse(cx, ly, R, ew, 0, 0, Math.PI); ctx.stroke();
+    // the current meter in the loop, on its right side
+    ctx.fillStyle = '#39444B'; ctx.fillRect(cx + R - 7, ly - 7, 14, 14); font(ctx, 9, '700'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText('A', cx + R, ly + 3);
+    dots('front');
+    if (show) {
+      // arrowheads on the near side, the loop's own field through it, and its poles
+      const dir = now.I > 0 ? 1 : -1;
+      [-0.35, 0.35].forEach(f => { const t = -Math.PI / 2 + f, x = cx + R * Math.cos(t), y = ly - ew * Math.sin(t), tx = -Math.sin(t) * dir, ty = -ew / R * Math.cos(t) * dir; arrow(ctx, x - tx * 10, y - ty * 10, x + tx * 6, y + ty * 6, C('--cur'), 2.5, 9); });
+      const up = now.I > 0, L = 34; ctx.save(); ctx.globalAlpha = 0.85; arrow(ctx, cx - R * 0.55, ly + (up ? L / 2 : -L / 2), cx - R * 0.55, ly + (up ? -L / 2 : L / 2), C('--pull'), 3, 9); ctx.restore();
+      if (!compact) { font(ctx, 10); ctx.fillStyle = C('--pull'); ctx.textAlign = 'right'; ctx.fillText('loop\'s field', cx - R * 0.55 - 6, ly + (up ? -L / 2 + 8 : L / 2)); }
+      coilPoles(ctx, cx - R - 14, ly - 10, cx - R - 14, ly + 12, 1);
+      if (!up) { ctx.save(); ctx.fillStyle = C('--panel'); ctx.fillRect(cx - R - 22, ly - 20, 16, 40); ctx.restore(); coilPoles(ctx, cx - R - 14, ly + 12, cx - R - 14, ly - 10, 1); }
+    }
+    if (hidden) { font(ctx, 20, '700'); ctx.fillStyle = C('--cur'); ctx.textAlign = 'center'; ctx.fillText('?', cx + R + 22, ly + 7); }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    if (!compact) ctx.fillText('loop, 8 cm across', 8, Ha - 10);
+    if (st.drop && !st.drop.done && st.slow > 1) ctx.fillText('slowed ' + st.slow + '×', 8, 16);
+    if (!st.touched && st.mover !== 'drop') { ctx.textAlign = 'center'; ctx.fillText('drag the ' + (st.mover === 'magnet' ? 'magnet' : 'loop'), cx, st.mover === 'magnet' ? my - MAGNET.L * s / 2 - 8 : ly + ew + 18); }
+    // the view from above
+    const ix = compact ? W * 0.76 : W * 0.43, iy = compact ? Ha * 0.33 : H * 0.34, ir = Math.min(compact ? 52 : 50, compact ? W * 0.17 : H * 0.2);
+    const view = show ? now.I > 0 : cur ? cur.chain.current === 'counterclockwise' : null;
+    ctx.strokeStyle = C('--copper'); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(ix, iy, ir, 0, TAU); ctx.stroke();
+    ctx.fillStyle = st.sign < 0 ? C('--south') : C('--north'); ctx.beginPath(); ctx.arc(ix, iy, MAGNET.b / LOOP.a * ir, 0, TAU); ctx.fill();   // the magnet's top end, seen from above
+    if (view !== null) {
+      ctx.save(); if (!show) ctx.globalAlpha = 0.45;
+      const ccw = view, a0 = ccw ? 0.6 : -0.6, a1 = ccw ? -4.2 : 4.2;      // on screen, counterclockwise means decreasing canvas angle
+      ctx.strokeStyle = C('--cur'); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(ix, iy, ir - 9, a0, a1, ccw); ctx.stroke();
+      const ex = ix + (ir - 9) * Math.cos(a1), ey = iy + (ir - 9) * Math.sin(a1), tx = ccw ? Math.sin(a1) : -Math.sin(a1), ty = ccw ? -Math.cos(a1) : Math.cos(a1);
+      arrow(ctx, ex - tx * 8, ey - ty * 8, ex + tx * 4, ey + ty * 4, C('--cur'), 2.5, 10);
+      ctx.restore();
+    } else if (hidden || st.pred) { font(ctx, 22, '700'); ctx.fillStyle = C('--cur'); ctx.textAlign = 'center'; ctx.fillText('?', ix, iy - ir * 0.45); }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('seen from above', ix, iy + ir + 15);
+    if (view !== null) { font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.fillText(view ? 'counterclockwise' : 'clockwise', ix, iy + ir + 31); }
+    // the reasoning
+    const tx0 = compact ? 12 : W * 0.55, tw = compact ? W - 24 : W - tx0 - 12; let ty = compact ? Ha + 22 : 24;
+    const c = cur ? cur.chain : null, res = cur, live = st.revealed;
+    ctx.textAlign = 'left';
+    if (res && c) {
+      font(ctx, 13, '700'); ctx.fillStyle = res.ok ? C('--vel') : C('--hot');
+      ctx.fillText((res.ok ? '✓ Right: the current started ' : '✗ Not this time: it started ') + res.first + '.' + (live ? '' : '  (last move)'), tx0, ty); ty += 18;
+      if (c.current !== res.first) { font(ctx, 12.5, '600'); ctx.fillStyle = C('--ink'); ctx.fillText(live ? 'Now it has reversed:' : 'By the end it had reversed:', tx0, ty); ty += 18; } else ty += 2;
+      font(ctx, compact ? 12 : 12.5); const lines = chainText(c, st.mover);
+      lines.forEach((t, i) => { ctx.fillStyle = C('--ink'); ctx.globalAlpha = live ? 1 : 0.6; const ws = wrap(ctx, t, tw - 18); font(ctx, compact ? 12 : 12.5, '700'); ctx.fillStyle = C('--muted'); ctx.fillText(String(i + 1), tx0, ty); font(ctx, compact ? 12 : 12.5); ctx.fillStyle = C('--ink');
+        ws.forEach(w => { ctx.fillText(w, tx0 + 16, ty); ty += 16; }); ty += 4; ctx.globalAlpha = 1; });
+    } else {
+      font(ctx, 13); ctx.fillStyle = C('--muted');
+      const msg = hidden ? 'There is a current, but you have not predicted it. Choose clockwise or counterclockwise first, then move again.'
+        : st.pred ? 'Prediction made: ' + (st.pred === 'ccw' ? 'counterclockwise' : 'clockwise') + '. Now ' + (st.mover === 'drop' ? 'drop the magnet.' : 'move the ' + (st.mover === 'magnet' ? 'magnet' : 'loop') + '.')
+        : 'Decide how you will move the ' + (st.mover === 'loop' ? 'loop' : 'magnet') + ', predict which way the current in the loop will flow, seen from above, then do it.';
+      wrap(ctx, msg, tw).forEach(w => { ctx.fillText(w, tx0, ty); ty += 18; });
+    }
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    if (tab === 1) drawScene1(ctx, W, H, compact); else if (tab === 2) drawScene2(ctx, W, H, compact); else drawScene3(ctx, W, H, compact);
+  }
+
+  // ---- graphs
+  function axes(ctx, b, xr, yr, xt, yt, xl, yl, fx, fy) {
+    const X = v => b.x + (v - xr[0]) / (xr[1] - xr[0]) * b.w, Y = v => b.y + b.h - (v - yr[0]) / (yr[1] - yr[0]) * b.h;
+    ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1; font(ctx, 10); ctx.fillStyle = C('--muted');
+    xt.forEach(v => { ctx.beginPath(); ctx.moveTo(X(v) + 0.5, b.y); ctx.lineTo(X(v) + 0.5, b.y + b.h); ctx.stroke(); if (xl !== null) { ctx.textAlign = 'center'; ctx.fillText(minus(fx ? fx(v) : String(v)), X(v), b.y + b.h + 13); } });
+    yt.forEach(v => { ctx.beginPath(); ctx.moveTo(b.x, Y(v) + 0.5); ctx.lineTo(b.x + b.w, Y(v) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(minus(fy ? fy(v) : String(v)), b.x - 4, Y(v) + 3); });
+    if (yr[0] < 0) { ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(b.x, Y(0) + 0.5); ctx.lineTo(b.x + b.w, Y(0) + 0.5); ctx.stroke(); }
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 11); ctx.fillStyle = C('--ink');
+    if (xl) { ctx.textAlign = 'center'; ctx.fillText(xl, b.x + b.w / 2, b.y + b.h + 28); }
+    if (yl) { ctx.textAlign = 'left'; ctx.fillText(yl, b.x, b.y - 7); }
+    return { X, Y };
+  }
+  function legend(ctx, b, items, where) {
+    font(ctx, 10);
+    items.forEach((it, i) => {
+      const tw = ctx.measureText(it.label).width, lx = where === 'left' ? b.x + 6 : b.x + b.w - 6 - tw, ly = where === 'bottom' ? b.y + b.h - 8 - 13 * (items.length - 1 - i) : b.y + 14 + 13 * i;
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(lx - 3, ly - 10, tw + 6, 13); ctx.fillStyle = it.col; ctx.textAlign = 'left'; ctx.fillText(it.label, lx, ly);
+    });
+  }
+  function drawGraph() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 100) return;
+    const ml = compact ? 50 : 60;
+    if (tab === 1) {
+      // traces on the left (on top on a phone), recorded peaks on the right (underneath)
+      const st = TAB[1], gap = 30, tw = compact ? W - ml - 14 : (W - ml - 14) * 0.6, th = compact ? (H * 0.62 - 22 - 40 - gap) / 2 : (H - 22 - 40 - gap) / 2;
+      const b1 = { x: ml, y: 22, w: tw, h: th }, b2 = { x: ml, y: 22 + th + gap, w: tw, h: th }, h = th;
+      const bp = compact ? { x: ml, y: H * 0.62 + 24, w: W - ml - 14, h: H * 0.38 - 24 - 40 } : { x: ml + tw + 56, y: 22, w: W - ml - tw - 56 - 14, h: H - 22 - 40 };
+      drawPeaks(ctx, bp, st);
+      const now = st.t, xr = [-3, 0], xt = [-3, -2, -1, 0];
+      const a1 = axes(ctx, b1, xr, [-0.08, 0.08], xt, [-0.08, -0.04, 0, 0.04, 0.08], null, 'flux through each turn (mWb)', null, v => v.toFixed(2));
+      const a2 = axes(ctx, b2, xr, [-2.5, 2.5], xt, [-2.5, -1.25, 0, 1.25, 2.5], 'time (s); pauses while the magnet is still', 'emf (V) = −N × rate of change of flux', v => v === 0 ? 'now' : v + ' s', v => v.toFixed(2));
+      const plot = (a, k, col, lim) => { ctx.save(); ctx.beginPath(); ctx.rect(a === a1 ? b1.x : b2.x, a === a1 ? b1.y : b2.y, b1.w, h); ctx.clip(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath();
+        let first = true; st.trace.forEach(p => { const x = a.X(p[0] - now), y = a.Y(Math.max(-lim, Math.min(lim, k === 1 ? p[1] * 1000 : p[2]))); first ? ctx.moveTo(x, y) : ctx.lineTo(x, y); first = false; }); ctx.stroke(); ctx.restore(); };
+      plot(a1, 1, C('--body'), 0.1); plot(a2, 2, C('--hot'), 3);
+      if (st.peak) { font(ctx, 10); ctx.fillStyle = C('--hot'); ctx.textAlign = 'right'; ctx.fillText('last push: peak ' + fmtV(st.peak.emf) + ' at ' + st.peak.v.toFixed(2) + ' m/s', b2.x + b2.w - 6, b2.y + 12); }
+      return;
+    }
+    if (tab === 2) {
+      const st = TAB[2], b = { x: ml, y: 24, w: W - ml - 14, h: H - 24 - 42 };
+      const a = axes(ctx, b, [0, 5], [0, 3], [0, 1, 2, 3, 4, 5], [0, 0.5, 1, 1.5, 2, 2.5, 3], 'time (s)', 'speed of the rod (m/s)', null, v => v.toFixed(1));
+      ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+      const line = (pts, col, w, dash) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); pts.forEach((p, i) => { const x = a.X(p[0]), y = a.Y(p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]); };
+      st.series.forEach(q => {
+        line(q.pts, C(q.col), 2);
+        if ($('theory').checked && isFinite(q.p.R) && q.p.B > 0) {
+          // the textbook construction: the terminal speed, and the starting slope reaching it (or zero) at t = tau
+          const k = q.p.B * q.p.B * q.p.l * q.p.l / q.p.R, tau = q.p.m / k, vT = q.p.F / k;
+          ctx.globalAlpha = 0.7;
+          if (q.mode === 'pull') { line([[0, vT], [5, vT]], C(q.col), 1.2, [5, 4]); line([[0, q.p.v0], [tau, vT]], C(q.col), 1.2, [2, 3]); }
+          else line([[0, q.p.v0], [tau, 0]], C(q.col), 1.2, [2, 3]);
+          ctx.fillStyle = C(q.col); font(ctx, 10); ctx.textAlign = 'center'; ctx.fillText('τ = ' + tau.toFixed(2) + ' s', a.X(tau), a.Y(q.mode === 'pull' ? vT : 0) - 6);
+          ctx.globalAlpha = 1;
+        }
+      });
+      if (st.run && !st.run.done) line(st.run.pts, C('--ink'), 2);
+      ctx.restore();
+      legend(ctx, b, st.series.map(q => ({ label: q.label, col: C(q.col) })), 'right');
+      if (!st.series.length && !st.run) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('each run is kept here, up to four', b.x + b.w / 2, b.y + b.h / 2); }
+      return;
+    }
+    const st = TAB[3], gap = 30, th = (H - 22 - 40 - gap) / 2, b1 = { x: ml, y: 22, w: W - ml - 14, h: th }, b2 = { x: ml, y: 22 + th + gap, w: W - ml - 14, h: th };
+    const xr = [-3, 0], xt = [-3, -2, -1, 0], now = st.t;
+    const a1 = axes(ctx, b1, xr, [-50, 50], xt, [-50, -25, 0, 25, 50], null, 'flux through the loop (µWb), up positive');
+    const a2 = axes(ctx, b2, xr, [-20, 20], xt, [-20, -10, 0, 10, 20], 'time (s); pauses while nothing moves', 'current (mA), counterclockwise from above positive', v => v === 0 ? 'now' : v + ' s');
+    const plot = (a, b, k, col, sc, lim) => { ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); let pen = false;
+      st.trace.forEach(p => { const v = p[k]; if (!isFinite(v)) { pen = false; return; } const x = a.X(p[0] - now), y = a.Y(Math.max(-lim, Math.min(lim, v * sc))); pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true; }); ctx.stroke(); ctx.restore(); };
+    plot(a1, b1, 1, C('--body'), 1e6, 60); plot(a2, b2, 2, C('--cur'), 1e3, 25);
+    if (!st.revealed && st.trace.some(p => !isFinite(p[2]) && p[0] > now - 3)) { font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('the current is shown once you have predicted it', b2.x + b2.w / 2, b2.y + b2.h / 2 - 6); }
+  }
+  function drawPeaks(ctx, b, st) {
+    const a = axes(ctx, b, [0, 2], [0, 2.5], [0, 0.5, 1, 1.5, 2], [0, 0.5, 1, 1.5, 2, 2.5], 'pushing speed (m/s)', 'peak emf (V), recorded', v => v.toFixed(1), v => v.toFixed(1));
+    st.series.forEach(q => {
+      if ($('theory').checked) { ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip(); ctx.strokeStyle = C(q.col); ctx.globalAlpha = 0.6; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(a.X(0), a.Y(0)); ctx.lineTo(a.X(2), a.Y(2 * q.N * maxSlope)); ctx.stroke(); ctx.restore(); }
+      ctx.fillStyle = C(q.col); q.pts.forEach(([v, e]) => { ctx.beginPath(); ctx.arc(a.X(v), a.Y(Math.min(e, 2.5)), 4, 0, TAU); ctx.fill(); });
+    });
+    legend(ctx, b, st.series.map(q => ({ label: q.label, col: C(q.col) })), 'left');
+    if (!st.series.length) { font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('push, then', b.x + b.w / 2, b.y + b.h / 2 - 7); ctx.fillText('"Record the peak"', b.x + b.w / 2, b.y + b.h / 2 + 8); }
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const st = TAB[1], c = state1(st.x, st.vx);
+      html = card('Flux through each turn', minus((1000 * c.flux).toFixed(4)) + ' mWb', 'magnet ' + minus((100 * st.x).toFixed(1)) + ' cm from the coil\'s center, moving ' + Math.abs(st.vx).toFixed(2) + ' m/s') +
+             card('Induced emf', minus(fmtV(c.emf)), 'current ' + minus(fmtA(c.I)) + ' through the coil (' + coilResistance(st.N).toFixed(1) + ' Ω) and the resistor') +
+             card('The coil pushes back', fmtN(Math.abs(c.force)), 'against the magnet\'s motion; the resistor and coil turn ' + (1000 * Math.abs(c.power)).toFixed(1) + ' mW into heat');
+    } else if (tab === 2) {
+      const st = TAB[2], r = st.run, p = r ? r.p : rodParams(), q = rod(p, r ? r.t : 0);
+      html = card('Emf and current', fmtV(q.emf) + ', ' + fmtA(q.I), isFinite(p.R) ? 'emf = B l v; current = emf / R' : 'emf = B l v, but with the circuit open no current flows') +
+             card('Forces on the rod', 'magnetic ' + fmtN(Math.abs(q.force)), (p.F > 0 ? 'pull ' + fmtN(p.F) + '; ' : '') + 'the magnetic force on the current, I l B, points against the motion') +
+             card('Energy so far', 'heat ' + fmtJ(q.heat), (p.F > 0 ? 'work by the pull ' + fmtJ(q.work) + '; ' : 'kinetic energy at the start ' + fmtJ(0.5 * p.m * p.v0 * p.v0) + '; ') + 'kinetic energy now ' + fmtJ(0.5 * p.m * q.v * q.v) + (r && r.done ? '. The rod ' + r.end + '.' : ''));
+    } else {
+      const st = TAB[3], c = st.now || loopState(FTL, st.ym, st.yl, st.vm, st.vl, st.sign), on = Math.abs(c.I) > ITHR;
+      html = card('Your predictions', st.total ? st.right + ' of ' + st.total + ' right' : 'none yet', 'each move counts once, judged by the first current it makes') +
+             card('Flux through the loop', (1e6 * Math.abs(c.flux)).toFixed(1) + ' µWb ' + (c.flux >= 0 ? 'up' : 'down'), on ? 'and ' + (c.flux * c.rate > 0 ? 'growing' : 'shrinking') + ' at ' + (1e3 * Math.abs(c.rate)).toFixed(2) + ' mWb/s' : 'not changing') +
+             card('Current in the loop', st.revealed && on ? fmtA(Math.abs(c.I)) + ' ' + (c.I > 0 ? 'counterclockwise' : 'clockwise') : on ? 'hidden' : 'none', st.revealed && on ? 'seen from above; the loop\'s resistance is 0.1 Ω' : on ? 'shown once you have predicted its direction' : 'nothing is changing, so nothing is induced');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'A coil of wire is connected to a resistor and a current meter. Predict: what does the meter read while the magnet sits still inside the coil? As it comes in? As it leaves? Drag the magnet, or push it through at a steady speed, and watch the graphs.',
+         notes: '<p><b>What to try.</b> Drag the magnet into the coil and stop: the flux through the coil stays high, but the emf drops to zero. Pull it back out and the emf reverses. Then push it through at a steady speed and record the peak emf; do it again at other speeds, and with other numbers of turns. Turn the magnet around. Watch the graphs as it passes the middle of the coil.</p>' +
+                '<p><b>Why.</b> Faraday\'s law: the emf in a coil is −<i>N</i> times the rate at which the flux through each turn changes, not the flux itself. As the magnet approaches, more and more of its field lines pass through the coil, so the flux climbs and the emf has one sign; as it leaves, the flux falls and the emf has the other. At the middle the flux is at its peak and, for an instant, not changing, so the emf passes through zero. Faster motion changes the flux in less time, so the peaks are taller and narrower, but the area under each one is the same: <i>N</i> times the change in flux. The minus sign is Lenz\'s law: the current always flows so that the coil becomes a magnet that pushes back, repelling the magnet as it comes and pulling on it as it goes, so you must do work to move it, and that work is the heat in the circuit.</p>' +
+                '<p><b>The model.</b> A neodymium magnet 12 mm across and 25 mm long (remanence 1.2 T), treated as exactly what a uniformly magnetized cylinder is, a solenoid wrapped around its surface; its flux through each turn is computed from elliptic integrals, not from a simple formula. The coil is 4 cm across and 1.2 cm long, wound with 28-gauge copper wire (2.7 Ω per 100 turns). Its self-inductance is left out: it would delay the current by about 0.2 ms, much shorter than a pass. The field lines are drawn so that equal amounts of flux lie between neighbors: the more lines pass through the coil, the more flux.</p>' },
+    2: { lede: 'A metal rod slides on two rails in a magnetic field, closing a circuit through a resistor. Predict: if you pull the rod with a steady force, does it keep speeding up? If you kick it and let go, does it coast forever?',
+         notes: '<p><b>What to try.</b> Pull with a steady force and watch the speed level off. Change the pull, the field and the resistance, and see what sets the final speed. Then kick the rod and let it go, and see how far it gets. Open the circuit and try both again. Turn on the theory lines for the textbook construction.</p>' +
+                '<p><b>Why.</b> As the rod moves, the circuit it closes grows, so the flux through it, <i>B</i> × area = <i>B l x</i>, increases at the rate <i>B l v</i>: that is the emf. The current <i>B l v</i>/<i>R</i> flows around the circuit, and the field pushes on the current in the rod with a force <i>I l B</i> = <i>B</i>²<i>l</i>²<i>v</i>/<i>R</i>, always against the motion (Lenz again). It grows with speed, like air resistance, so a steady pull reaches a terminal speed <i>v</i> = <i>FR</i>/(<i>Bl</i>)², and a kicked rod slows exponentially, stopping after a distance <i>v</i><sub>0</sub><i>mR</i>/(<i>Bl</i>)². Both happen on the time scale τ = <i>mR</i>/(<i>Bl</i>)². All the work done on the rod, beyond its kinetic energy, ends up as heat in the resistor. With the circuit open, no current flows and nothing brakes the rod.</p>' +
+                '<p><b>The model.</b> A 40 g rod on frictionless rails 20 cm apart, in a uniform field into the screen. The rails and rod have no resistance, and the circuit\'s self-inductance is left out. The motion follows the exact solution of <i>m</i> d<i>v</i>/d<i>t</i> = <i>F</i> − <i>B</i>²<i>l</i>²<i>v</i>/<i>R</i>.</p>' },
+    3: { lede: 'A magnet sits above a loop of wire. Before each move, predict which way the current in the loop will flow, seen from above: clockwise or counterclockwise. Then drag the magnet, drag the loop, or drop the magnet through it, and see whether you were right.',
+         notes: '<p><b>What to try.</b> Work through the cases: the north end coming down toward the loop, and going back up; then the south end. Hold the magnet still inside the loop. Move the loop up to the magnet instead of the magnet down to the loop. Drop the magnet through and watch the current reverse as it passes. Before each move, say the reasoning out loud, then check it against the steps on the right.</p>' +
+                '<p><b>Why.</b> Lenz\'s law: the induced current flows in the direction that opposes the change in flux that drives it. Follow the steps: which way the magnet\'s field passes through the loop; whether that flux is growing or shrinking; the loop\'s own field must then point against a growing flux or along with a shrinking one; and the right-hand rule (curl your fingers with the current, and your thumb points along the field it makes) gives the current\'s direction. The loop becomes a little magnet that repels the magnet as they approach and attracts it as they part, so it always resists the motion. It has to: if it helped the motion instead, the current would grow by itself, making energy from nothing. Only the change counts, not the flux itself, and only the relative motion: moving the loop up to the magnet does the same as moving the magnet down to the loop.</p>' +
+                '<p><b>The model.</b> The magnet from the first screen, and a loop of copper wire 8 cm across whose ends are joined through a current meter, 0.1 Ω in all, so the currents are a few milliamperes; the loop\'s self-inductance changes them by far less than a percent. The loop barely slows a falling magnet: it adds about a hundredth of a millisecond to the fall. A current of under 0.3 mA counts as none. Directions are given as seen from above, looking down the magnet\'s axis.</p>' }
+  };
+
+  const SHOW = { lab_N: [1], lab_R: [1], lab_spd: [1], lab_flip: [1], lab_slow: [1, 3], lab_mode: [2], lab_F: [2], lab_v0: [2], lab_B: [2], lab_Rr: [2], lab_circ: [2], lab_mover: [3], lab_pole: [3], lab_lines: [1, 3], lab_theory: [1, 2], predbox: [3] };
+  function visibility() {
+    Object.keys(SHOW).forEach(id => { $(id).hidden = SHOW[id].indexOf(tab) < 0; });
+    $('rec').hidden = tab !== 1; document.body.classList.toggle('t1', tab === 1); document.body.classList.toggle('t3', tab === 3);
+    if (tab === 3) { $('lab_slow').hidden = TAB[3].mover !== 'drop'; $('go').hidden = TAB[3].mover !== 'drop'; } else $('go').hidden = false;
+    if (tab === 2) { $('lab_F').hidden = TAB[2].mode !== 'pull'; $('lab_v0').hidden = TAB[2].mode !== 'kick'; $('lab_Rr').hidden = !TAB[2].closed; }
+    const pr = (id, v) => document.querySelectorAll('#' + id + ' button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v))));
+    pr('N', TAB[1].N); pr('flip', TAB[1].sign); pr('slow', TAB[tab === 3 ? 3 : 1].slow); pr('mode', TAB[2].mode); pr('circ', TAB[2].closed ? 1 : 0); pr('mover', TAB[3].mover); pr('pole', TAB[3].sign); pr('pred', TAB[3].pred);
+    $('theory_t').textContent = tab === 1 ? 'theory lines' : tab === 2 ? 'theory: terminal speed and τ' : 'free fall, for comparison';
+    const st = S();
+    if (tab === 1) { $('go').textContent = st.push ? 'Pushing…' : 'Push it through'; $('go').disabled = !!st.push; $('rec').disabled = !st.peak || st.recorded; $('clear').textContent = 'Clear points';
+      $('hint').textContent = st.push ? '' : st.peak && !st.recorded ? 'record this pass, or push again' : 'drag the magnet, or push it through'; }
+    if (tab === 2) { const r = st.run; $('go').textContent = r && !r.done ? 'Stop' : r ? 'Run again' : 'Go'; $('go').disabled = false; $('clear').textContent = 'Clear runs'; $('hint').textContent = ''; }
+    if (tab === 3) { const D = st.drop, falling = !!(D && !D.done); $('go').textContent = falling ? 'Falling…' : D ? 'Drop it again' : 'Drop it'; $('go').disabled = falling || !st.pred; $('clear').textContent = 'Start over';
+      $('hint').textContent = st.mover === 'drop' && !st.pred && !falling ? 'predict first' : '';
+      document.querySelectorAll('#pred button').forEach(b => { b.disabled = st.revealed; }); }
+  }
+  function sync() {
+    const a = TAB[1], b = TAB[2];
+    $('R').value = String(a.R); $('spd').value = String(a.spd);
+    $('F').value = String(b.F); $('v0').value = String(b.v0); $('B').value = String(b.B); $('Rr').value = String(b.R);
+    vals();
+  }
+  function vals() {
+    const a = TAB[1], b = TAB[2];
+    $('R_v').textContent = a.R + ' Ω'; $('spd_v').textContent = a.spd.toFixed(2) + ' m/s';
+    $('F_v').textContent = b.F.toFixed(2) + ' N'; $('v0_v').textContent = b.v0.toFixed(1) + ' m/s'; $('B_v').textContent = b.B.toFixed(2) + ' T'; $('Rr_v').textContent = b.R.toFixed(1) + ' Ω';
+  }
+  function upd() { visibility(); vals(); readout(); draw(); }
+  function setTab(k) {
+    tab = k;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+
+  const seg = (id, fn) => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => { fn(b.dataset.v); upd(); }));
+  seg('N', v => { TAB[1].N = +v; });
+  seg('flip', v => { TAB[1].sign = +v; });
+  seg('slow', v => { TAB[tab === 3 ? 3 : 1].slow = +v; });
+  seg('mode', v => { TAB[2].mode = v; if (TAB[2].run && !TAB[2].run.done) TAB[2].run = null; });
+  seg('circ', v => { TAB[2].closed = v === '1'; });
+  seg('mover', v => { const s = TAB[3]; s.mover = v; s.drop = null; s.tm = null; s.tl = null; if (v === 'drop') { s.ym = DROP_H; s.yl = 0; } });
+  seg('pole', v => { TAB[3].sign = +v; });
+  seg('pred', v => { const s = TAB[3]; if (!s.revealed) s.pred = v; });
+  const slider = (id, fn) => $(id).addEventListener('input', () => { fn(+$(id).value); upd(); });
+  slider('R', v => { TAB[1].R = v; });
+  slider('spd', v => { TAB[1].spd = v; });
+  slider('F', v => { TAB[2].F = v; });
+  slider('v0', v => { TAB[2].v0 = v; });
+  slider('B', v => { TAB[2].B = v; });
+  slider('Rr', v => { TAB[2].R = v; });
+  $('go').addEventListener('click', () => {
+    if (tab === 1) startPush();
+    else if (tab === 2) { const r = TAB[2].run; if (r && !r.done) TAB[2].run = null; else startRod(); }
+    else startDrop();
+    upd();
+  });
+  $('rec').addEventListener('click', () => { record1(); upd(); });
+  $('clear').addEventListener('click', () => {
+    const st = S();
+    if (tab === 3) { Object.assign(st, { ym: st.mover === 'drop' ? DROP_H : 0.055, yl: 0, vm: 0, vl: 0, tm: null, tl: null, drop: null, pred: null, revealed: false, ok: null, right: 0, total: 0, chain: null, last: null, trace: [], still: 1 }); }
+    else { st.series = []; if (tab === 2) st.run = null; }
+    upd();
+  });
+  $('theory').addEventListener('change', draw);
+  $('lines').addEventListener('change', drawScene);
+  window.addEventListener('resize', draw);
+
+  // dragging the magnet on the first screen (mouse, pen or finger), and the arrow keys
+  const sc = $('scene');
+  function xFromEvent(e) { const r = sc.getBoundingClientRect(), W = r.width, H = r.height, g = geom1(W, H, W < 560); return { x: (e.clientX - r.left - W / 2) / g.s, y: e.clientY - r.top, g }; }
+  let dragging = false;
+  sc.addEventListener('pointerdown', e => {
+    if (tab !== 1 || TAB[1].push) return;
+    const p = xFromEvent(e), st = TAB[1];
+    if (Math.abs(p.x - st.x) < MAGNET.L * 0.9 + 0.01 && Math.abs(p.y - p.g.y0) < Math.max(28, MAGNET.b * p.g.s * 2.5)) {
+      dragging = true; st.touched = true; st.target = st.x; st.grab = p.x - st.x; sc.setPointerCapture(e.pointerId); e.preventDefault();
+    }
+  });
+  sc.addEventListener('pointermove', e => {
+    const st = TAB[1];
+    if (tab === 1 && !dragging) { const p = xFromEvent(e); sc.style.cursor = Math.abs(p.x - st.x) < MAGNET.L * 0.9 + 0.01 && Math.abs(p.y - p.g.y0) < 30 ? 'grab' : 'default'; }
+    if (!dragging) return;
+    const p = xFromEvent(e); st.target = Math.max(-XLIM, Math.min(XLIM, p.x - st.grab));
+  });
+  // the third screen: drag the magnet or the loop up and down
+  function hit3(e) {
+    const r = sc.getBoundingClientRect(), W = r.width, H = r.height, g = geom3(W, H, W < 560), st = TAB[3], x = e.clientX - r.left, y = e.clientY - r.top;
+    const yv = (g.Ha * 0.5 - y) / g.s;
+    if (st.mover === 'magnet') return Math.abs(x - g.cx) < Math.max(22, MAGNET.b * g.s * 2.5) && Math.abs(yv - st.ym) < MAGNET.L * 0.5 + 0.012 ? { yv, key: 'ym', tk: 'tm' } : null;
+    if (st.mover === 'loop') return Math.abs(x - g.cx) < LOOP.a * g.s + 12 && Math.abs(yv - st.yl) < 0.016 ? { yv, key: 'yl', tk: 'tl' } : null;
+    return null;
+  }
+  let drag3 = null;
+  sc.addEventListener('pointerdown', e => {
+    if (tab !== 3) return; const h = hit3(e); if (!h) return;
+    const st = TAB[3]; drag3 = { key: h.key, tk: h.tk, grab: h.yv - st[h.key] }; st[h.tk] = st[h.key]; st.touched = true; sc.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  sc.addEventListener('pointermove', e => {
+    if (tab !== 3) return;
+    if (!drag3) { sc.style.cursor = hit3(e) ? 'grab' : 'default'; return; }
+    const r = sc.getBoundingClientRect(), g = geom3(r.width, r.height, r.width < 560), yv = (g.Ha * 0.5 - (e.clientY - r.top)) / g.s;
+    TAB[3][drag3.tk] = Math.max(-Y3, Math.min(Y3, yv - drag3.grab));
+  });
+  // on a touch screen, a finger on the magnet or loop drags it instead of scrolling the page
+  sc.addEventListener('touchstart', e => { if (tab === 3 && e.touches.length === 1 && hit3(e.touches[0])) e.preventDefault(); }, { passive: false });
+  sc.addEventListener('touchmove', e => { if (tab === 3 && drag3) e.preventDefault(); }, { passive: false });
+  const endDrag = () => { dragging = false; drag3 = null; };
+  sc.addEventListener('pointerup', endDrag); sc.addEventListener('pointercancel', endDrag);
+  sc.addEventListener('keydown', e => {
+    if (tab === 3) {
+      const st = TAB[3], d = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0; if (!d || st.mover === 'drop') return;
+      const key = st.mover === 'magnet' ? 'ym' : 'yl', tk = st.mover === 'magnet' ? 'tm' : 'tl';
+      st.touched = true; st[tk] = Math.max(-Y3, Math.min(Y3, (st[tk] === null ? st[key] : st[tk]) + d * (e.shiftKey ? 0.02 : 0.005))); e.preventDefault(); return;
+    }
+    if (tab !== 1 || TAB[1].push) return;
+    const st = TAB[1], d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return;
+    st.touched = true; st.target = Math.max(-XLIM, Math.min(XLIM, (st.target === null ? st.x : st.target) + d * (e.shiftKey ? 0.02 : 0.005))); e.preventDefault();
+  });
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null, wasBusy = false;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (dt > 0 && !document.hidden) {
+      let busy = false;
+      if (tab === 1) { const st = TAB[1]; const before = !!st.push; advance1(dt); busy = before || st.target !== null && (Math.abs(st.target - st.x) > 1e-5 || Math.abs(st.vx) > 1e-4) || st.still < 0.45; if (before && !st.push) visibility(); }
+      if (tab === 2) { const r = TAB[2].run; busy = !!(r && !r.done); advance2(dt); if (busy && r.done) visibility(); }
+      if (tab === 3) {
+        const st = TAB[3], before = [st.revealed, st.pred, st.drop && st.drop.done].join();
+        advance3(dt);
+        busy = !!(st.drop && !st.drop.done) || st.still < 0.7 || [st.tm, st.tl].some((t, i) => t !== null && Math.abs(t - (i ? st.yl : st.ym)) > 1e-5) || Math.abs(st.vm) + Math.abs(st.vl) > 1e-4;
+        if ([st.revealed, st.pred, st.drop && st.drop.done].join() !== before) visibility();
+      }
+      if (busy || wasBusy) { readout(); draw(); }
+      wasBusy = busy;
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
