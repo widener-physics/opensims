@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<!--
+  Colliding carts - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Total momentum stays the
+  same at every instant, through the squeeze; kinetic energy + energy held in the bumpers + heat stays equal
+  to the starting kinetic energy at every instant; each bumper returns the same share of the closing speed
+  whatever the masses and speeds, and the final speeds match the textbook formula; a pad collision matches a
+  separate, finer integration; the area under the force is each cart's change in momentum; and seen from the
+  center of mass the momenta are always equal and opposite.
+  Credit: PhET's Collision Lab covers balls on a table; this sim uses lab carts with real bumpers, shows the
+  squeeze in slow motion, and shows the same collision from the center of mass.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colliding carts</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --cartA: #1D4F73; --cartB: #C8321E; --total: #172128; --store: #2E7D32; --heat: #E09A1A; --cm: #B5306D; --rail: #8E9BA3;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 330; }
+  #graph { aspect-ratio: 900 / 210; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  #lab_mA input, #lab_vA input { accent-color: var(--cartA); }
+  #lab_mB input, #lab_vB input { accent-color: var(--cartB); }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.85; }
+    #graph { aspect-ratio: 1 / 0.75; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Colliding carts</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Collisions</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Center-of-mass view</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="Two carts on a track, with a magnified view of their bumpers"></canvas>
+  <div class="row2">
+    <button id="go">Go</button>
+    <button id="reset" class="secondary">Reset</button>
+    <label><input type="checkbox" id="slow" checked> slow motion during the collision</label>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Bars showing each cart's momentum and where the energy is"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_bump"><div>Bumpers (the same on both carts)</div>
+      <div class="seg" id="bump" role="group" aria-label="Bumpers"><button data-v="magnet">magnets</button><button data-v="spring">springs</button><button data-v="rubber">rubber</button><button data-v="velcro">Velcro</button></div></div>
+    <label id="lab_mA"><div class="row"><span>Cart A's mass</span><span class="val" id="mA_v"></span></div><input type="range" id="mA" min="0.25" max="1.25" step="0.25"></label>
+    <label id="lab_vA"><div class="row"><span>Cart A's starting velocity</span><span class="val" id="vA_v"></span></div><input type="range" id="vA" min="-1" max="1" step="0.05"></label>
+    <label id="lab_mB"><div class="row"><span>Cart B's mass</span><span class="val" id="mB_v"></span></div><input type="range" id="mB" min="0.25" max="1.25" step="0.25"></label>
+    <label id="lab_vB"><div class="row"><span>Cart B's starting velocity</span><span class="val" id="vB_v"></span></div><input type="range" id="vB" min="-1" max="1" step="0.05"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own: momentum and energy at every instant, each
+  //    bumper's coefficient of restitution, a separate integration, the impulse and the center-of-mass frame.
+  //    It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: two carts colliding on a level track ----
+  // SI units. Two carts roll without friction along a track; each has the same kind of bumper on the end facing
+  // the other. The bumpers are the only force between them, equal and opposite (Newton's third law), so the total
+  // momentum cannot change. What the bumpers do with the energy depends on what they are:
+  //   magnets   - repel without touching, F = A / d^4 across the gap d: nothing is lost (stored in the field, returned)
+  //   spring    - a stiff steel spring with a little internal friction: a spring k with a damper alongside
+  //   rubber    - a stiffer, lossier pad: the same model, more damping
+  //   Velcro    - a spring and heavy damper that grip once they touch, so the carts end up moving together
+  // A pad can push but not pull: contact ends when its force would turn into a pull, and whatever energy is still in
+  // the pad then dies away inside it. Each pad's damping is set from the pair's reduced mass, so it returns the same
+  // share of the carts' relative speed (the coefficient of restitution) whatever the masses and speeds.
+  const CART = { L: 0.17 };                         // cart length (m)
+  const TRACK = { len: 2.4 };                       // positions are cart centers, 0 to 2.4 m
+  const BUMPERS = {
+    magnet: { kind: 'magnet', A: 2.4e-7, reach: 0, e: 1, name: 'magnets' },
+    spring: { kind: 'pad', k: 3000, e: 0.85, reach: 0.02, name: 'springs' },
+    rubber: { kind: 'pad', k: 12000, e: 0.5, reach: 0.008, name: 'rubber pads' },
+    velcro: { kind: 'grip', k: 4000, zeta: 1.5, reach: 0.006, name: 'Velcro' }
+  };
+  // the coefficient of restitution of a pad with damping ratio zeta: a unit closing speed, reduced mass 1, k 1
+  function padE(zeta) {
+    let x = 0, v = 1, dt = 2e-5;
+    const f = (x, v) => Math.max(0, x + 2 * zeta * v);
+    for (let i = 0; i < 2e6; i++) {
+      const a1 = -f(x, v), a2 = -f(x + dt / 2 * v, v + dt / 2 * a1), a3 = -f(x + dt / 2 * (v + dt / 2 * a1), v + dt / 2 * a2), a4 = -f(x + dt * (v + dt / 2 * a2), v + dt * a3);
+      const xn = x + dt * (v + dt / 6 * (a1 + a2 + a3)), vn = v + dt / 6 * (a1 + 2 * a2 + 2 * a3 + a4);
+      if (vn < 0 && (xn <= 0 || f(xn, vn) <= 0)) return -vn;     // released: the pad's force has dropped to zero
+      x = xn; v = vn;
+    }
+    return 0;
+  }
+  // the damping ratio giving a wanted coefficient of restitution, by bisection
+  function zetaFor(e) { let lo = 0, hi = 1.5; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (padE(m) > e) lo = m; else hi = m; } return (lo + hi) / 2; }
+  Object.keys(BUMPERS).forEach(k => { const b = BUMPERS[k]; if (b.kind === 'pad') b.zeta = zetaFor(b.e); });
+
+  // The run: cart A starts on the left, B on the right. Positions, speeds, the energy held in the bumpers, and the
+  // energy turned to heat, at every step. Integrated by RK4 with a step that shrinks while the bumpers act.
+  // p = { mA, mB, vA, vB, xA, xB, bumper }. Returns samples { t, xA, vA, xB, vB, F, stored, lost, s } and events.
+  function collide(p, opts) {
+    opts = opts || {}; const b = BUMPERS[p.bumper], mA = p.mA, mB = p.mB, mu = mA * mB / (mA + mB);
+    const c = b.kind === 'magnet' ? 0 : 2 * (b.zeta) * Math.sqrt(b.k * mu);
+    const tMax = opts.tMax || 30, gap0 = (xA, xB) => xB - xA - CART.L - 2 * b.reach;   // gap between the bumpers' faces
+    let xA = p.xA, vA = p.vA, xB = p.xB, vB = p.vB, t = 0, lost = 0, gripped = false, touching = false, pad = 0, locked = false;   // pad: the pads' squeeze left after release
+    // force pushing the carts apart, from the gap g and its rate gd
+    function force(g, gd) {
+      if (b.kind === 'magnet') { const d = g + 2 * b.reach; return d > 0 ? b.A / (d * d * d * d) : 1e9; }
+      const x = -g, xd = -gd;                      // squeeze of the two pads together (in series)
+      if (b.kind === 'grip') return gripped ? b.k * x + c * xd : 0;
+      return touching ? Math.max(0, b.k * x + c * xd) : 0;      // contact is switched on at the start of a step
+    }
+    function stored(g) {
+      if (b.kind === 'magnet') { const d = g + 2 * b.reach; return b.A / (3 * d * d * d); }
+      if (gripped) return 0.5 * b.k * g * g;
+      if (touching) return g < 0 ? 0.5 * b.k * g * g : 0;
+      return 0.5 * b.k * pad * pad;
+    }
+    const out = { t: [], xA: [], vA: [], xB: [], vB: [], F: [], stored: [], lost: [], squeeze: [], contact: [] };
+    const push = (F) => { const g = gap0(xA, xB); out.t.push(t); out.xA.push(xA); out.vA.push(vA); out.xB.push(xB); out.vB.push(vB); out.F.push(F); out.stored.push(stored(g)); out.lost.push(lost); out.squeeze.push(b.kind === 'magnet' ? 0 : Math.max(0, touching || gripped ? -g : pad)); out.contact.push(touching || gripped || (b.kind === 'magnet' && F > 0.05)); };
+    push(force(gap0(xA, xB), vB - vA));
+    let lastSave = 0, first = null, last = null, peak = 0;
+    const E0 = 0.5 * mA * vA * vA + 0.5 * mB * vB * vB + stored(gap0(xA, xB));
+    while (t < tMax) {
+      if (locked) {                                 // stuck together and settled: they move as one
+        const dt = 2e-3; xA += vA * dt; xB += vB * dt; t += dt;
+        if (t - lastSave >= 2e-3) { push(0); lastSave = t; }
+        if (xA - CART.L / 2 < 0 || xB + CART.L / 2 > TRACK.len || opts.stopWhenApart) break;
+        continue;
+      }
+      const g = gap0(xA, xB), near = b.kind === 'magnet' ? g < 0.06 : g < 0.004 || touching || gripped;
+      let dt = !near ? 5e-4 : b.kind === 'magnet' ? Math.min(1e-4, 0.002 * (g + 2 * b.reach) / (Math.abs(vB - vA) + 0.01)) : 2e-6;
+      if (touching && b.kind === 'pad' && vB - vA > 0 && b.k * -g + c * -(vB - vA) < 0.03 * peak) dt = 2e-8;   // tiny steps as a pad lets go
+      // contact begins when the pads meet
+      if (b.kind !== 'magnet' && !touching && !gripped && g <= 0 && vB - vA < 0) { touching = true; if (b.kind === 'grip') gripped = true; lost += 0.5 * b.k * pad * pad; pad = 0; }
+      const acc = (xa, va, xb, vb) => { const F = force(xb - xa - CART.L - 2 * b.reach, vb - va); return [F, -F / mA, F / mB]; };
+      const k1 = acc(xA, vA, xB, vB);
+      const k2 = acc(xA + dt / 2 * vA, vA + dt / 2 * k1[1], xB + dt / 2 * vB, vB + dt / 2 * k1[2]);
+      const k3 = acc(xA + dt / 2 * (vA + dt / 2 * k1[1]), vA + dt / 2 * k2[1], xB + dt / 2 * (vB + dt / 2 * k1[2]), vB + dt / 2 * k2[2]);
+      const k4 = acc(xA + dt * (vA + dt / 2 * k2[1]), vA + dt * k3[1], xB + dt * (vB + dt / 2 * k2[2]), vB + dt * k3[2]);
+      // heat in the damper over the step: c times the squared squeeze rate, by Simpson's rule on the stage rates
+      if (c > 0 && (touching || gripped)) {
+        const r1 = vB - vA, r2 = (vB + dt / 2 * k1[2]) - (vA + dt / 2 * k1[1]), r3 = (vB + dt / 2 * k2[2]) - (vA + dt / 2 * k2[1]), r4 = (vB + dt * k3[2]) - (vA + dt * k3[1]);
+        const on = F => F > 0 || gripped ? 1 : 0;
+        lost += dt / 6 * c * (on(k1[0]) * r1 * r1 + 2 * on(k2[0]) * r2 * r2 + 2 * on(k3[0]) * r3 * r3 + on(k4[0]) * r4 * r4);
+      }
+      xA += dt * (vA + dt / 6 * (k1[1] + k2[1] + k3[1])); vA += dt / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+      xB += dt * (vB + dt / 6 * (k1[2] + k2[2] + k3[2])); vB += dt / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]);
+      t += dt;
+      const gn = gap0(xA, xB), Fn = force(gn, vB - vA);
+      if (Fn > 0 && first === null) first = t;
+      if (Fn > 0) { last = t; peak = Math.max(peak, Fn); }
+      // a pad lets go when its force would become a pull; the squeeze it still holds then relaxes into heat
+      if (touching && b.kind === 'pad' && vB - vA > 0 && Fn <= 0) { touching = false; pad = Math.max(0, -gn); }
+      if (!touching && pad > 0) { const pn = pad * Math.exp(-dt * b.k / c); lost += 0.5 * b.k * (pad * pad - pn * pn); pad = pn; if (pad < 1e-9) { lost += 0.5 * b.k * pad * pad; pad = 0; } }
+      const busy = touching || gripped && Math.abs(vB - vA) > 1e-6 || (b.kind === 'magnet' && gn < 0.06);
+      if (t - lastSave >= (busy ? 1e-4 : 2e-3)) { push(Fn); lastSave = t; }
+      if (xA - CART.L / 2 < 0 || xB + CART.L / 2 > TRACK.len || (opts.stopWhenApart && first !== null && !touching && !gripped && gn > 0.08 && vB - vA > 0)) break;
+      if (gripped && Math.abs(vB - vA) < 1e-7 && Math.abs(Fn) < 1e-4) {
+        // settled: what little the Velcro still holds is lost, and the pair moves on at one speed (momentum unchanged)
+        const V = (mA * vA + mB * vB) / (mA + mB); lost += 0.5 * mA * (vA - V) ** 2 + 0.5 * mB * (vB - V) ** 2 + 0.5 * b.k * gn * gn; vA = V; vB = V; locked = true; gripped = false; touching = false;
+        xB = xA + CART.L + 2 * b.reach; push(0); lastSave = t;
+      }
+    }
+    push(force(gap0(xA, xB), vB - vA));
+    out.E0 = E0; out.first = first; out.last = last; out.peak = peak; out.mu = mu; out.c = c;
+    return out;
+  }
+  // the textbook result for a collision with coefficient of restitution e
+  function textbook(mA, mB, vA, vB, e) {
+    const P = mA * vA + mB * vB, M = mA + mB;
+    return { vA: (P + mB * e * (vB - vA)) / M, vB: (P + mA * e * (vA - vB)) / M };
+  }
+  const momentum = (mA, mB, vA, vB) => mA * vA + mB * vB;
+  const kinetic = (mA, mB, vA, vB) => 0.5 * mA * vA * vA + 0.5 * mB * vB * vB;
+  const vCM = (mA, mB, vA, vB) => (mA * vA + mB * vB) / (mA + mB);
+  // ---- end of core ----
+
+  const START = { xA: 0.55, xB: 1.85 };
+  const P = { bumper: 'spring', mA: 0.5, mB: 0.5, vA: 0.5, vB: 0 };
+  let tab = 1, run = null, playing = false, simT = 0;
+  const fmtV = v => (v > 0.0005 ? '+' : v < -0.0005 ? '−' : '') + Math.abs(v).toFixed(2) + ' m/s';
+  const fmtP = p => (p > 0.0005 ? '+' : p < -0.0005 ? '−' : '') + Math.abs(p).toFixed(3) + ' kg·m/s';
+  const fmtE = e => (1000 * e).toFixed(1) + ' mJ';
+
+  // the run: computed in full when Go is pressed, then played back; the collision itself in slow motion
+  function compute() {
+    const r = collide({ mA: P.mA, mB: P.mB, vA: P.vA, vB: P.vB, xA: START.xA, xB: START.xB, bumper: P.bumper });
+    // the stretch to slow down: where the bumpers push hard (above 2% of the peak force)
+    let a = null, z = null; const thr = 0.02 * Math.max(...r.F);
+    for (let i = 0; i < r.t.length; i++) if (r.F[i] > thr) { if (a === null) a = r.t[i]; z = r.t[i]; }
+    if (a !== null) { const span = Math.max(z - a, 1e-3); r.slowFrom = a - 0.15 * span - 0.004; r.slowTo = z + 0.15 * span + 0.004; r.slowRate = Math.min(1, (r.slowTo - r.slowFrom) / 2.5); }
+    r.met = a !== null; r.tEnd = r.t[r.t.length - 1];
+    r.end = r.xA[r.t.length - 1] - CART.L / 2 <= 0.001 || r.xB[r.t.length - 1] + CART.L / 2 >= TRACK.len - 0.001 ? 'track end' : 'time';
+    return r;
+  }
+  function state(t) {
+    if (!run) return { t: 0, xA: START.xA, xB: START.xB, vA: P.vA, vB: P.vB, F: 0, stored: 0, lost: 0, squeeze: 0 };
+    const r = run; let lo = 0, hi = r.t.length - 1;
+    if (t >= r.t[hi]) lo = hi; else { while (hi - lo > 1) { const m = (lo + hi) >> 1; if (r.t[m] <= t) lo = m; else hi = m; } }
+    const j = Math.min(lo + 1, r.t.length - 1), f = j > lo ? (t - r.t[lo]) / (r.t[j] - r.t[lo]) : 0, L = k => r[k][lo] + (r[k][j] - r[k][lo]) * f;
+    return { t, xA: L('xA'), xB: L('xB'), vA: L('vA'), vB: L('vB'), F: L('F'), stored: L('stored'), lost: L('lost'), squeeze: L('squeeze') };
+  }
+  const slowNow = t => run && run.slowFrom !== undefined && $('slow').checked && t >= run.slowFrom && t <= run.slowTo;
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, w) => { ctx.font = (w || '') + ' ' + px + 'px ' + C('--sans'); };
+  function arrow(ctx, x0, y0, x1, y1, col, w, head) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head || 8, L * 0.6);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.6, y1 - uy * hd * 0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.5, y1 - uy * hd + ux * hd * 0.5); ctx.lineTo(x1 - ux * hd + uy * hd * 0.5, y1 - uy * hd - ux * hd * 0.5); ctx.closePath(); ctx.fill();
+  }
+  const bars = m => Math.round((m - 0.25) / 0.25);     // extra 0.25 kg bars on the cart
+  // a cart: body, wheels, its extra mass bars, a letter; its bumper end drawn by bumperEnd
+  function cart(ctx, cx, yTop, s, m, col, label) {
+    const w = CART.L * s, h = Math.max(12, 0.045 * s), x0 = cx - w / 2;
+    ctx.fillStyle = '#39444B'; [0.22, 0.78].forEach(f => { ctx.beginPath(); ctx.arc(x0 + w * f, yTop + h + 3, Math.max(3, h * 0.28), 0, TAU); ctx.fill(); });
+    ctx.fillStyle = col; ctx.fillRect(x0, yTop, w, h);
+    const n = bars(m), bh = Math.max(4, h * 0.42);
+    for (let k = 0; k < n; k++) { ctx.fillStyle = '#6B7780'; ctx.fillRect(x0 + w * 0.12, yTop - (k + 1) * (bh + 1), w * 0.76, bh); }
+    font(ctx, Math.min(13, h * 0.8), '700'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(label, cx, yTop + h * 0.78);
+    return { h };
+  }
+  // the bumper on one end: dir = +1 for the right end of cart A, -1 for the left end of cart B; squeeze in meters
+  function bumperEnd(ctx, xEnd, yTop, h, s, dir, kind, squeeze) {
+    const b = BUMPERS[kind], len = Math.max(0, b.reach - squeeze / 2) * s;
+    if (kind === 'magnet') { ctx.fillStyle = '#5C6B73'; ctx.fillRect(dir > 0 ? xEnd - Math.max(3, 0.012 * s) : xEnd, yTop + h * 0.15, Math.max(3, 0.012 * s), h * 0.7); return; }
+    if (kind === 'spring') {
+      ctx.strokeStyle = '#5C6B73'; ctx.lineWidth = Math.max(1.2, s * 0.0012); ctx.beginPath(); ctx.moveTo(xEnd, yTop + h / 2);
+      const n = 6; for (let k = 1; k <= n; k++) ctx.lineTo(xEnd + dir * len * (k - 0.5) / n, yTop + h / 2 + (k % 2 ? -1 : 1) * h * 0.32);
+      ctx.lineTo(xEnd + dir * len, yTop + h / 2); ctx.stroke();
+      ctx.fillStyle = '#39444B'; ctx.fillRect(xEnd + dir * len - (dir > 0 ? Math.max(2, s * 0.002) : 0), yTop + h * 0.1, Math.max(2, s * 0.002), h * 0.8);
+      return;
+    }
+    const thick = (kind === 'rubber' ? 1 : 1.0) * h * (1 + 0.6 * squeeze / Math.max(1e-9, b.reach * 2));   // a squashed pad bulges
+    ctx.fillStyle = kind === 'rubber' ? '#2B2F33' : '#6E7F5C';
+    ctx.fillRect(dir > 0 ? xEnd : xEnd - len, yTop + h / 2 - thick / 2, len, thick);
+    if (kind === 'velcro' && len > 4) { ctx.strokeStyle = '#A9B892'; ctx.lineWidth = 1; for (let y = yTop + h / 2 - thick / 2 + 2; y < yTop + h / 2 + thick / 2; y += 3) { ctx.beginPath(); ctx.moveTo(xEnd + dir * len * 0.2, y); ctx.lineTo(xEnd + dir * len * 0.9, y + 1.5); ctx.stroke(); } }
+  }
+
+  function track(ctx, x0, x1, y) {
+    ctx.fillStyle = '#C9D2D8'; ctx.fillRect(x0, y, x1 - x0, 6); ctx.fillStyle = '#9AA6AE'; ctx.fillRect(x0, y + 6, x1 - x0, 2);
+    ctx.fillStyle = '#5C6B73'; ctx.fillRect(x0 - 4, y - 14, 4, 22); ctx.fillRect(x1, y - 14, 4, 22);
+  }
+  // one view of the carts: frame offset (meters to subtract from positions) and the track's tick marks slide by
+  function view(ctx, W, st, yTrack, s, x0, shift, opts) {
+    const X = x => x0 + (x - shift) * s, wheelR = Math.max(3, Math.max(12, 0.045 * s) * 0.28);
+    if (!opts.moving) track(ctx, X(0), X(TRACK.len), yTrack);
+    else { ctx.fillStyle = '#C9D2D8'; ctx.fillRect(0, yTrack, W, 6); ctx.fillStyle = '#9AA6AE'; ctx.fillRect(0, yTrack + 6, W, 2); ctx.fillStyle = '#5C6B73'; ctx.fillRect(X(0) - 4, yTrack - 14, 4, 22); ctx.fillRect(X(TRACK.len), yTrack - 14, 4, 22);
+      ctx.fillStyle = '#8E9BA3'; for (let m = -3; m <= 6; m += 0.1) { const x = X(m); if (x > 0 && x < W) ctx.fillRect(x, yTrack + 8, 1, 5); } }
+    const h = Math.max(12, 0.045 * s), yTop = yTrack - 2 * wheelR - h + 1;
+    const vA = st.vA - (opts.frameV || 0), vB = st.vB - (opts.frameV || 0);
+    const a = cart(ctx, X(st.xA), yTop, s, P.mA, C('--cartA'), 'A');
+    cart(ctx, X(st.xB), yTop, s, P.mB, C('--cartB'), 'B');
+    bumperEnd(ctx, X(st.xA) + CART.L * s / 2, yTop, a.h, s, 1, P.bumper, st.squeeze);
+    bumperEnd(ctx, X(st.xB) - CART.L * s / 2, yTop, a.h, s, -1, P.bumper, st.squeeze);
+    // velocity arrows above each cart, in this frame
+    const vs = Math.min(70, s * 0.12), ya = yTop - (bars(Math.max(P.mA, P.mB)) + 1) * Math.max(5, h * 0.42 + 1) - 12;
+    const close = Math.abs(X(st.xB) - X(st.xA)) < 110;
+    [[st.xA, vA, C('--cartA'), close ? 14 : 0], [st.xB, vB, C('--cartB'), 0]].forEach(([x, v, col, up]) => {
+      if (Math.abs(v) > 0.004) arrow(ctx, X(x), ya - up, X(x) + v * vs * 1.6, ya - up, col, 2.5, 8);
+      font(ctx, 11); ctx.fillStyle = col; ctx.textAlign = 'center'; const lab = Math.abs(v) < 0.004 ? 'at rest' : fmtV(v), hw = ctx.measureText(lab).width / 2 + 3; ctx.fillText(lab, Math.max(hw, Math.min(W - hw, X(x) + (Math.abs(v) > 0.004 ? v * vs * 0.8 : 0))), ya - 8 - up - (close ? 14 : 0) * (up ? 1 : 0));
+    });
+    // the center of mass
+    if (opts.cm) {
+      const xc = (P.mA * st.xA + P.mB * st.xB) / (P.mA + P.mB), xs = X(xc), yc = yTrack + 22;
+      ctx.strokeStyle = C('--cm'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(xs, yc, 6, 0, TAU); ctx.moveTo(xs - 9, yc); ctx.lineTo(xs + 9, yc); ctx.moveTo(xs, yc - 9); ctx.lineTo(xs, yc + 9); ctx.stroke();
+      font(ctx, 10); ctx.fillStyle = C('--cm'); ctx.textAlign = 'left'; ctx.fillText('center of mass', xs + 12, yc + 4);
+    }
+    return { yTop, h, X };
+  }
+  // the magnified view of the bumpers where the carts meet
+  function inset(ctx, st, bx, by, bw, bh, sMain) {
+    const span = 0.075, s = bw / span, mid = ((st.xA + CART.L / 2) + (st.xB - CART.L / 2)) / 2;
+    ctx.save(); ctx.fillStyle = '#FAFBFC'; ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.fillRect(bx, by, bw, bh); ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+    ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+    const X = x => bx + bw / 2 + (x - mid) * s, h = bh * 0.3, yTop = by + bh * 0.22;
+    ctx.fillStyle = C('--cartA'); ctx.fillRect(X(st.xA - CART.L / 2), yTop, CART.L * s, h);
+    ctx.fillStyle = C('--cartB'); ctx.fillRect(X(st.xB - CART.L / 2), yTop, CART.L * s, h);
+    bumperEnd(ctx, X(st.xA + CART.L / 2), yTop, h, s, 1, P.bumper, st.squeeze);
+    bumperEnd(ctx, X(st.xB - CART.L / 2), yTop, h, s, -1, P.bumper, st.squeeze);
+    if (P.bumper === 'magnet') { font(ctx, 10, '700'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText('N', X(st.xA + CART.L / 2) - 0.006 * s, yTop + h * 0.62); ctx.fillText('N', X(st.xB - CART.L / 2) + 0.006 * s, yTop + h * 0.62); }
+    // equal and opposite forces
+    if (st.F > 0.02) {
+      const L = Math.min(bw * 0.4, 18 * Math.log10(1 + st.F * 10)), y = yTop + h + 12;
+      arrow(ctx, X(st.xA + CART.L / 2) - 6, y, X(st.xA + CART.L / 2) - 6 - L, y, C('--cartA'), 2.5, 8);
+      arrow(ctx, X(st.xB - CART.L / 2) + 6, y, X(st.xB - CART.L / 2) + 6 + L, y, C('--cartB'), 2.5, 8);
+      font(ctx, 11, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText(st.F.toFixed(st.F < 10 ? 1 : 0) + ' N on each, opposite ways', bx + bw / 2, by + bh - 6);
+    }
+    ctx.restore();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText('the bumpers, magnified ' + Math.round(s / sMain) + '×', bx, by - 5);
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    const st = state(simT), m = compact ? 12 : 20, s = (W - 2 * m) / TRACK.len;
+    if (tab === 1) {
+      const iw = compact ? W * 0.6 : Math.min(300, W * 0.38), ih = compact ? H * 0.4 : H * 0.42;
+      inset(ctx, st, compact ? 10 : (W - iw) / 2, 22, iw, ih, s);
+      view(ctx, W, st, H * (compact ? 0.84 : 0.84), s, m, 0, { cm: false });
+    } else {
+      // the lab view above, the center-of-mass view below: same scale, the lower one following the center of mass
+      const V = vCM(P.mA, P.mB, P.vA, P.vB), xc = (P.mA * st.xA + P.mB * st.xB) / (P.mA + P.mB);
+      font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('Seen from the lab', 10, 18);
+      view(ctx, W, st, H * 0.4, s, m, 0, { cm: true });
+      ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(0, H * 0.53 + 0.5); ctx.lineTo(W, H * 0.53 + 0.5); ctx.stroke();
+      font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('Seen riding along with the center of mass (' + (Math.abs(V) < 0.0005 ? 'which is not moving' : 'moving ' + fmtV(V)) + ')', 10, H * 0.53 + 18);
+      view(ctx, W, st, H * 0.9, s, W / 2 - xc * s, 0, { cm: true, moving: true, frameV: V });
+    }
+    // the clock
+    font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'right';
+    ctx.fillText('t = ' + simT.toFixed(simT < 10 ? 3 : 2) + ' s', W - 10, 18);
+    if (slowNow(simT) && playing) { font(ctx, 11); ctx.fillStyle = C('--hot'); ctx.fillText('slow motion: ' + Math.round(1 / run.slowRate) + '× slower', W - 10, 34); }
+  }
+
+  // ---- the bars: momentum on the left, energy on the right (stacked on a phone)
+  function drawGraph() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 100) return;
+    const st = state(simT), cm = tab === 2, V = cm ? vCM(P.mA, P.mB, P.vA, P.vB) : 0;
+    const pa = P.mA * (st.vA - V), pb = P.mB * (st.vB - V), pt = pa + pb;
+    const pa0 = P.mA * (P.vA - V), pb0 = P.mB * (P.vB - V);
+    const pMax = Math.max(0.25, Math.abs(pa0), Math.abs(pb0), Math.abs(pa0 + pb0)) * 1.15;
+    const left = compact ? { x: 12, y: 26, w: W - 24, h: H * 0.48 - 30 } : { x: 14, y: 26, w: W * 0.46 - 14, h: H - 40 };
+    const right = compact ? { x: 12, y: H * 0.52 + 22, w: W - 24, h: H * 0.48 - 30 } : { x: W * 0.52, y: 26, w: W * 0.48 - 16, h: H - 40 };
+    // momentum: signed bars from a center line, with the starting values marked
+    font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(cm ? 'Momentum, seen from the center of mass' : 'Momentum', left.x, left.y - 10);
+    const lw = compact ? 112 : 140, cx = left.x + lw + (left.w - lw) / 2, half = (left.w - lw) / 2 - 4, rows = [['A', pa, pa0, C('--cartA')], ['B', pb, pb0, C('--cartB')], ['total', pt, pa0 + pb0, C('--total')]];
+    const rh = left.h / 3;
+    ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(cx + 0.5, left.y); ctx.lineTo(cx + 0.5, left.y + left.h); ctx.stroke();
+    rows.forEach(([name, p, p0, col], i) => {
+      const y = left.y + i * rh + rh * 0.2, bh = rh * 0.5, L = p / pMax * half;
+      font(ctx, 11, '600'); ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.fillText(name, left.x, y + bh * 0.75);
+      font(ctx, compact ? 10 : 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'right'; ctx.fillText(fmtP(p), left.x + lw - 6, y + bh * 0.75);
+      ctx.fillStyle = col; ctx.fillRect(Math.min(cx, cx + L), y, Math.abs(L), bh);
+      const L0 = p0 / pMax * half; ctx.strokeStyle = col; ctx.setLineDash([3, 2]); ctx.lineWidth = 1.2; ctx.strokeRect(Math.min(cx, cx + L0) + 0.5, y - 2.5, Math.abs(L0), bh + 5); ctx.setLineDash([]);
+    });
+    font(ctx, 9); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText('dashed: at the start; right is positive', left.x + left.w, left.y + left.h + 10);
+    // energy: one bar the length of the energy there is to share, split into where it is now
+    const E0 = cm ? kinetic(P.mA, P.mB, P.vA - V, P.vB - V) : kinetic(P.mA, P.mB, P.vA, P.vB);
+    const kA = 0.5 * P.mA * (st.vA - V) ** 2, kB = 0.5 * P.mB * (st.vB - V) ** 2;
+    font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(cm ? (compact ? 'Energy seen from the center of mass' : 'Kinetic energy seen from the center of mass, and where it goes') : 'Energy: where it is', right.x, right.y - 10);
+    const parts = [['A\'s kinetic', kA, C('--cartA')], ['B\'s kinetic', kB, C('--cartB')], ['in the bumpers', st.stored, C('--store')], ['turned to heat', st.lost, C('--heat')]];
+    const by = right.y + 4, bh = Math.min(26, right.h * 0.3);
+    ctx.fillStyle = C('--soft'); ctx.fillRect(right.x, by, right.w, bh);
+    let x = right.x; const tot = Math.max(1e-12, E0);
+    parts.forEach(([n, e, col]) => { const w = Math.max(0, e / tot) * right.w; ctx.fillStyle = col; ctx.fillRect(x, by, Math.min(w, right.x + right.w - x), bh); x += w; });
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(right.x + 0.5, by + 0.5, right.w - 1, bh - 1);
+    font(ctx, 11); const colW = compact ? right.w / 2 : right.w / 2;
+    parts.forEach(([n, e, col], i) => {
+      const lx = right.x + (i % 2) * colW, ly = by + bh + 18 + Math.floor(i / 2) * 18;
+      ctx.fillStyle = col; ctx.fillRect(lx, ly - 9, 10, 10); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(n + ': ' + fmtE(e), lx + 14, ly);
+    });
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    const note = cm ? 'not counted: ' + fmtE(0.5 * (P.mA + P.mB) * V * V) + (compact ? ' in the center of mass\'s own motion' : ' in the motion of the center of mass, which no collision can touch') : 'total, always ' + fmtE(E0);
+    const yy = by + bh + 18 + 2 * 18 + 2;
+    if (yy < right.y + right.h + 14) ctx.fillText(note, right.x, yy);
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    const st = state(simT), n = run ? run.t.length - 1 : 0, done = run && simT >= run.tEnd;
+    const V = vCM(P.mA, P.mB, P.vA, P.vB), Pt = momentum(P.mA, P.mB, P.vA, P.vB), K0 = kinetic(P.mA, P.mB, P.vA, P.vB);
+    let html = card('Total momentum', fmtP(momentum(P.mA, P.mB, st.vA, st.vB)), 'it started at ' + fmtP(Pt) + '; what one cart gains, the other loses');
+    if (tab === 1) {
+      const after = done && run.met;
+      html += card('Velocities', 'A ' + fmtV(st.vA) + ', B ' + fmtV(st.vB), after ? (P.bumper === 'velcro' ? 'stuck together, they move as one at the speed of the center of mass' : 'they separate at ' + (Math.abs(run.vB[n] - run.vA[n]) / Math.abs(P.vA - P.vB)).toFixed(2) + ' of the speed at which they closed in') : 'positive means to the right');
+      html += card('Kinetic energy', fmtE(kinetic(P.mA, P.mB, st.vA, st.vB)), after ? 'of ' + fmtE(K0) + ' at the start: ' + (100 * kinetic(P.mA, P.mB, run.vA[n], run.vB[n]) / K0).toFixed(0) + '% is left; the rest became heat (and sound) in the bumpers' : st.F > 0.02 ? 'some of it is held in the squeezed bumpers right now' : 'of ' + fmtE(K0) + ' at the start');
+    } else {
+      html += card('Center of mass', fmtV(V), 'total momentum ÷ total mass (' + (P.mA + P.mB).toFixed(2) + ' kg); the collision cannot change it');
+      html += card('Velocities seen from it', 'A ' + fmtV(st.vA - V) + ', B ' + fmtV(st.vB - V), 'always opposite, with equal and opposite momenta');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'Two carts on a level track, with bumpers on the ends that meet. Predict: when a cart runs into an identical one at rest, what does each do afterward? Does the answer change with Velcro instead of springs? With a heavier cart?',
+         notes: '<p><b>What to try.</b> Equal masses, one at rest, with magnets: the moving cart stops dead and the other carries on at its speed. Swap in Velcro: they move off together at half the speed. Try a heavy cart hitting a light one, then a light one hitting a heavy one. Send them at each other. Watch the magnified bumpers and the bars while they squeeze: the momentum bars of the two carts change, but their total never does; the kinetic energy drains into the bumpers and then comes back, or does not.</p>' +
+                '<p><b>Why.</b> While the bumpers are in contact, each cart pushes on the other with the same force in the opposite direction (Newton\'s third law) for the same time, so whatever momentum one cart gains, the other loses: the total cannot change, whatever the bumpers are made of. Energy is another matter. As the bumpers squeeze, the carts\' kinetic energy is stored in them, like a compressed spring; magnets give it all back, springs most of it, rubber only part of it, and Velcro grabs and keeps the carts together, turning into heat all the energy that the carts could have used to separate. A collision that gives back all the kinetic energy is called elastic; one where the objects stick is perfectly inelastic. The share of the closing speed with which the carts separate is the coefficient of restitution: 1 for the magnets here, 0.85 for the springs, 0.5 for the rubber, 0 for Velcro.</p>' +
+                '<p><b>The model.</b> Carts of 0.25 kg, with 0.25 kg bars added on top, on a frictionless track. The magnets repel without touching, with a force that grows as the inverse fourth power of the gap; the springs and rubber pads are each a spring with a damper (internal friction) alongside, which can push but not pull; Velcro grips once it touches. Each bumper is tuned to return the same share of the closing speed whatever the masses and speeds, as textbooks assume; real bumpers vary somewhat. The squeeze lasts a few hundredths of a second and is shown slowed down.</p>' },
+    2: { lede: 'The same collision, watched twice: from the lab, and by a camera riding along with the center of mass. Predict: from the moving camera, what does every collision look like, whatever the masses and speeds?',
+         notes: '<p><b>What to try.</b> Set up any collision, say a heavy cart overtaking a light one, and watch the lower view. Then switch the bumpers between magnets, springs, rubber and Velcro. Compare the energy bar here with the one on the first screen.</p>' +
+                '<p><b>Why.</b> The center of mass moves at a steady velocity, the total momentum divided by the total mass, because the carts\' forces on each other cancel. Ride along with it and the total momentum is zero: the carts always come in from opposite sides, with equal and opposite momenta, and leave the same way. Elastic, they bounce back at the speeds they came in with; with Velcro, they stop dead together. Only this energy, of the carts\' motion relative to the center of mass, is available to the bumpers. The rest, (1/2)<i>MV</i><sup>2</sup> for the motion of the center of mass itself, is untouchable: that is why sticking carts in the lab keep moving, and why the most energy a collision can lose is (1/2)μ<i>v</i><sub>rel</sub><sup>2</sup>, with μ = <i>m</i><sub>A</sub><i>m</i><sub>B</sub>/(<i>m</i><sub>A</sub> + <i>m</i><sub>B</sub>).</p>' +
+                '<p><b>The model.</b> Exactly the same collision as on the first screen; only the camera differs. In the lower view the track slides past underneath.</p>' }
+  };
+
+  function visibility() {
+    $('go').textContent = !run ? 'Go' : playing ? 'Pause' : simT >= run.tEnd ? 'Run again' : 'Resume';
+    document.querySelectorAll('#bump button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === P.bumper)));
+    const closing = P.vA - P.vB > 0;
+    $('hint').textContent = !closing ? 'with these velocities the carts never meet' : run && simT >= run.tEnd ? (run.end === 'track end' ? 'a cart reached the end of the track' : '') : '';
+  }
+  function vals() {
+    const mtxt = m => m.toFixed(2) + ' kg' + (bars(m) ? ' (cart + ' + bars(m) + ' bar' + (bars(m) > 1 ? 's' : '') + ')' : ' (empty cart)');
+    $('mA_v').textContent = mtxt(P.mA); $('mB_v').textContent = mtxt(P.mB);
+    const vtxt = v => fmtV(v) + (Math.abs(v) < 0.001 ? ' (at rest)' : v > 0 ? ' (right)' : ' (left)');
+    $('vA_v').textContent = vtxt(P.vA); $('vB_v').textContent = vtxt(P.vB);
+  }
+  function sync() { $('mA').value = String(P.mA); $('mB').value = String(P.mB); $('vA').value = String(P.vA); $('vB').value = String(P.vB); vals(); }
+  function reset() { run = null; playing = false; simT = 0; }
+  function upd() { visibility(); vals(); readout(); draw(); }
+  function setTab(k) {
+    tab = k;
+    [1, 2].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    reset(); sync(); upd();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#bump button').forEach(b => b.addEventListener('click', () => { P.bumper = b.dataset.v; reset(); upd(); }));
+  ['mA', 'mB', 'vA', 'vB'].forEach(id => $(id).addEventListener('input', () => { P[id] = +$(id).value; reset(); upd(); }));
+  $('go').addEventListener('click', () => {
+    if (!run || simT >= run.tEnd) { run = compute(); simT = 0; playing = true; }
+    else playing = !playing;
+    upd();
+  });
+  $('reset').addEventListener('click', () => { reset(); upd(); });
+  $('slow').addEventListener('change', upd);
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (dt > 0 && playing && run && !document.hidden) {
+      // advance in small pieces so the switch into and out of slow motion lands where it should
+      let left = dt;
+      while (left > 1e-9 && simT < run.tEnd) {
+        const slow = slowNow(simT), rate = slow ? run.slowRate : 1, piece = Math.min(left, 0.004);
+        let next = simT + piece * rate;
+        if (!slow && run.slowFrom !== undefined && $('slow').checked && simT < run.slowFrom && next > run.slowFrom) { left -= (run.slowFrom - simT) / rate; simT = run.slowFrom; continue; }
+        simT = Math.min(run.tEnd, next); left -= piece;
+      }
+      if (simT >= run.tEnd) { playing = false; visibility(); }
+      readout(); draw();
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'collisions',
+    title: 'Colliding carts',
+    topic: 'dynamics',
+    tags: ['momentum', 'collisions', 'elastic', 'inelastic', 'coefficient of restitution', 'impulse', "Newton's third law", 'center of mass', 'kinetic energy'],
+    blurb: "Two lab carts collide with magnetic, spring, rubber or Velcro bumpers. Watch the bumpers squeeze in slow motion, with equal and opposite forces, while the momentum bars trade off and the kinetic energy drains into the bumpers and back, or into heat. A second view rides along with the center of mass, where every collision looks the same.",
+    level: 'intro',
+    added: '2026-10-09',
+    status: 'ready'
+  },
+  {
     slug: 'induction',
     title: 'Electromagnetic induction',
     topic: 'em',
