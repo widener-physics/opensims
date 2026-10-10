@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<!--
+  Turning frames - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The path seen from the
+  platform (the straight ground path turned back) matches a separate step-by-step integration of the
+  centrifugal and Coriolis forces; the Coriolis force is always sideways, to the right on a counterclockwise
+  platform; (1/2)v^2 - (1/2)w^2 r^2 is conserved on the platform; and the aims that reach a friend were found
+  and checked.
+  Credit: fills a gap - to our knowledge PhET has no simulation of rotating frames.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turning frames: the Coriolis effect</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --deck: #E8D9BF; --deck2: #DCC8A6; --rim: #8A6A42; --grass: #DCEBD3; --ink-trail: #1D4F73; --ground-path: #8E9BA3;
+    --cent: #E09A1A; --cor: #8E3FB5; --thrower: #1D4F73; --friend: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 450; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.9; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Turning frames: the Coriolis effect</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Merry-go-round</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Playing catch</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>The fictitious forces</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="A turning platform seen from above, not turning, and from the platform, turning with it"></canvas>
+  <div class="row2">
+    <button id="go">Slide the puck</button>
+    <button id="step" class="secondary">Step 0.1 s</button>
+    <button id="clear" class="secondary">Clear</button>
+    <button id="aimme" class="secondary">Aim for me</button>
+    <label><input type="checkbox" id="slow"> slow motion (¼ speed)</label>
+    <span class="hint" id="hint"></span>
+  </div>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_spin"><div class="row"><span>Platform's spin</span><span class="val" id="spin_v"></span></div><input type="range" id="spin" min="-15" max="15" step="0.5"></label>
+    <div class="grp" id="lab_from"><div>The rider who slides the puck stands</div>
+      <div class="seg" id="from" role="group" aria-label="Where the rider stands"><button data-v="0">at the center</button><button data-v="0.5">halfway out</button><button data-v="1">at the rim</button></div></div>
+    <div class="grp" id="lab_setup"><div>Who throws to whom</div>
+      <div class="seg" id="setup" role="group" aria-label="Thrower and friend"><button data-v="out">center to rim</button><button data-v="in">rim to center</button><button data-v="across">rim to rim</button></div></div>
+    <label id="lab_speed"><div class="row"><span id="speed_t">Push, relative to the platform</span><span class="val" id="speed_v"></span></div><input type="range" id="speed" min="0.5" max="6" step="0.1"></label>
+    <label id="lab_aim"><div class="row"><span id="aim_t">Aimed, from straight at the flag</span><span class="val" id="aim_v"></span></div><input type="range" id="aim" min="-80" max="80" step="1"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI, DEG = Math.PI / 180;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against a step-by-step integration of the
+  //    centrifugal and Coriolis forces, and for the aims that reach a friend. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: motion seen from a turning platform ----
+  // SI units. A platform of radius R turns counterclockwise (seen from above) at angular velocity w (negative: clockwise).
+  // Platform coordinates are fixed to it and coincide with ground coordinates at t = 0. Something launched by a rider
+  // moves with no horizontal force on it (a puck on a frictionless surface, or a ball in flight), so seen from the
+  // ground it goes in a straight line at a steady speed; it starts with the rider's own velocity, w x r, added to the
+  // velocity the rider gives it. Seen from the platform its path is the same straight line, turned back by the angle
+  // the platform has turned: the curve that the centrifugal and Coriolis forces describe.
+  const PLATFORM = { R: 2 };
+  const rpm = w => w * 60 / (2 * Math.PI);
+  const fromRpm = n => n * 2 * Math.PI / 60;
+  const rot = (p, a) => [p[0] * Math.cos(a) - p[1] * Math.sin(a), p[0] * Math.sin(a) + p[1] * Math.cos(a)];
+  // launch from platform position r0 with velocity u relative to the platform (both at t = 0)
+  function launch(r0, u, w) { return { r0: r0.slice(), v0: [u[0] - w * r0[1], u[1] + w * r0[0]], w }; }
+  // seen from the ground: position and velocity
+  const ground = (L, t) => ({ r: [L.r0[0] + L.v0[0] * t, L.r0[1] + L.v0[1] * t], v: L.v0.slice() });
+  // seen from the platform: position, velocity, and the two fictitious forces per unit mass that account for the path
+  function platform(L, t) {
+    const g = ground(L, t), w = L.w, r = rot(g.r, -w * t), vg = rot(g.v, -w * t);
+    const v = [vg[0] + w * r[1], vg[1] - w * r[0]];                    // v_platform = v_ground - w x r (in platform axes)
+    return { r, v, centrifugal: [w * w * r[0], w * w * r[1]], coriolis: [2 * w * v[1], -2 * w * v[0]] };   // -2 w x v
+  }
+  // when it reaches the platform's rim (or null if it never does)
+  function rimTime(L, R) {
+    R = R || PLATFORM.R; const a = L.v0[0] ** 2 + L.v0[1] ** 2, b = 2 * (L.r0[0] * L.v0[0] + L.r0[1] * L.v0[1]), c = L.r0[0] ** 2 + L.r0[1] ** 2 - R * R;
+    if (a === 0) return null; const d = b * b - 4 * a * c; if (d < 0) return null;
+    const t = (-b + Math.sqrt(d)) / (2 * a); return t > 1e-12 ? t : null;
+  }
+  // playing catch: a ball thrown from platform position A, aimed at angle aim (radians, counterclockwise) from the
+  // straight line to the friend at platform position B, at speed s relative to the platform. Returns the closest it
+  // comes to the friend (who rides along) and when, while it is over the platform (up to 0.4 m past the rim).
+  function miss(A, B, s, aim, w, tMax) {
+    const d = [B[0] - A[0], B[1] - A[1]], dl = Math.hypot(d[0], d[1]), dir = rot([d[0] / dl, d[1] / dl], aim);
+    const L = launch(A, [s * dir[0], s * dir[1]], w);
+    const tEnd = Math.min(tMax || 10, rimTime(L, PLATFORM.R + 0.4) || 10);
+    // the gap to the friend is smooth in time: golden-section search after a coarse scan
+    const gap = t => { const p = ground(L, t).r, f = rot(B, w * t); return Math.hypot(p[0] - f[0], p[1] - f[1]); };
+    let best = 0, bg = gap(0); const n = 400;
+    for (let i = 1; i <= n; i++) { const t = tEnd * i / n, g = gap(t); if (g < bg) { bg = g; best = t; } }
+    let lo = Math.max(0, best - tEnd / n), hi = Math.min(tEnd, best + tEnd / n);
+    for (let i = 0; i < 80; i++) { const m1 = lo + (hi - lo) * 0.382, m2 = lo + (hi - lo) * 0.618; if (gap(m1) < gap(m2)) hi = m2; else lo = m1; }
+    const t = (lo + hi) / 2; return { gap: gap(t), t, L, tEnd };
+  }
+  // the aim that makes the ball reach the friend: the root of the sideways miss, by bisection over aims that keep the
+  // ball heading the friend's way
+  function aimFor(A, B, s, w) {
+    const side = aim => {      // signed sideways miss: which side of the friend the ball passes, at its closest
+      const m = miss(A, B, s, aim, w), p = ground(m.L, m.t).r, f = rot(B, w * m.t), v = m.L.v0;
+      return (v[0] * (f[1] - p[1]) - v[1] * (f[0] - p[0])) / Math.hypot(v[0], v[1]);
+    };
+    let lo = -1.4, hi = 1.4, flo = side(lo), fhi = side(hi);
+    if (flo * fhi > 0) return null;
+    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2, fm = side(m); if (fm * flo > 0) { lo = m; flo = fm; } else { hi = m; fhi = fm; } }
+    return (lo + hi) / 2;
+  }
+  // ---- end of core ----
+
+  const R = PLATFORM.R, PUCK = 0.17, CATCH = 0.3;
+  const S = { spin: 8, from: 0.5, speed: 2.5, aim: 0, setup: 'out', tspeed: 4, taim: 0, slow: false };
+  let tab = 1, theta = 0, run = null, playing = true;   // theta: the platform's angle; run: the launch in flight
+  const w = () => fromRpm(S.spin);
+  const fmtA = a => (a > 0 ? '+' : a < 0 ? '−' : '') + Math.abs(a).toFixed(0) + '°';
+
+  // where the rider and the flag (or the friend) are, in platform coordinates
+  function setupPoints() {
+    if (tab === 2) {
+      if (S.setup === 'out') return { A: [0, 0], B: [R, 0] };
+      if (S.setup === 'in') return { A: [-R, 0], B: [0, 0] };
+      return { A: [-R, 0], B: [R, 0] };
+    }
+    const r = S.from * R; return { A: [-r, 0], B: [R, 0] };
+  }
+  function start() {
+    const { A, B } = setupPoints(), s = tab === 2 ? S.tspeed : S.speed, aim = (tab === 2 ? S.taim : S.aim) * DEG;
+    const d = [B[0] - A[0], B[1] - A[1]], dl = Math.hypot(...d), dir = rot([d[0] / dl, d[1] / dl], aim);
+    const L = launch(A, [s * dir[0], s * dir[1]], w());
+    const tEnd = Math.min(8, rimTime(L, R + 0.8) || 8);
+    run = { L, t: 0, tEnd, theta0: theta, w: w(), A, B, tab, result: null };
+    if (tab === 2) { const m = miss(A, B, s, aim, w()); run.miss = m; run.tEnd = Math.min(tEnd, m.gap < CATCH ? m.t : tEnd); }
+    playing = true;
+  }
+  // positions for drawing: ground coordinates rotate launch-frame positions by theta0
+  const gpos = (r, t) => rot(ground(r.L, t).r, r.theta0);
+  const ppos = (r, t) => platform(r.L, t).r;
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function arrow(ctx, x0, y0, x1, y1, col, wd, head) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head || 8, L * 0.6);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = wd || 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.6, y1 - uy * hd * 0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.5, y1 - uy * hd + ux * hd * 0.5); ctx.lineTo(x1 - ux * hd + uy * hd * 0.5, y1 - uy * hd - ux * hd * 0.5); ctx.closePath(); ctx.fill();
+  }
+  // things fixed to the ground, in ground coordinates: two trees, a bench, a lamp
+  const SCENERY = [{ k: 'tree', p: [2.75, 1.7] }, { k: 'tree', p: [-2.5, 2.1] }, { k: 'bench', p: [-2.6, -1.9], a: 0.6 }, { k: 'lamp', p: [2.6, -2.0] }, { k: 'tree', p: [0.4, -2.85] }];
+  // one panel. spinG: angle by which ground things appear turned; spinP: angle by which the platform appears turned
+  function panel(ctx, px, py, pw, ph, title, spinG, spinP, which) {
+    const cx = px + pw / 2, cy = py + ph / 2 + 8, s = Math.min(pw, ph - 26) / 2 / 3.05;
+    const P = p => [cx + p[0] * s, cy - p[1] * s];
+    ctx.save(); ctx.beginPath(); ctx.rect(px, py, pw, ph); ctx.clip();
+    ctx.fillStyle = C('--grass'); ctx.fillRect(px, py, pw, ph);
+    // scenery
+    SCENERY.forEach(o => {
+      const q = P(rot(o.p, spinG));
+      if (o.k === 'tree') { ctx.fillStyle = '#7FA86A'; ctx.beginPath(); ctx.arc(q[0], q[1], 0.42 * s, 0, TAU); ctx.fill(); ctx.fillStyle = '#5E8A4C'; ctx.beginPath(); ctx.arc(q[0] - 0.1 * s, q[1] - 0.08 * s, 0.22 * s, 0, TAU); ctx.fill(); }
+      else if (o.k === 'bench') { ctx.save(); ctx.translate(q[0], q[1]); ctx.rotate(-(o.a + spinG)); ctx.fillStyle = '#8A6A42'; ctx.fillRect(-0.45 * s, -0.12 * s, 0.9 * s, 0.24 * s); ctx.restore(); }
+      else { ctx.fillStyle = '#5C6B73'; ctx.beginPath(); ctx.arc(q[0], q[1], 0.09 * s, 0, TAU); ctx.fill(); ctx.strokeStyle = '#E8C547'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q[0], q[1], 0.17 * s, 0, TAU); ctx.stroke(); }
+    });
+    // the platform: alternating sectors so its turning shows
+    const c0 = P([0, 0]);
+    for (let k = 0; k < 8; k++) { ctx.fillStyle = k % 2 ? C('--deck') : C('--deck2'); ctx.beginPath(); ctx.moveTo(c0[0], c0[1]); ctx.arc(c0[0], c0[1], R * s, -(spinP + k * TAU / 8), -(spinP + (k + 1) * TAU / 8), true); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle = C('--rim'); ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(c0[0], c0[1], R * s, 0, TAU); ctx.stroke();
+    ctx.fillStyle = C('--rim'); ctx.beginPath(); ctx.arc(c0[0], c0[1], 0.12 * s, 0, TAU); ctx.fill();
+    ctx.restore();
+    font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(title, px + 8, py + 17);
+    return { P, s, cx, cy };
+  }
+  function person(ctx, q, s, col, label) {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(q[0], q[1], 0.17 * s, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    if (label) { font(ctx, 10); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText(label, q[0], q[1] + 0.17 * s + 12); }
+  }
+  function flag(ctx, q, s) { ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[0], q[1] - 0.45 * s); ctx.stroke(); ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.moveTo(q[0], q[1] - 0.45 * s); ctx.lineTo(q[0] + 0.3 * s, q[1] - 0.36 * s); ctx.lineTo(q[0], q[1] - 0.27 * s); ctx.fill(); }
+  function path(ctx, pts, P, col, wd, dash) {
+    if (pts.length < 2) return; ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.setLineDash(dash || []); ctx.beginPath();
+    pts.forEach((p, i) => { const q = P(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    const gap = 8, two = compact ? [[0, 0, W, (H - gap) / 2], [0, (H + gap) / 2, W, (H - gap) / 2]] : [[0, 0, (W - gap) / 2, H], [(W + gap) / 2, 0, (W - gap) / 2, H]];
+    ctx.fillStyle = C('--panel'); ctx.fillRect(0, 0, W, H);
+    const r = run, t = r ? r.t : 0, th = theta;
+    const pts = setupPoints();
+    // where the riders are in platform coordinates; the ground view turns them with the platform
+    const views = [
+      { box: two[0], title: 'Seen from above, not turning', spinG: 0, spinP: th, toScreen: p => rot(p, th) },
+      { box: two[1], title: 'Seen from the platform, turning with it', spinG: -th, spinP: 0, toScreen: p => p }
+    ];
+    views.forEach((v, vi) => {
+      const g = panel(ctx, v.box[0], v.box[1], v.box[2], v.box[3], v.title, v.spinG, v.spinP);
+      ctx.save(); ctx.beginPath(); ctx.rect(v.box[0], v.box[1] + 22, v.box[2], v.box[3] - 22); ctx.clip();
+      if (r) {
+        // the trail the puck leaves on the platform (platform coordinates), and its path over the ground
+        const n = Math.max(2, Math.ceil(80 * t / Math.max(0.5, r.tEnd))), plat = [], grd = [];
+        for (let i = 0; i <= n; i++) { const ti = t * i / n; plat.push(ppos(r, ti)); grd.push(gpos(r, ti)); }
+        const toView = vi === 0 ? (p => rot(p, th)) : (p => p);                  // platform coords into this view
+        const gToView = vi === 0 ? (p => p) : (p => rot(p, -th));                 // ground coords into this view
+        if (tab === 2) path(ctx, vi === 0 ? grd : plat, g.P, C('--thrower'), 2.5);      // a ball in the air: its path as each view sees it
+        else { path(ctx, grd.map(gToView), g.P, C('--ground-path'), 1.5, [5, 4]); path(ctx, plat.map(toView), g.P, C('--ink-trail'), 2.5); }
+      }
+      // riders (and the flag), which ride on the platform
+      if (tab === 2) { person(ctx, g.P(v.toScreen(pts.A)), g.s, C('--thrower'), compact ? '' : 'thrower'); person(ctx, g.P(v.toScreen(pts.B)), g.s, C('--friend'), compact ? '' : 'friend'); }
+      else { person(ctx, g.P(v.toScreen(pts.A)), g.s, C('--thrower'), compact ? '' : 'rider'); flag(ctx, g.P(v.toScreen(pts.B)), g.s); }
+      // the puck or ball
+      const gone = r && r.t >= r.tEnd && Math.hypot(...gpos(r, t)) > R + 0.05;   // it has slid off the platform
+      if (r && !gone) {
+        const q = vi === 0 ? g.P(gpos(r, t)) : g.P(ppos(r, t));
+        ctx.fillStyle = tab === 2 ? '#F4F1E6' : '#172128'; ctx.strokeStyle = '#172128'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(q[0], q[1], Math.max(4, 0.11 * g.s), 0, TAU); ctx.fill(); ctx.stroke();
+        if (tab === 3) forces(ctx, g, r, t, vi);
+      }
+      ctx.restore();
+      // aiming line before the launch
+      if (!r || r.t === 0) {
+        const s = tab === 2 ? S.tspeed : S.speed, aim = (tab === 2 ? S.taim : S.aim) * DEG, d = [pts.B[0] - pts.A[0], pts.B[1] - pts.A[1]], dl = Math.hypot(...d);
+        if (dl > 0) { const dir = rot([d[0] / dl, d[1] / dl], aim), a = g.P(v.toScreen(pts.A)), b = g.P(v.toScreen([pts.A[0] + dir[0] * 0.25 * s, pts.A[1] + dir[1] * 0.25 * s]));
+          arrow(ctx, a[0], a[1], b[0], b[1], C('--vel'), 2.5, 9); }
+      }
+    });
+    // the legend and the clock
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    const lx = W - 8, ly = H - 8;
+    ctx.fillText((r ? 't = ' + r.t.toFixed(2) + ' s · ' : '') + (S.spin === 0 ? 'platform still' : Math.abs(S.spin) + ' turns a minute, ' + (S.spin > 0 ? 'counterclockwise' : 'clockwise')), lx, ly);
+    if (r && !compact) { ctx.textAlign = 'left'; ctx.fillText(tab === 2 ? 'the ball\'s path, as each view sees it' : tab === 3 ? 'green: velocity   purple: Coriolis force   orange: centrifugal force' : 'solid: the trail it leaves on the platform   dashed: its path over the ground', 8, H - 8); }
+  }
+  // the third screen: the forces on the puck. Seen from the ground there are none; on the platform, the centrifugal
+  // and Coriolis forces, which together bend the path
+  function forces(ctx, g, r, t, vi) {
+    const q = vi === 0 ? g.P(gpos(r, t)) : g.P(ppos(r, t));
+    if (vi === 0) { font(ctx, 11, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('no force on it', q[0] + 10, q[1] - 10);
+      const v = rot(ground(r.L, t).v, r.theta0), k = 0.35 * g.s; arrow(ctx, q[0], q[1], q[0] + v[0] * k, q[1] - v[1] * k, C('--vel'), 2.5, 8); return; }
+    const st = platform(r.L, t), k = 0.35 * g.s, fk = 0.16 * g.s;    // arrows: velocity per m/s, force per m/s^2 (x mass shown in text)
+    arrow(ctx, q[0], q[1], q[0] + st.v[0] * k, q[1] - st.v[1] * k, C('--vel'), 2.5, 8);
+    arrow(ctx, q[0], q[1], q[0] + st.centrifugal[0] * fk, q[1] - st.centrifugal[1] * fk, C('--cent'), 2.5, 8);
+    arrow(ctx, q[0], q[1], q[0] + st.coriolis[0] * fk, q[1] - st.coriolis[1] * fk, C('--cor'), 2.5, 8);
+    font(ctx, 11, '600'); ctx.textAlign = 'left';
+    const lab = (vec, col, txt) => { const L = Math.hypot(...vec); if (L * fk < 14) return; ctx.fillStyle = col; ctx.fillText(txt, q[0] + vec[0] * fk + 6, q[1] - vec[1] * fk + 4); };
+    lab(st.centrifugal, C('--cent'), 'centrifugal'); lab(st.coriolis, C('--cor'), 'Coriolis');
+  }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    const om = w(), rim = Math.abs(om) * R, r = run;
+    let html = card('The platform', S.spin === 0 ? 'not turning' : Math.abs(S.spin) + ' turns a minute', S.spin === 0 ? 'set it spinning with the slider' : (S.spin > 0 ? 'counterclockwise' : 'clockwise') + ' seen from above; its rim moves at ' + rim.toFixed(1) + ' m/s');
+    if (tab === 1 || tab === 3) {
+      const g = r ? Math.hypot(...r.L.v0) : null, st = r ? platform(r.L, r.t) : null;
+      html += card('Speed of the puck', r ? Math.hypot(...st.v).toFixed(2) + ' m/s on the platform' : '–', r ? 'seen from the ground a steady ' + g.toFixed(2) + ' m/s' + (Math.abs(om) * S.from * R > 0.005 ? ', which includes the rider\'s own motion (' + (Math.abs(om) * S.from * R).toFixed(2) + ' m/s)' : '') : 'pushed at ' + S.speed.toFixed(1) + ' m/s relative to the platform');
+      if (tab === 1) {
+        const tr = r ? rimTime(r.L) : null;
+        html += card('Crossing', r && tr !== null && r.t >= tr ? tr.toFixed(2) + ' s' : '–', r && tr !== null && r.t >= tr ? 'to reach the rim, while the platform turned ' + (Math.abs(om) * tr / DEG).toFixed(0) + '°' : 'time to reach the rim, and how far the platform turns meanwhile');
+      } else {
+        const fc = r ? PUCK * Math.hypot(...st.centrifugal) : 0, fo = r ? PUCK * Math.hypot(...st.coriolis) : 0;
+        html += card('Forces seen on the platform', r ? 'Coriolis ' + fo.toFixed(2) + ' N, centrifugal ' + fc.toFixed(2) + ' N' : '–', 'on a 0.17 kg puck: Coriolis 2 m ω v, sideways to the motion; centrifugal m ω² r, straight out');
+      }
+    } else {
+      const res = r && r.t >= r.tEnd ? (r.miss.gap < CATCH ? 'caught' : 'missed by ' + r.miss.gap.toFixed(1) + ' m') : '–';
+      html += card('The throw', res, r && r.t >= r.tEnd ? (r.miss.gap < CATCH ? 'the ball reached the friend' : 'the friend had moved, or the ball curved away, depending on how you look at it') : 'thrown at ' + S.tspeed.toFixed(1) + ' m/s, aimed ' + fmtA(S.taim) + ' from straight at the friend');
+      const need = aimFor(setupPoints().A, setupPoints().B, S.tspeed, om);
+      html += card('Aim that works', need === null ? 'none at this speed' : fmtA(need / DEG), need === null ? 'throw harder' : S.spin === 0 ? 'straight at the friend: the platform is still' : 'to the ' + (need > 0 ? 'left' : 'right') + ' of the friend, seen by the thrower');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'A rider on a spinning merry-go-round slides a puck across its slippery floor, aiming at a flag on the far rim. Predict: where does the puck go, seen by someone standing on the ground? And seen by the rider?',
+         notes: '<p><b>What to try.</b> Slide the puck from the center with the platform still, then spinning: from above it goes straight, but the trail it leaves on the platform curves, and the rider sees it swerve. Turn the platform the other way. Stand at the rim instead of the center and slide it toward the flag, or give it only a gentle push: the rider\'s own motion carries it off sideways. Compare the two views of the same slide.</p>' +
+                '<p><b>Why.</b> Nothing pushes the puck sideways once it leaves the rider\'s hand, so seen from the ground it goes straight at a steady speed (Newton\'s first law). But the platform turns underneath it, so the line it draws on the platform is a curve, and to a rider, who naturally takes the platform as fixed, the puck seems to be pushed sideways. Two more things surprise riders: the puck starts with the rider\'s own velocity, so a puck launched from the rim heads off partly sideways from the ground\'s point of view, and the faster the platform turns or the slower the puck, the more the platform turns while it crosses.</p>' +
+                '<p><b>The model.</b> A platform 4 m across, turning at a steady rate, with a frictionless floor (like ice), and a puck that slides without friction once it is released. Its path seen from the ground is an exact straight line; seen from the platform, the same line turned back by the angle the platform has turned. Spinning a real playground merry-go-round at 15 turns a minute would be fast but not unheard of.</p>' },
+    2: { lede: 'Two friends on a spinning merry-go-round play catch. Predict: if the thrower aims straight at the friend, where does the ball go? Which way must the thrower aim instead?',
+         notes: '<p><b>What to try.</b> Throw straight at the friend with the platform still, then spinning. Try each setup: from the center out, from the rim in, and across. Then use "Aim for me", and look at which side of the friend the thrower has to aim. Throw harder, and see how much less you need to aim off.</p>' +
+                '<p><b>Why.</b> Seen from the ground, the ball flies straight (gravity only pulls it down, not sideways), but while it is in the air the friend is carried around, and the thrower\'s own motion adds to the ball\'s. On a counterclockwise platform the ball always ends up to the right of where it was aimed, as the riders see it, whichever way it is thrown, so you aim to the left. A faster throw spends less time in the air, so the platform turns less and the miss is smaller. On the turning Earth the same thing happens to anything that travels a long way, like winds, ocean currents and long-range shells: in the Northern Hemisphere they veer right.</p>' +
+                '<p><b>The model.</b> The ball travels at a steady speed horizontally (the sim ignores its rise and fall and air resistance); a throw counts as caught if it passes within 30 cm of the friend. The aim that works is found by searching for the aim that brings the ball straight to the friend.</p>' },
+    3: { lede: 'From the ground nothing pushes on the sliding puck; from the platform its path curves. Predict: what forces would a rider say act on the puck, and which way do they point?',
+         notes: '<p><b>What to try.</b> Slide the puck and step through its motion 0.1 s at a time. Watch the two forces in the rider\'s view: the Coriolis force stays at right angles to the puck\'s motion, always to its right on a counterclockwise platform, and the centrifugal force always points straight out from the center. Slide it from the center, where the centrifugal force starts at zero, and from the rim with no push at all, where only the centrifugal force acts at first.</p>' +
+                '<p><b>Why.</b> In a turning frame Newton\'s laws work only if you add two forces that no object exerts. The centrifugal force, <i>m</i>ω²<i>r</i>, points straight out from the axis and grows with distance from it. The Coriolis force, 2<i>m</i>ω<i>v</i>, acts only on things moving relative to the platform, at right angles to that motion, so it changes the direction of motion but never the speed. Together they produce exactly the curve the rider sees. Seen from the ground neither exists: the puck simply goes straight. They are called fictitious, or inertial, forces because they come from the frame, not from any push or pull.</p>' +
+                '<p><b>The model.</b> The same platform and puck as on the first screen. The arrows are drawn from the exact path: velocity as seen in each view, and the centrifugal and Coriolis forces as seen on the platform, for a 0.17 kg puck (an ice-hockey puck).</p>' }
+  };
+
+  function visibility() {
+    $('lab_from').hidden = tab === 2; $('lab_setup').hidden = tab !== 2;
+    $('aimme').hidden = tab !== 2; $('step').hidden = tab !== 3;
+    $('speed_t').textContent = tab === 2 ? 'Throwing speed, relative to the thrower' : 'Push, relative to the platform';
+    $('aim_t').textContent = tab === 2 ? 'Aimed, from straight at the friend' : 'Aimed, from straight at the flag';
+    $('go').textContent = tab === 2 ? (run && run.t < run.tEnd ? 'Throwing…' : 'Throw') : (run && run.t < run.tEnd ? (playing ? 'Pause' : 'Resume') : 'Slide the puck');
+    $('go').disabled = tab === 2 && !!(run && run.t < run.tEnd);
+    document.querySelectorAll('#from button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.from)));
+    document.querySelectorAll('#setup button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.setup)));
+    $('hint').textContent = '';
+  }
+  function vals() {
+    $('spin_v').textContent = S.spin === 0 ? 'still' : Math.abs(S.spin) + ' turns/min ' + (S.spin > 0 ? '⟲ counterclockwise' : '⟳ clockwise');
+    const sp = tab === 2 ? S.tspeed : S.speed, am = tab === 2 ? S.taim : S.aim;
+    $('speed_v').textContent = sp.toFixed(1) + ' m/s'; $('aim_v').textContent = am === 0 ? 'straight' : fmtA(am) + (am > 0 ? ' (left)' : ' (right)');
+  }
+  function sync() { $('spin').value = String(S.spin); $('speed').value = String(tab === 2 ? S.tspeed : S.speed); $('aim').value = String(tab === 2 ? S.taim : S.aim); vals(); }
+  function upd() { visibility(); vals(); readout(); drawScene(); }
+  function setTab(k) {
+    tab = k; run = null; playing = true;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  $('spin').addEventListener('input', () => { S.spin = +$('spin').value; run = null; upd(); });
+  $('speed').addEventListener('input', () => { if (tab === 2) S.tspeed = +$('speed').value; else S.speed = +$('speed').value; run = null; upd(); });
+  $('aim').addEventListener('input', () => { if (tab === 2) S.taim = +$('aim').value; else S.aim = +$('aim').value; run = null; upd(); });
+  document.querySelectorAll('#from button').forEach(b => b.addEventListener('click', () => { S.from = +b.dataset.v; run = null; upd(); }));
+  document.querySelectorAll('#setup button').forEach(b => b.addEventListener('click', () => { S.setup = b.dataset.v; run = null; upd(); }));
+  $('go').addEventListener('click', () => {
+    if (tab !== 2 && run && run.t < run.tEnd) { playing = !playing; upd(); return; }
+    start(); upd();
+  });
+  $('step').addEventListener('click', () => { if (!run || run.t >= run.tEnd) { start(); } playing = false; const d = Math.min(0.1, run.tEnd - run.t); run.t += d; theta += run.w * d; upd(); });
+  $('clear').addEventListener('click', () => { run = null; playing = true; upd(); });
+  $('aimme').addEventListener('click', () => { const pts = setupPoints(), a = aimFor(pts.A, pts.B, S.tspeed, w()); if (a !== null) { S.taim = Math.round(a / DEG); sync(); run = null; upd(); } });
+  $('slow').addEventListener('change', () => { S.slow = $('slow').checked; });
+  window.addEventListener('resize', drawScene);
+
+  // ================================================================
+  // 4. LOOP: the platform always turns; a launched puck or ball moves on its own clock
+  // ================================================================
+  let last = null, lastRead = 0;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000) * (S.slow ? 0.25 : 1);
+    last = ts;
+    if (dt > 0 && !document.hidden) {
+      const flying = run && run.t < run.tEnd;
+      if (!flying || playing) {
+        theta = (theta + w() * dt) % TAU;
+        if (flying) { run.t = Math.min(run.tEnd, run.t + dt); if (run.t >= run.tEnd) visibility(); }
+      }
+      drawScene();
+      if (ts - lastRead > 100) { readout(); lastRead = ts; }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

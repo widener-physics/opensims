@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<!--
+  Quantum tunneling - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The barrier solution
+  matches the textbook transmission formula in 63 cases and satisfies the Schrodinger equation; the
+  Crank-Nicolson packet keeps the total probability at 1, matches the plane-wave transmission averaged over its
+  energies, converges as the grid is refined, and moves and spreads as the exact free solution says; the STM
+  current falls about 9 times per 0.1 nm; and the Gamow model of alpha decay matches its closed form and gets 7
+  of 8 measured half-lives within a factor of 10 over 24 powers of ten.
+  Credit: replaces PhET's Quantum Tunneling and Wave Packets, a Java simulation never moved to HTML5.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quantum tunneling</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --barrier: #C9D2D8; --barrier-edge: #8E9BA3; --energy: #C8321E; --re: #1D4F73; --im: #B5306D; --model: #1D4F73; --meas: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 340; }
+  #graph { aspect-ratio: 900 / 220; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.9; }
+    #graph { aspect-ratio: 1 / 0.7; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Quantum tunneling</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Wave on a barrier</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Wave packet</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Where it matters</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="The potential energy, the electron's energy, and its wave function"></canvas>
+  <div class="row2">
+    <button id="go">Go</button>
+    <button id="reset" class="secondary">Reset</button>
+    <label id="lab_reim"><input type="checkbox" id="reim"> show real and imaginary parts</label>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="How the chance of getting through depends on energy"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_where"><div>Show</div>
+      <div class="seg" id="where" role="group" aria-label="Application"><button data-v="stm">scanning tunneling microscope</button><button data-v="alpha">alpha decay</button></div></div>
+    <label id="lab_E"><div class="row"><span id="E_t">Electron's energy</span><span class="val" id="E_v"></span></div><input type="range" id="E" min="0.2" max="10" step="0.05"></label>
+    <label id="lab_V"><div class="row"><span>Barrier height</span><span class="val" id="V_v"></span></div><input type="range" id="V" min="0" max="10" step="0.1"></label>
+    <label id="lab_a"><div class="row"><span>Barrier width</span><span class="val" id="a_v"></span></div><input type="range" id="a" min="0.05" max="1" step="0.01"></label>
+    <label id="lab_sig"><div class="row"><span>Packet's width</span><span class="val" id="sig_v"></span></div><input type="range" id="sig" min="0.6" max="2.5" step="0.1"></label>
+    <div class="grp" id="lab_mode"><div>Scanning</div>
+      <div class="seg" id="mode" role="group" aria-label="Scanning mode"><button data-v="current">keep the current steady</button><button data-v="height">keep the tip's height steady</button></div></div>
+    <label id="lab_gap"><div class="row"><span>Tip's height above the surface</span><span class="val" id="gap_v"></span></div><input type="range" id="gap" min="0.35" max="1" step="0.01"></label>
+    <div class="grp" id="lab_nuc"><div>Nucleus</div>
+      <div class="seg" id="nuc" role="group" aria-label="Nucleus"></div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own against the textbook transmission formula, the
+  //    Schrodinger equation, exact free-packet motion, and measured alpha-decay half-lives. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: quantum tunneling ----
+  // Units: energies in eV, lengths in nm, times in fs. An electron: hbar^2 / 2m = 0.0380998 eV nm^2, hbar = 0.6582120 eV fs.
+  // Complex numbers as [re, im].
+  const H2M = 0.0380998, HBAR = 0.6582120;
+  const c = (re, im) => [re, im || 0];
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1]], sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  const mul = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+  const div = (a, b) => { const d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; };
+  const cexp = z => { const m = Math.exp(z[0]); return [m * Math.cos(z[1]), m * Math.sin(z[1])]; };
+  const abs2 = a => a[0] * a[0] + a[1] * a[1];
+  const csqrt = z => { const r = Math.hypot(z[0], z[1]), re = Math.sqrt((r + z[0]) / 2), im = Math.sign(z[1] || 1) * Math.sqrt(Math.max(0, (r - z[0]) / 2)); return [re, z[1] === 0 && z[0] < 0 ? Math.sqrt(-z[0]) : im]; };
+
+  // ---- 1. a steady wave of energy E on a rectangular barrier of height V0 from x = 0 to x = a ----
+  // In each region psi = A e^{i q x} + B e^{-i q x} with q = sqrt((E - V)/H2M) (imaginary, i kappa, inside a barrier
+  // taller than E). Matching psi and psi' at each edge, with the incoming wave of amplitude 1 and nothing coming from
+  // the right, gives the reflected amplitude r, the transmitted amplitude t, and the wave everywhere.
+  function waveOn(E, V0, a) {
+    const k = Math.sqrt(E / H2M), q = csqrt(c((E - V0) / H2M));     // q = k2 inside the barrier (complex if E < V0)
+    const qq = abs2(q) < 1e-24 ? c(1e-9) : q;                       // E = V0 exactly: the limit, taken numerically
+    // work backward from the right: psi = t e^{ikx} for x > a. Inside: A e^{iqx} + B e^{-iqx}, matched at x = a.
+    // Take t = 1 first, then rescale so the incoming amplitude is 1.
+    const I = c(0, 1), eka = cexp(c(0, k * a));
+    const iqa = mul(I, mul(qq, c(a))), ep = cexp(iqa), em = cexp(c(-iqa[0], -iqa[1]));
+    // psi(a) = A ep + B em = eka;  psi'(a) = i q (A ep - B em) = i k eka
+    const ratio = div(c(k), qq);                                     // k / q
+    const A = div(mul(eka, add(c(1), ratio)), mul(c(2), ep)), B = div(mul(eka, sub(c(1), ratio)), mul(c(2), em));
+    // at x = 0: psi(0) = A + B = 1 + r (times scale); psi'(0) = i q (A - B) = i k (1 - r)
+    const p0 = add(A, B), d0 = mul(div(qq, c(k)), sub(A, B));        // (1 + r), (1 - r) up to the common scale
+    const inc = div(add(p0, d0), c(2)), ref = div(sub(p0, d0), c(2));
+    const t = div(c(1), inc), r = div(ref, inc), An = div(A, inc), Bn = div(B, inc);
+    const psi = x => x < 0 ? add(cexp(c(0, k * x)), mul(r, cexp(c(0, -k * x))))
+      : x <= a ? add(mul(An, cexp(mul(mul(I, qq), c(x)))), mul(Bn, cexp(mul(mul(I, qq), c(-x)))))
+      : mul(t, cexp(c(0, k * x)));
+    return { k, q, kappa: E < V0 ? Math.sqrt((V0 - E) / H2M) : 0, r, t, R: abs2(r), T: abs2(t), psi };
+  }
+  // the textbook formula, for comparison
+  function transmission(E, V0, a) {
+    if (V0 === 0) return 1;
+    if (E < V0) { const kap = Math.sqrt((V0 - E) / H2M), s = Math.sinh(kap * a); return 1 / (1 + V0 * V0 * s * s / (4 * E * (V0 - E))); }
+    if (E > V0) { const k2 = Math.sqrt((E - V0) / H2M), s = Math.sin(k2 * a); return 1 / (1 + V0 * V0 * s * s / (4 * E * (E - V0))); }
+    return 1 / (1 + V0 * a * a / (4 * H2M));
+  }
+
+  // ---- 2. a wave packet, by the Crank-Nicolson method on a grid ----
+  // i hbar dpsi/dt = -H2M d2psi/dx2 + V psi. Each step solves (1 + i dt H / 2 hbar) psi_new = (1 - i dt H / 2 hbar) psi_old,
+  // which keeps the total probability exactly 1. The matrix is tridiagonal and the same every step, so its
+  // factorization is done once.
+  function makeGrid(x0, x1, N, V) {
+    const dx = (x1 - x0) / (N - 1), xs = new Float64Array(N), Vs = new Float64Array(N);
+    for (let i = 0; i < N; i++) { xs[i] = x0 + i * dx; Vs[i] = V(xs[i]); }
+    return { x0, x1, N, dx, xs, Vs };
+  }
+  function makeStepper(g, dt) {
+    const N = g.N, a = dt * H2M / (2 * HBAR * g.dx * g.dx);      // off-diagonal coupling, in units of i
+    // left matrix: diagonal 1 + i (2a + dt V / 2 hbar), off-diagonals -i a. Thomas algorithm, factored once.
+    const dRe = new Float64Array(N), dIm = new Float64Array(N);
+    for (let i = 0; i < N; i++) { dRe[i] = 1; dIm[i] = 2 * a + dt * g.Vs[i] / (2 * HBAR); }
+    const off = [0, -a];
+    const cpRe = new Float64Array(N), cpIm = new Float64Array(N), mRe = new Float64Array(N), mIm = new Float64Array(N);
+    let prev = [0, 0];
+    for (let i = 0; i < N; i++) {
+      const di = [dRe[i], dIm[i]], den = i ? sub(di, mul(off, prev)) : di;
+      mRe[i] = den[0]; mIm[i] = den[1];
+      const cp = div(off, den); cpRe[i] = cp[0]; cpIm[i] = cp[1]; prev = cp;
+    }
+    const re = new Float64Array(N), im = new Float64Array(N), yRe = new Float64Array(N), yIm = new Float64Array(N);
+    return function step(pr, pi) {
+      // right side: (1 - i dt H / 2 hbar) psi
+      for (let i = 0; i < N; i++) {
+        const lr = i ? pr[i - 1] : 0, li = i ? pi[i - 1] : 0, rr = i < N - 1 ? pr[i + 1] : 0, ri = i < N - 1 ? pi[i + 1] : 0;
+        const dI = -(2 * a + dt * g.Vs[i] / (2 * HBAR));            // diagonal: 1 + i dI
+        // (1 + i dI) psi_i + i a (psi_{i-1} + psi_{i+1})
+        re[i] = pr[i] - dI * pi[i] - a * (li + ri);
+        im[i] = pi[i] + dI * pr[i] + a * (lr + rr);
+      }
+      // forward sweep
+      for (let i = 0; i < N; i++) {
+        let br = re[i], bi = im[i];
+        if (i) { const t = mul(off, [yRe[i - 1], yIm[i - 1]]); br -= t[0]; bi -= t[1]; }
+        const y = div([br, bi], [mRe[i], mIm[i]]); yRe[i] = y[0]; yIm[i] = y[1];
+      }
+      // back substitution
+      pr[N - 1] = yRe[N - 1]; pi[N - 1] = yIm[N - 1];
+      for (let i = N - 2; i >= 0; i--) { const t = mul([cpRe[i], cpIm[i]], [pr[i + 1], pi[i + 1]]); pr[i] = yRe[i] - t[0]; pi[i] = yIm[i] - t[1]; }
+    };
+  }
+  // a Gaussian packet centered at xc, width sigma (in |psi|^2 the standard deviation is sigma), mean wavenumber k0
+  function packet(g, xc, sigma, k0) {
+    const pr = new Float64Array(g.N), pi = new Float64Array(g.N); let n = 0;
+    for (let i = 0; i < g.N; i++) { const x = g.xs[i], env = Math.exp(-((x - xc) ** 2) / (4 * sigma * sigma)); pr[i] = env * Math.cos(k0 * x); pi[i] = env * Math.sin(k0 * x); n += env * env; }
+    const s = 1 / Math.sqrt(n * g.dx); for (let i = 0; i < g.N; i++) { pr[i] *= s; pi[i] *= s; }
+    return { pr, pi };
+  }
+  function probIn(g, P, xa, xb) { let s = 0; for (let i = 0; i < g.N; i++) if (g.xs[i] >= xa && g.xs[i] < xb) s += P.pr[i] ** 2 + P.pi[i] ** 2; return s * g.dx; }
+  // the transmission a packet should show: the plane-wave T averaged over the packet's spread of wavenumbers
+  function packetT(k0, sigma, V0, a) {
+    const sk = 1 / (2 * sigma); let s = 0, w = 0;
+    for (let j = -400; j <= 400; j++) { const k = k0 + 6 * sk * j / 400; if (k <= 0) continue; const p = Math.exp(-((k - k0) ** 2) / (2 * sk * sk)); s += p * transmission(H2M * k * k, V0, a); w += p; }
+    return s / w;
+  }
+
+  // ---- 3. where it matters ----
+  // The scanning tunneling microscope: electrons tunnel across the gap d between tip and surface through a barrier
+  // about the height of the work function W, so the current falls as e^{-2 kappa d}, kappa = sqrt(W / H2M).
+  const STM = { W: 4.5 };
+  const stmKappa = () => Math.sqrt(STM.W / H2M);
+  const stmCurrent = (d, I0, d0) => I0 * Math.exp(-2 * stmKappa() * (d - d0));
+  // Alpha decay (Gamow): an alpha particle of energy Q inside a nucleus of radius R meets the Coulomb barrier
+  // V = 2 Zd e^2 / (4 pi eps0 r) of the daughter nucleus (charge Zd). Tunneling probability per hit e^{-2G},
+  // G = integral from R to b of sqrt(2 mu (V - Q)) / hbar dr, b = 2 Zd e^2 / Q; hits per second v / 2R.
+  // Nuclear units: MeV, fm. e^2 / 4 pi eps0 = 1.44 MeV fm, hbar c = 197.327 MeV fm, alpha mass 3727.379 MeV.
+  const NUC = { e2: 1.44, hc: 197.327, mAlpha: 3727.379, u: 931.494, r0: 1.2, c: 2.998e23 };   // c in fm/s
+  function gamow(Z, A, Q, n) {
+    const Zd = Z - 2, Ad = A - 4, mu = NUC.mAlpha * Ad * NUC.u / (NUC.mAlpha + Ad * NUC.u);
+    const R = NUC.r0 * (Math.cbrt(Ad) + Math.cbrt(4)), B = 2 * Zd * NUC.e2, b = B / Q;
+    // the integral, by Gauss-Chebyshev-friendly substitution r = R + (b - R) sin^2 u (smooth at the turning point)
+    n = n || 2000; let G = 0;
+    for (let i = 0; i < n; i++) { const u = (i + 0.5) / n * Math.PI / 2, r = R + (b - R) * Math.sin(u) ** 2, dr = (b - R) * 2 * Math.sin(u) * Math.cos(u) * Math.PI / 2 / n; G += Math.sqrt(Math.max(0, 2 * mu * (B / r - Q))) / NUC.hc * dr; }
+    const P = Math.exp(-2 * G), v = Math.sqrt(2 * Q / NUC.mAlpha) * NUC.c, f = v / (2 * R);
+    return { Zd, Ad, R, B, b, G, P, f, halfLife: Math.log(2) / (f * P), Vtop: B / R };
+  }
+  // measured values (Q value in MeV, half-life in s) for comparison
+  const YEAR = 3.15576e7;
+  const ALPHA = [
+    { name: 'polonium-212', sym: 'Po-212', Z: 84, A: 212, Q: 8.954, t: 0.299e-6 },
+    { name: 'polonium-214', sym: 'Po-214', Z: 84, A: 214, Q: 7.833, t: 164.3e-6 },
+    { name: 'radon-222', sym: 'Rn-222', Z: 86, A: 222, Q: 5.590, t: 3.8235 * 86400 },
+    { name: 'polonium-210', sym: 'Po-210', Z: 84, A: 210, Q: 5.407, t: 138.38 * 86400 },
+    { name: 'radium-226', sym: 'Ra-226', Z: 88, A: 226, Q: 4.871, t: 1600 * YEAR },
+    { name: 'uranium-234', sym: 'U-234', Z: 92, A: 234, Q: 4.858, t: 2.455e5 * YEAR },
+    { name: 'uranium-238', sym: 'U-238', Z: 92, A: 238, Q: 4.270, t: 4.468e9 * YEAR },
+    { name: 'thorium-232', sym: 'Th-232', Z: 90, A: 232, Q: 4.082, t: 1.405e10 * YEAR }
+  ];
+  // ---- end of core ----
+
+  const S = { E: 3, V: 5, a: 0.3, sig: 1.2, where: 'stm', mode: 'current', gap: 0.6, nuc: 0 };
+  let tab = 1, phase = 0, playing = false;
+  // the packet: a grid wider than the view so nothing reaches the edges while it is shown
+  const PK = { g: null, step: null, psi: null, t: 0, key: '' };
+  const DT = 0.004, X0 = -8, VIEW = [-14, 14];
+  function setupPacket() {
+    const key = [S.E, S.V, S.a, S.sig].join();
+    PK.g = makeGrid(-26, 26, 4161, x => x >= 0 && x <= S.a ? S.V : 0);
+    PK.step = makeStepper(PK.g, DT); PK.psi = packet(PK.g, X0, S.sig, Math.sqrt(S.E / H2M)); PK.t = 0; PK.key = key; PK.done = false;
+  }
+  // the microscope: a row of atoms 0.25 nm apart, with a step one atom high halfway along
+  const STEPX = 0.0, SURF = x => 0.02 * Math.cos(TAU * x / 0.25) + (x > STEPX ? 0.2 : 0);
+  const SCAN = { x: -1.6, dir: 1, trace: [], on: false, tipZ: 0.5 };
+  const I0 = 1, D0 = 0.5;                                   // 1 nA at a 0.5 nm gap
+  // half-lives in words
+  function human(t) {
+    if (t < 1e-3) return (t * 1e6 < 10 ? (t * 1e6).toFixed(2) : (t * 1e6).toFixed(0)) + ' µs';
+    if (t < 1) return (t * 1e3).toFixed(1) + ' ms';
+    if (t < 3600) return t.toFixed(0) + ' s';
+    if (t < 86400 * 2) return (t / 3600).toFixed(1) + ' hours';
+    if (t < YEAR * 2) return (t / 86400).toFixed(t < 86400 * 10 ? 1 : 0) + ' days';
+    if (t < YEAR * 1e6) return Math.round(t / YEAR).toLocaleString('en-US') + ' years';
+    if (t < YEAR * 1e9) return (t / YEAR / 1e6).toFixed(1) + ' million years';
+    return (t / YEAR / 1e9).toFixed(1) + ' billion years';
+  }
+  const sci = x => { const e = Math.floor(Math.log10(x)), m = x / Math.pow(10, e); return m.toFixed(1) + ' × 10' + String(e).replace('-', '⁻').replace(/[0-9]/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]); };
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  // the energy diagram with a wave drawn on it: potential V(x), the energy line, and |psi|^2 above the energy line,
+  // filled in one color. f(x) returns [re, im] of psi.
+  function waveView(ctx, b, xr, Vfun, E, f, scale, opts) {
+    const X = x => b.x + (x - xr[0]) / (xr[1] - xr[0]) * b.w, Ytop = 11, Y = e => b.y + b.h - e / Ytop * b.h;
+    // axes and gridlines in eV
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1;
+    for (let e = 0; e <= 10; e += 2) { ctx.beginPath(); ctx.moveTo(b.x, Y(e) + 0.5); ctx.lineTo(b.x + b.w, Y(e) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(e + '', b.x - 4, Y(e) + 3); }
+    ctx.textAlign = 'left'; ctx.fillText('energy (eV)', b.x, b.y - 6);
+    // the barrier
+    const px = Math.max(1, b.w / 900);
+    ctx.fillStyle = C('--barrier'); ctx.strokeStyle = C('--barrier-edge');
+    let inB = false, x0 = 0;
+    for (let i = 0; i <= b.w; i++) { const x = xr[0] + i / b.w * (xr[1] - xr[0]), v = Vfun(x); if (v > 0 && !inB) { inB = true; x0 = i; } if ((v <= 0 || i === b.w) && inB) { inB = false; const Vv = Vfun(xr[0] + (x0 + 0.5) / b.w * (xr[1] - xr[0])); ctx.fillRect(b.x + x0, Y(Vv), i - x0, Y(0) - Y(Vv)); ctx.strokeRect(b.x + x0 + 0.5, Y(Vv) + 0.5, i - x0, Y(0) - Y(Vv)); } }
+    // the wave: |psi|^2 above the energy line
+    const base = Y(E), n = Math.floor(b.w / px);
+    for (let i = 0; i < n; i++) {
+      const x = xr[0] + (i + 0.5) / n * (xr[1] - xr[0]), p = f(x), m = p[0] * p[0] + p[1] * p[1], h = Math.min(base - b.y, m * scale);
+      if (h < 0.3) continue;
+      ctx.fillStyle = 'rgba(29,79,115,0.45)'; ctx.fillRect(b.x + i * px, base - h, px + 0.6, h);
+    }
+    // outline of |psi|^2
+    ctx.strokeStyle = 'rgba(23,33,40,0.55)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = 0; i <= n; i++) { const x = xr[0] + i / n * (xr[1] - xr[0]), p = f(x), m = p[0] * p[0] + p[1] * p[1], y = base - Math.min(base - b.y, m * scale); i ? ctx.lineTo(b.x + i * px, y) : ctx.moveTo(b.x, y); }
+    ctx.stroke();
+    if (opts && opts.reim) {
+      const A = opts.reimScale;      // pixels per unit of psi
+      ['--re', '--im'].forEach((col, k) => { ctx.strokeStyle = C(col); ctx.lineWidth = 1.4; ctx.beginPath();
+        for (let i = 0; i <= n; i++) { const x = xr[0] + i / n * (xr[1] - xr[0]), p = f(x), y = base - Math.max(-(Y(0) - base), Math.min(base - b.y, p[k] * A)); i ? ctx.lineTo(b.x + i * px, y) : ctx.moveTo(b.x, y); }
+        ctx.stroke(); });
+      font(ctx, 10); ctx.textAlign = 'left'; ctx.fillStyle = C('--re'); ctx.fillText('real part', b.x + 4, b.y + 24); ctx.fillStyle = C('--im'); ctx.fillText('imaginary part', b.x + 60, b.y + 24);
+    }
+    // the energy line
+    ctx.strokeStyle = C('--energy'); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(b.x, base + 0.5); ctx.lineTo(b.x + b.w, base + 0.5); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--energy'); ctx.textAlign = 'left'; ctx.fillText('E = ' + E.toFixed(2) + ' eV', b.x + 4, base - 4 > b.y + 10 ? base - 6 : base + 14);
+    // x axis
+    ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(b.x, Y(0) + 0.5); ctx.lineTo(b.x + b.w, Y(0) + 0.5); ctx.stroke();
+    return { X, Y };
+  }
+  function xAxis(ctx, b, xr, step, label) {
+    const X = x => b.x + (x - xr[0]) / (xr[1] - xr[0]) * b.w;
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let x = Math.ceil(xr[0] / step) * step; x <= xr[1] + 1e-9; x += step) { ctx.fillRect(X(x), b.y + b.h, 1, 4); ctx.fillText((Math.abs(x) < 1e-9 ? 0 : +x.toFixed(2)).toString().replace('-', '−'), X(x), b.y + b.h + 15); }
+    ctx.fillStyle = C('--ink'); font(ctx, 11); ctx.fillText(label, b.x + b.w / 2, b.y + b.h + 30);
+  }
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    const b = { x: compact ? 34 : 44, y: 22, w: W - (compact ? 34 : 44) - 12, h: H - 22 - 40 };
+    if (tab === 1) {
+      const w = waveOn(S.E, S.V, S.a), xr = [-1.4, S.a + 1.4];
+      const f = x => mul(w.psi(x), cexp(c(0, -phase)));
+      waveView(ctx, b, xr, x => x >= 0 && x <= S.a ? S.V : 0, S.E, f, 1.0 / 11 * b.h, { reim: $('reim').checked, reimScale: 0.4 / 11 * b.h });
+      xAxis(ctx, b, xr, 0.5, 'position (nm)');
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+      if (!compact) { ctx.fillText('comes in from the left', b.x + 4, b.y + 12); ctx.textAlign = 'right'; ctx.fillText('what gets through: ' + (100 * w.T).toFixed(w.T < 0.001 ? 4 : w.T < 0.1 ? 2 : 1) + '%', b.x + b.w - 30, b.y + 12); }
+      return;
+    }
+    if (tab === 2) {
+      const g = PK.g, P2 = PK.psi, dx = g.dx;
+      const f = x => { const i = Math.round((x - g.x0) / dx); return i >= 0 && i < g.N ? [P2.pr[i], P2.pi[i]] : [0, 0]; };
+      waveView(ctx, b, VIEW, x => x >= 0 && x <= S.a ? S.V : 0, S.E, f, 6 / 11 * b.h, { reim: $('reim').checked, reimScale: 3 / 11 * b.h });
+      xAxis(ctx, b, VIEW, compact ? 4 : 2, 'position (nm)');
+      font(ctx, 12, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('t = ' + PK.t.toFixed(1) + ' fs', b.x + 4, b.y + 12);
+      return;
+    }
+    if (S.where === 'stm') drawSTM(ctx, W, H, compact); else drawAlpha(ctx, W, H, compact);
+  }
+  // the microscope, side view: atoms along the surface, the tip, and the electrons' current across the gap
+  function drawSTM(ctx, W, H, compact) {
+    const xr = [-1.8, 1.8], s = (W - 20) / (xr[1] - xr[0]), X = x => 10 + (x - xr[0]) * s, ybase = H * 0.78, Y = z => ybase - z * s;
+    // atoms
+    ctx.fillStyle = '#E6EBEF'; ctx.fillRect(0, ybase, W, H - ybase);
+    for (let x = -2; x <= 2; x += 0.25) { const top = x > STEPX ? 0.2 : 0; ctx.fillStyle = top ? '#A9B9C4' : '#BFCBD3'; ctx.beginPath(); ctx.arc(X(x), Y(top - 0.06), 0.125 * s, 0, TAU); ctx.fill(); ctx.strokeStyle = '#8E9BA3'; ctx.lineWidth = 1; ctx.stroke(); if (top) { ctx.fillStyle = '#BFCBD3'; ctx.beginPath(); ctx.arc(X(x), Y(-0.06), 0.125 * s, 0, TAU); ctx.fill(); ctx.stroke(); } }
+    // the tip: a cone ending in one atom
+    const tz = SCAN.tipZ, tx = SCAN.x, tipY = Y(tz + 0.06);
+    ctx.fillStyle = '#5C6B73'; ctx.beginPath(); ctx.moveTo(X(tx) - 0.9 * s, 0); ctx.lineTo(X(tx) + 0.9 * s, 0); ctx.lineTo(X(tx) + 0.1 * s, tipY - 0.1 * s); ctx.lineTo(X(tx) - 0.1 * s, tipY - 0.1 * s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#39444B'; ctx.beginPath(); ctx.arc(X(tx), tipY, 0.1 * s, 0, TAU); ctx.fill();
+    // the gap and the current
+    const gap = tz - SURF(tx), I = stmCurrent(gap, I0, D0);
+    ctx.strokeStyle = C('--energy'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(tx) + 0.22 * s, tipY + 0.1 * s); ctx.lineTo(X(tx) + 0.22 * s, Y(SURF(tx) + 0.06)); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--energy'); ctx.textAlign = 'left'; ctx.fillText('gap ' + gap.toFixed(2) + ' nm', X(tx) + 0.28 * s, (tipY + Y(SURF(tx))) / 2 + 4);
+    // a meter
+    const mx = compact ? 12 : 16, my = 18; font(ctx, 13, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText('current ' + (I >= 10 ? I.toFixed(0) : I >= 0.1 ? I.toFixed(2) : I.toFixed(4)) + ' nA', mx, my);
+    const bw = compact ? W * 0.45 : 220, frac = Math.max(0, Math.min(1, (Math.log10(I) + 3) / 6));
+    ctx.fillStyle = C('--soft'); ctx.fillRect(mx, my + 8, bw, 10); ctx.fillStyle = C('--energy'); ctx.fillRect(mx, my + 8, bw * frac, 10);
+    font(ctx, 9); ctx.fillStyle = C('--muted'); ['0.001', '1', '1000 nA'].forEach((t, k) => { ctx.textAlign = k === 0 ? 'left' : k === 1 ? 'center' : 'right'; ctx.fillText(t, mx + bw * k / 2, my + 30); });
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText('atoms 0.25 nm apart, with a step one atom high', W - 10, H - 8);
+  }
+  // alpha decay: the alpha particle's potential energy against distance from the center of the nucleus
+  function drawAlpha(ctx, W, H, compact) {
+    const n = ALPHA[S.nuc], g = gamow(n.Z, n.A, n.Q), rMax = 70, b = { x: compact ? 38 : 48, y: 22, w: W - (compact ? 38 : 48) - 14, h: H - 22 - 40 }, Etop = 35;
+    const X = r => b.x + r / rMax * b.w, Y = e => b.y + b.h - (e + 10) / (Etop + 10) * b.h;
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.strokeStyle = C('--soft');
+    for (let e = -10; e <= Etop; e += 10) { ctx.beginPath(); ctx.moveTo(b.x, Y(e) + 0.5); ctx.lineTo(b.x + b.w, Y(e) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(String(e).replace('-', '−'), b.x - 4, Y(e) + 3); }
+    ctx.textAlign = 'left'; ctx.fillText('energy (MeV)', b.x, b.y - 6);
+    xAxis(ctx, b, [0, rMax], 10, 'distance from the center of the nucleus (fm)');
+    // the potential: a well inside the nucleus, then the Coulomb wall falling as 1/r
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(0), Y(-8)); ctx.lineTo(X(g.R), Y(-8)); ctx.lineTo(X(g.R), Y(Math.min(Etop, g.B / g.R)));
+    for (let r = g.R; r <= rMax; r += 0.25) ctx.lineTo(X(r), Y(Math.min(Etop, g.B / r)));
+    ctx.stroke();
+    // the forbidden stretch at the alpha's energy: the barrier it must tunnel through
+    ctx.fillStyle = 'rgba(200,50,30,0.12)'; ctx.beginPath(); ctx.moveTo(X(g.R), Y(n.Q)); for (let r = g.R; r <= g.b; r += 0.2) ctx.lineTo(X(r), Y(Math.min(Etop, g.B / r))); ctx.lineTo(X(g.b), Y(n.Q)); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C('--energy'); ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(0), Y(n.Q)); ctx.lineTo(X(rMax), Y(n.Q)); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--energy'); ctx.textAlign = 'left'; ctx.fillText('alpha particle\'s energy ' + n.Q.toFixed(2) + ' MeV', X(g.R) + 6, Y(n.Q) - 6);
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+    ctx.fillText('barrier ' + (g.b - g.R).toFixed(0) + ' fm thick', X((g.R + g.b) / 2), Y(n.Q) + 16);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.fillText('nucleus', X(g.R / 2), Y(-8) - 6);
+    ctx.textAlign = 'left'; ctx.fillText('Coulomb barrier top ' + g.Vtop.toFixed(0) + ' MeV', X(g.R) + 6, b.y + 12);
+    // the alpha particle rattling around inside
+    const ax = X(g.R * (0.5 + 0.42 * Math.sin(phase * 3))); ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.arc(ax, Y(n.Q), 4, 0, TAU); ctx.fill();
+  }
+
+  // ---- the graph below: transmission against energy (tabs 1 and 2), the scan (STM), or half-life against energy (alpha)
+  function drawGraph() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 100) return;
+    const ml = tab === 3 && S.where === 'alpha' ? (compact ? 50 : 76) : compact ? 46 : 56, b = { x: ml, y: 24, w: W - ml - 14, h: H - 24 - 40 };
+    if (tab === 1 || tab === 2) {
+      const X = e => b.x + e / 10 * b.w, lo = -8, Y = T => b.y + b.h - (Math.log10(Math.max(T, 1e-8)) - lo) / -lo * b.h;
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1;
+      for (let p = lo; p <= 0; p += 2) { ctx.beginPath(); ctx.moveTo(b.x, Y(Math.pow(10, p)) + 0.5); ctx.lineTo(b.x + b.w, Y(Math.pow(10, p)) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(p === 0 ? '1' : '10' + String(p).replace('-', '⁻').replace(/[0-9]/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[d]), b.x - 4, Y(Math.pow(10, p)) + 3); }
+      for (let e = 0; e <= 10; e += 2) { ctx.beginPath(); ctx.moveTo(X(e) + 0.5, b.y); ctx.lineTo(X(e) + 0.5, b.y + b.h); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(e + '', X(e), b.y + b.h + 13); }
+      ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText('electron\'s energy (eV)', b.x + b.w / 2, b.y + b.h + 28);
+      ctx.textAlign = 'left'; ctx.fillText('chance of getting through, T (log scale)', b.x, b.y - 8);
+      // the barrier top
+      ctx.strokeStyle = C('--barrier-edge'); ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(S.V) + 0.5, b.y); ctx.lineTo(X(S.V) + 0.5, b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; if (S.V > 0.2) ctx.fillText('barrier top', X(S.V) + 4, b.y + b.h - 6);
+      // the packet's spread of energies (tab 2), shaded
+      if (tab === 2) {
+        const k0 = Math.sqrt(S.E / H2M), sk = 1 / (2 * S.sig);
+        ctx.fillStyle = 'rgba(29,79,115,0.12)'; ctx.beginPath(); ctx.moveTo(X(0), b.y + b.h);
+        for (let i = 0; i <= 300; i++) { const e = i / 300 * 10, k = Math.sqrt(e / H2M), p = Math.exp(-((k - k0) ** 2) / (2 * sk * sk)); ctx.lineTo(X(e), b.y + b.h - p * b.h * 0.9); }
+        ctx.lineTo(X(10), b.y + b.h); ctx.closePath(); ctx.fill();
+        font(ctx, 10); ctx.fillStyle = C('--body'); ctx.textAlign = 'left'; ctx.fillText('shaded: the packet\'s spread of energies', b.x + 6, b.y + 12);
+      }
+      ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+      ctx.strokeStyle = C('--body'); ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 600; i++) { const e = 0.02 + i / 600 * 9.98, T = transmission(e, S.V, S.a); i ? ctx.lineTo(X(e), Y(T)) : ctx.moveTo(X(e), Y(T)); }
+      ctx.stroke(); ctx.restore();
+      const T = transmission(S.E, S.V, S.a); ctx.fillStyle = C('--energy'); ctx.beginPath(); ctx.arc(X(S.E), Y(T), 5, 0, TAU); ctx.fill();
+      return;
+    }
+    if (S.where === 'stm') {
+      // the scan: what the microscope records along the line (tip height, or current)
+      const xr = [-1.8, 1.8], X = x => b.x + (x - xr[0]) / (xr[1] - xr[0]) * b.w, cc = S.mode === 'current';
+      const yr = cc ? [0.35, 0.85] : [-3, 3], Y = v => b.y + b.h - (v - yr[0]) / (yr[1] - yr[0]) * b.h;
+      ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      (cc ? [0.4, 0.5, 0.6, 0.7, 0.8] : [-3, -2, -1, 0, 1, 2, 3]).forEach(v => { ctx.fillText(cc ? v.toFixed(1) : (Math.pow(10, v) >= 1 ? Math.pow(10, v).toFixed(0) : Math.pow(10, v).toFixed(3 + Math.max(0, -v - 1))).replace(/0+$/, '').replace(/\.$/, ''), b.x - 4, Y(v) + 3); });
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(cc ? 'what it records: the tip\'s height (nm), adjusted to keep 1 nA flowing' : 'what it records: the current (nA, log scale) at a fixed tip height', b.x, b.y - 8);
+      xAxis(ctx, b, xr, 0.5, 'position along the surface (nm)');
+      ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip(); ctx.strokeStyle = C('--energy'); ctx.lineWidth = 2; ctx.beginPath();
+      SCAN.trace.forEach((p, i) => { const y = Y(cc ? p[1] : Math.log10(Math.max(1e-6, p[2]))); i && Math.abs(p[0] - SCAN.trace[i - 1][0]) < 0.1 ? ctx.lineTo(X(p[0]), y) : ctx.moveTo(X(p[0]), y); });
+      ctx.stroke(); ctx.restore();
+      if (!SCAN.trace.length) { font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('press Scan', b.x + b.w / 2, b.y + b.h / 2); }
+      return;
+    }
+    // Geiger-Nuttall: half-life against energy, model curves for polonium and uranium, measured points
+    const qr = [3.8, 9.2], X = q => b.x + (q - qr[0]) / (qr[1] - qr[0]) * b.w, lr = [-8, 19], Y = l => b.y + b.h - (l - lr[0]) / (lr[1] - lr[0]) * b.h;
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.strokeStyle = C('--soft');
+    [[-6, '1 µs'], [0, '1 s'], [Math.log10(86400), '1 day'], [Math.log10(YEAR), '1 yr'], [Math.log10(YEAR * 1e6), compact ? '10⁶ yr' : '1 million yr'], [Math.log10(YEAR * 1e9), compact ? '10⁹ yr' : '1 billion yr']].forEach(([l, t]) => { ctx.beginPath(); ctx.moveTo(b.x, Y(l) + 0.5); ctx.lineTo(b.x + b.w, Y(l) + 0.5); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(t, b.x - 4, Y(l) + 3); });
+    for (let q = 4; q <= 9; q++) { ctx.textAlign = 'center'; ctx.fillText(q + '', X(q), b.y + b.h + 13); }
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText('alpha particle\'s energy (MeV)', b.x + b.w / 2, b.y + b.h + 28);
+    ctx.textAlign = 'left'; ctx.fillText('half-life (log scale): tunneling model (lines) and measured (dots)', b.x, b.y - 8);
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+    [[84, 210, 'polonium'], [92, 236, 'uranium']].forEach(([Z, A, nm], k) => { ctx.strokeStyle = C('--model'); ctx.globalAlpha = k ? 0.5 : 1; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let q = qr[0]; q <= qr[1]; q += 0.02) { const l = Math.log10(gamow(Z, A, q).halfLife); q === qr[0] ? ctx.moveTo(X(q), Y(l)) : ctx.lineTo(X(q), Y(l)); } ctx.stroke(); ctx.globalAlpha = 1; });
+    ALPHA.forEach((n, i) => { ctx.fillStyle = C('--meas'); ctx.beginPath(); ctx.arc(X(n.Q), Y(Math.log10(n.t)), i === S.nuc ? 6 : 4, 0, TAU); ctx.fill(); if (i === S.nuc) { ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.stroke(); } });
+    ctx.restore();
+    font(ctx, 10); ctx.fillStyle = C('--model'); ctx.textAlign = 'left'; ctx.fillText('model: polonium (Z = 84), and paler, uranium (Z = 92)', b.x + 6, b.y + b.h - 8);
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  const pct = T => T < 1e-12 ? 'none' : (100 * T < 0.001 ? sci(100 * T) : 100 * T < 1 ? (100 * T).toFixed(3) : (100 * T).toFixed(1)) + '%';
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const w = waveOn(S.E, S.V, S.a), lam = TAU / w.k;
+      html = card('Gets through', pct(w.T), 'reflected: ' + pct(w.R) + '. Together, always 100%');
+      html += card('Wavelength outside', lam.toFixed(3) + ' nm', 'λ = h / p, with p = √(2mE)');
+      html += card('Inside the barrier', S.E < S.V ? 'decays in ' + (1 / w.kappa).toFixed(3) + ' nm' : 'oscillates', S.E < S.V ? 'κ = √(2m(V₀ − E))/ħ = ' + w.kappa.toFixed(1) + ' nm⁻¹; the wave falls by e for each 1/κ of width' : 'above the barrier top it is still a wave, with a longer wavelength, and can still reflect');
+    } else if (tab === 2) {
+      const g = PK.g, left = probIn(g, PK.psi, -30, 0), right = probIn(g, PK.psi, S.a, 30);
+      html = card('Probability past the barrier', pct(right), 'to the left: ' + pct(left) + '; inside the barrier: ' + pct(Math.max(0, 1 - left - right)));
+      html += card('For a single energy', pct(transmission(S.E, S.V, S.a)), 'what a steady wave at the packet\'s average energy would give');
+      html += card('Averaged over the packet', pct(packetT(Math.sqrt(S.E / H2M), S.sig, S.V, S.a)), 'the packet has a spread of energies; its faster parts get through more easily');
+    } else if (S.where === 'stm') {
+      const gap = SCAN.tipZ - SURF(SCAN.x), I = stmCurrent(gap, I0, D0);
+      html = card('Current', (I >= 10 ? I.toFixed(0) : I >= 0.1 ? I.toFixed(2) : I.toPrecision(2)) + ' nA', 'across a gap of ' + gap.toFixed(2) + ' nm of empty space');
+      html += card('Each 0.1 nm closer', '× ' + Math.exp(2 * stmKappa() * 0.1).toFixed(1), 'the current grows by this factor: e^(2κ × 0.1 nm), κ = ' + stmKappa().toFixed(1) + ' nm⁻¹ for a 4.5 eV work function');
+      html += card('Mode', S.mode === 'current' ? 'steady current' : 'steady height', S.mode === 'current' ? 'a feedback loop raises and lowers the tip to keep 1 nA flowing; its height traces the surface' : 'the tip stays put and the current rises and falls with the surface');
+    } else {
+      const n = ALPHA[S.nuc], g = gamow(n.Z, n.A, n.Q);
+      html = card('Chance per hit', '1 in ' + sci(1 / g.P).replace('1.0 × ', ''), 'the alpha particle hits the wall ' + sci(g.f) + ' times a second');
+      html += card('Half-life, from the model', human(g.halfLife), 'ln 2 / (hits per second × chance per hit)');
+      html += card('Half-life, measured', human(n.t), n.sym === 'Po-210' ? 'the model is off most here: polonium-210 has 126 neutrons, a closed nuclear shell this simple model ignores' : 'the simple model is within a factor of ' + Math.max(2, Math.round(Math.max(g.halfLife / n.t, n.t / g.halfLife))) + ', across a range of 24 powers of ten');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'An electron with less energy than a barrier\'s height meets the barrier. Classically it must bounce back. Predict: does any of its wave get through, and what happens to that as the barrier gets wider or taller?',
+         notes: '<p><b>What to try.</b> Start below the barrier top and widen the barrier: the part that gets through shrinks fast, by the same factor for each extra tenth of a nanometer. Raise the energy toward the top, then past it: above the top, some of the wave still reflects, and at certain energies none does (the dips toward 1 on the graph). Turn on the real and imaginary parts. On the left the incoming and reflected waves interfere, so the height ripples; on the right only one wave travels, so the height is flat.</p>' +
+                '<p><b>Why.</b> The electron\'s wave function ψ obeys the Schrödinger equation. Where <i>E</i> &gt; <i>V</i> it oscillates with wavenumber <i>k</i> = √(2<i>m</i>(<i>E</i> − <i>V</i>))/ħ; inside a barrier taller than <i>E</i> it cannot oscillate, but it does not stop dead either: it decays as e<sup>−κ<i>x</i></sup>, κ = √(2<i>m</i>(<i>V</i><sub>0</sub> − <i>E</i>))/ħ. If the barrier is thin enough, some of it is left at the far side and continues as a smaller wave. The share that gets through is <i>T</i> = [1 + <i>V</i><sub>0</sub><sup>2</sup> sinh<sup>2</sup>(κ<i>a</i>)/(4<i>E</i>(<i>V</i><sub>0</sub> − <i>E</i>))]<sup>−1</sup>, close to 16(<i>E</i>/<i>V</i><sub>0</sub>)(1 − <i>E</i>/<i>V</i><sub>0</sub>) e<sup>−2κ<i>a</i></sup> for a thick barrier: exponential in the width. The height of the shaded band is |ψ|<sup>2</sup>, the probability density, with the incoming wave\'s amplitude set to 1. It does not change in time; ψ itself does, turning between its real and imaginary parts about 10<sup>15</sup> times a second (shown slowed when you turn them on).</p>' +
+                '<p><b>The model.</b> An electron (ħ<sup>2</sup>/2<i>m</i> = 0.0381 eV nm<sup>2</sup>) and a rectangular barrier, solved exactly: a wave of one energy, steady in time, coming from the left.</p>' },
+    2: { lede: 'A real electron is not an endless wave but a packet, here a few nanometers long. Predict: when the packet meets the barrier, does part of the electron go through and part bounce back?',
+         notes: '<p><b>What to try.</b> Run the default packet and watch it split. Make the barrier wider, or lower the energy, and less gets through. Compare the share that ends up past the barrier with the single-energy value: they differ, because a short packet has a spread of energies (the shaded band on the graph), and its faster parts tunnel far more easily. Make the packet narrower and the spread widens. Watch the packet spread out as it travels, too.</p>' +
+                '<p><b>Why.</b> The packet is a superposition of waves with a range of energies; each one is transmitted with its own <i>T</i>. After the collision the wave function has two pieces, one moving left and one moving right, and |ψ|<sup>2</sup> integrated over each gives the probability of finding the electron there. It is one electron: a detector finds it in one place or the other, never half in each, but repeated many times the fractions match these areas. The spreading is the uncertainty principle at work: a packet confined to a small region has a spread of momenta, so its parts move at different speeds.</p>' +
+                '<p><b>The model.</b> The time-dependent Schrödinger equation solved step by step on a grid of 4161 points 0.0125 nm apart (the Crank–Nicolson method, which keeps the total probability exactly 1), in steps of 0.004 fs. The packet is a Gaussian 8 nm to the left of the barrier. Time runs about 10<sup>15</sup> times slower than in reality.</p>' },
+    3: { lede: 'Tunneling is not a curiosity: microscopes that see single atoms, and the decay of uranium, depend on it. Predict: how much does the current change if the tip moves 0.1 nm, about half an atom\'s width?',
+         notes: '<p><b>What to try.</b> Scanning tunneling microscope: scan with the current held steady and the tip\'s height traces the atoms and the step; switch to a steady height and watch the current jump by tens of times at the step. Move the tip up and down. Alpha decay: step through the nuclei, from polonium-212 (less than a microsecond) to thorium-232 (longer than the age of the universe), and watch how little the energy changes compared with the half-life.</p>' +
+                '<p><b>Why.</b> In a scanning tunneling microscope, electrons tunnel across the vacuum gap between a sharp tip and the surface, through a barrier about as high as the metal\'s work function (about 4.5 eV), so the current falls as e<sup>−2κ<i>d</i></sup>: roughly nine times for each 0.1 nm. That is why a microscope with an ordinary tip can resolve single atoms (Binnig and Rohrer, Nobel Prize 1986). In alpha decay (Gamow, 1928), an alpha particle rattles about inside the nucleus, hitting the Coulomb barrier around 10<sup>21</sup> times a second; each hit it gets through with a chance e<sup>−2<i>G</i></sup>, where <i>G</i> = ∫√(2μ(<i>V</i> − <i>E</i>))/ħ d<i>r</i> across the barrier. A small change in energy changes the barrier\'s thickness, and the exponential turns that into a change of half-life by many powers of ten: the Geiger–Nuttall law.</p>' +
+                '<p><b>The model.</b> STM: current ∝ e<sup>−2κ<i>d</i></sup>, set to 1 nA at a 0.5 nm gap, over a surface of atoms 0.25 nm apart with 0.02 nm bumps and a step one atom high. Alpha decay: a nucleus of radius 1.2 fm × (<i>A</i><sub>daughter</sub><sup>1/3</sup> + 4<sup>1/3</sup>), the alpha particle\'s energy the measured <i>Q</i> value, and hits per second <i>v</i>/2<i>R</i>. Measured half-lives from nuclear data tables.</p>' }
+  };
+
+  function visibility() {
+    const show = (id, on) => { $(id).hidden = !on; };
+    show('lab_E', tab !== 3); show('lab_V', tab !== 3); show('lab_a', tab !== 3); show('lab_sig', tab === 2);
+    show('lab_where', tab === 3); show('lab_mode', tab === 3 && S.where === 'stm'); show('lab_gap', tab === 3 && S.where === 'stm' && S.mode === 'height'); show('lab_nuc', tab === 3 && S.where === 'alpha');
+    show('lab_reim', tab !== 3); show('go', tab === 2 || (tab === 3 && S.where === 'stm')); show('reset', tab === 2 || (tab === 3 && S.where === 'stm'));
+    $('E_t').textContent = tab === 2 ? 'Packet\'s average energy' : 'Electron\'s energy';
+    if (tab === 2) $('go').textContent = PK.done ? 'Run again' : playing ? 'Pause' : PK.t > 0 ? 'Resume' : 'Go';
+    if (tab === 3) $('go').textContent = SCAN.on ? 'Stop' : 'Scan';
+    document.querySelectorAll('#where button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.where)));
+    document.querySelectorAll('#mode button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.mode)));
+    document.querySelectorAll('#nuc button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.nuc)));
+    $('hint').textContent = tab === 2 ? 'time slowed about 10¹⁵ times' : '';
+  }
+  function vals() {
+    $('E_v').textContent = S.E.toFixed(2) + ' eV'; $('V_v').textContent = S.V.toFixed(1) + ' eV'; $('a_v').textContent = S.a.toFixed(2) + ' nm';
+    $('sig_v').textContent = S.sig.toFixed(1) + ' nm'; $('gap_v').textContent = S.gap.toFixed(2) + ' nm';
+  }
+  function sync() { ['E', 'V', 'a', 'sig', 'gap'].forEach(id => { $(id).value = String(S[id]); }); vals(); }
+  function upd() { visibility(); vals(); readout(); draw(); }
+  function setTab(k) {
+    tab = k; playing = false; SCAN.on = false;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    if (k === 2) setupPacket();
+    sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  ['E', 'V', 'a', 'sig'].forEach(id => $(id).addEventListener('input', () => { S[id] = +$(id).value; if (tab === 2) { playing = false; setupPacket(); } upd(); }));
+  $('gap').addEventListener('input', () => { S.gap = +$('gap').value; SCAN.tipZ = S.gap; upd(); });
+  $('reim').addEventListener('change', draw);
+  ALPHA.forEach((n, i) => { const b = document.createElement('button'); b.dataset.v = String(i); b.textContent = n.sym; $('nuc').appendChild(b); b.addEventListener('click', () => { S.nuc = i; upd(); }); });
+  document.querySelectorAll('#where button').forEach(b => b.addEventListener('click', () => { S.where = b.dataset.v; SCAN.on = false; upd(); }));
+  document.querySelectorAll('#mode button').forEach(b => b.addEventListener('click', () => { S.mode = b.dataset.v; SCAN.trace = []; if (S.mode === 'height') SCAN.tipZ = S.gap; upd(); }));
+  $('go').addEventListener('click', () => {
+    if (tab === 2) { if (PK.done) { setupPacket(); playing = true; } else playing = !playing; }
+    else { SCAN.on = !SCAN.on; if (SCAN.on && SCAN.x >= 1.75) { SCAN.x = -1.75; SCAN.trace = []; } }
+    upd();
+  });
+  $('reset').addEventListener('click', () => { if (tab === 2) { playing = false; setupPacket(); } else { SCAN.on = false; SCAN.x = -1.6; SCAN.trace = []; SCAN.tipZ = S.mode === 'height' ? S.gap : SURF(SCAN.x) + D0; } upd(); });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (dt > 0 && !document.hidden) {
+      let busy = false;
+      if (!reduced) { phase = (phase + dt * TAU / 1.6) % (TAU * 1000); busy = tab === 1 || (tab === 3 && S.where === 'alpha'); }
+      if (tab === 2 && playing) {
+        // about 2.5 fs of electron time per second on screen
+        const n = Math.max(1, Math.round(2.5 * dt / DT));
+        for (let i = 0; i < n; i++) PK.step(PK.psi.pr, PK.psi.pi);
+        PK.t += n * DT;
+        // stop before anything reaches the edge of the grid
+        const edge = probIn(PK.g, PK.psi, -26, -20) + probIn(PK.g, PK.psi, 20, 26);
+        if (edge > 1e-3 || PK.t > 60) { playing = false; PK.done = true; visibility(); }
+        busy = true; readout();
+      }
+      if (tab === 3 && S.where === 'stm' && SCAN.on) {
+        SCAN.x += 0.35 * dt;
+        if (S.mode === 'current') SCAN.tipZ = SURF(SCAN.x) + D0; else SCAN.tipZ = S.gap;   // feedback: hold the gap that gives 1 nA
+        SCAN.trace.push([SCAN.x, SCAN.tipZ, stmCurrent(SCAN.tipZ - SURF(SCAN.x), I0, D0)]);
+        if (SCAN.x >= 1.75) { SCAN.on = false; visibility(); }
+        busy = true; readout();
+      }
+      if (busy) draw();
+    }
+    requestAnimationFrame(frame);
+  }
+  SCAN.tipZ = SURF(SCAN.x) + D0;
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

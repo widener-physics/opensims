@@ -16,6 +16,26 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'tunneling',
+    title: 'Quantum tunneling',
+    topic: 'modern',
+    tags: ['tunneling', 'wave function', 'Schrodinger equation', 'barrier', 'wave packet', 'transmission', 'scanning tunneling microscope', 'alpha decay', 'Gamow'],
+    blurb: "An electron meets a barrier taller than its energy, and part of its wave gets through. See the wave decay inside the barrier, watch a wave packet split in two, and see why a tunneling microscope can image single atoms and why alpha-decay half-lives range from a microsecond to billions of years.",
+    level: 'intermediate',
+    added: '2026-10-10',
+    status: 'ready'
+  },
+  {
+    slug: 'coriolis',
+    title: 'Turning frames: the Coriolis effect',
+    topic: 'rotation',
+    tags: ['Coriolis', 'centrifugal', 'rotating frame', 'fictitious forces', 'inertial frame', "Newton's first law", 'merry-go-round', 'reference frames'],
+    blurb: "A puck slid across a spinning merry-go-round, seen at once from above and from the platform: straight over the ground, curved on the platform. Play catch with a friend across the platform and miss until you aim off, then watch the centrifugal and Coriolis forces a rider needs to explain the curve.",
+    level: 'intro',
+    added: '2026-10-09',
+    status: 'ready'
+  },
+  {
     slug: 'collisions',
     title: 'Colliding carts',
     topic: 'dynamics',
