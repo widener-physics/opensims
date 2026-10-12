@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<!--
+  Radio waves - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The field lines of the
+  shaken charge, built from light rays, run along the exact Lienard-Wiechert field (itself checked against
+  Coulomb's law and Heaviside's field of a moving charge); the antenna's field satisfies Gauss's law in empty
+  space, has the right near and far limits, and its contour field lines run along it.
+  Credit: replaces PhET's Radio Waves & Electromagnetic Fields, a legacy simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio waves</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --line: #5C6B73; --charge: #1D4F73; --front: #C8321E; --rod: #8A6A42; --plus: #C8321E; --minus: #1D4F73;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 470; touch-action: pan-y; }
+  #scene.grab { touch-action: none; cursor: grab; }
+  #graph { aspect-ratio: 900 / 170; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.05; }
+    #graph { aspect-ratio: 1 / 0.55; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Radio waves</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Shake a charge</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Transmitter and receiver</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="Electric field lines around a moving charge or an antenna"></canvas>
+  <div class="row2">
+    <button id="go">Pause</button>
+    <button id="jolt" class="secondary">Jolt it</button>
+    <button id="reset" class="secondary">Reset</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="The transmitter's current and the push on the receiver's electrons against time"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_motion"><div>The charge</div>
+      <div class="seg" id="motion" role="group" aria-label="Motion"><button data-v="drag">move it by hand</button><button data-v="wiggle">wiggle steadily</button><button data-v="jolt">jolt it</button></div></div>
+    <label id="lab_f"><div class="row"><span>Frequency</span><span class="val" id="f_v"></span></div><input type="range" id="f" min="50" max="300" step="5"></label>
+    <label id="lab_A"><div class="row"><span>How far it moves each way</span><span class="val" id="A_v"></span></div><input type="range" id="A" min="0.02" max="0.4" step="0.01"></label>
+    <label id="lab_d"><div class="row"><span>Receiver's distance</span><span class="val" id="d_v"></span></div><input type="range" id="d" min="1.5" max="12" step="0.1"></label>
+    <div class="grp" id="lab_orient"><div>Receiving antenna</div>
+      <div class="seg" id="orient" role="group" aria-label="Receiving antenna"><button data-v="v">upright, like the transmitter</button><button data-v="h">lying flat</button></div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own: the light-ray field lines against the exact field of
+  //    a moving charge, and the antenna's field against Maxwell's equations. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: radiation from moving charges ----
+  // SI units, positions in meters, times in seconds. Motion is in the x-y plane of the picture; the field lines
+  // drawn are those in that plane.
+  const CLIGHT = 299792458;
+
+  // ---- 1. one charge, shaken ----
+  // The electric field lines of a point charge in any motion can be built from light: a field line is the set of
+  // points reached at time t by light rays that left the charge at every earlier time t', each leaving in the same
+  // direction as seen in the charge's own frame at that moment (n0), turned into our frame by the aberration of light.
+  // Where the charge sped up or slowed down, neighboring rays left in different directions and the line has a kink,
+  // and the kink travels outward at c: that is the radiation.
+  // aberration: a direction n0 in the charge's frame, seen in ours when the charge moves with velocity beta (in units of c)
+  function aberrate(n0, b) {
+    const b2 = b[0] * b[0] + b[1] * b[1]; if (b2 < 1e-30) return n0.slice();
+    const g = 1 / Math.sqrt(1 - b2), bn = b[0] * n0[0] + b[1] * n0[1], k = (g - 1) * bn / b2 + g;
+    const d = g * (1 + bn); return [(n0[0] + k * b[0]) / d, (n0[1] + k * b[1]) / d];
+  }
+  // a history of the charge: arrays t, x, y, vx, vy (oldest first), equally spaced in time with step h
+  function makeHistory(h, n) { return { h, t: new Float64Array(n), x: new Float64Array(n), y: new Float64Array(n), vx: new Float64Array(n), vy: new Float64Array(n), len: 0 }; }
+  // points of the field line leaving at angle th0 (charge's own frame), at time t, from every sample in the history
+  function fieldLine(H, t, th0, every) {
+    every = every || 1; const n0 = [Math.cos(th0), Math.sin(th0)], pts = [];
+    for (let i = H.len - 1; i >= 0; i -= every) {
+      const d = CLIGHT * (t - H.t[i]); if (d < 0) continue;
+      const n = aberrate(n0, [H.vx[i] / CLIGHT, H.vy[i] / CLIGHT]);
+      pts.push([H.x[i] + d * n[0], H.y[i] + d * n[1]]);
+    }
+    return pts;   // from the charge outward
+  }
+  // motions, as functions of time returning position and velocity (for testing, and for the set motions)
+  const wiggle = (A, f) => t => { const w = 2 * Math.PI * f; return t <= 0 ? { x: 0, y: 0, vx: 0, vy: 0 } : { x: 0, y: A * Math.sin(w * t), vx: 0, vy: A * w * Math.cos(w * t) }; };
+  // a jolt: from rest at y = 0 to rest at y = d, with a smooth (half-cosine) speed profile lasting T
+  const jolt = (d, T) => t => { if (t <= 0) return { x: 0, y: 0, vx: 0, vy: 0 }; if (t >= T) return { x: 0, y: d, vx: 0, vy: 0 };
+    const s = t / T; return { x: 0, y: d * (s - Math.sin(2 * Math.PI * s) / (2 * Math.PI)), vx: 0, vy: d / T * (1 - Math.cos(2 * Math.PI * s)) }; };
+  // the field itself (Lienard-Wiechert), in units of q / (4 pi eps0), at point r and time t, for a motion m(t):
+  // found at the retarded time, when light leaving the charge would arrive at r at time t
+  function lienardWiechert(m, r, t) {
+    // retarded time by bisection: c (t - tr) = |r - x(tr)|
+    let lo = t - 1e-6, hi = t;
+    const f = tr => { const s = m(tr); return CLIGHT * (t - tr) - Math.hypot(r[0] - s.x, r[1] - s.y); };
+    for (let i = 0; i < 200; i++) { const mid = (lo + hi) / 2; if (f(mid) > 0) lo = mid; else hi = mid; }
+    const tr = (lo + hi) / 2, s = m(tr), h = 1e-13, s1 = m(tr + h), s0 = m(tr - h);
+    const R = [r[0] - s.x, r[1] - s.y], Rl = Math.hypot(R[0], R[1]), n = [R[0] / Rl, R[1] / Rl];
+    const b = [s.vx / CLIGHT, s.vy / CLIGHT], bd = [(s1.vx - s0.vx) / (2 * h) / CLIGHT, (s1.vy - s0.vy) / (2 * h) / CLIGHT];
+    const k = 1 - n[0] * b[0] - n[1] * b[1], b2 = b[0] * b[0] + b[1] * b[1];
+    // velocity field (n - b)(1 - b^2) / (k^3 R^2) and radiation field n x ((n - b) x bd) / (c k^3 R)
+    const u = [n[0] - b[0], n[1] - b[1]], nb = n[0] * bd[0] + n[1] * bd[1], nu = n[0] * u[0] + n[1] * u[1];
+    // n x (u x bd) = u (n . bd) - bd (n . u)
+    const rad = [u[0] * nb - bd[0] * nu, u[1] * nb - bd[1] * nu];
+    const k3 = k * k * k;
+    return [u[0] * (1 - b2) / (k3 * Rl * Rl) + rad[0] / (CLIGHT * k3 * Rl), u[1] * (1 - b2) / (k3 * Rl * Rl) + rad[1] / (CLIGHT * k3 * Rl)];
+  }
+
+  // ---- 2. an antenna: an oscillating dipole along y, p(t) = p0 cos(w t), at the origin ----
+  // The exact field in the plane, in units of k^3 p0 / (4 pi eps0), at point (x, y), with rho = k r and theta measured
+  // from the antenna's axis (y). Near the antenna it is the dipole's own field; far away the radiation, falling as 1/r.
+  function dipoleE(x, y, k, wt) {
+    const r = Math.hypot(x, y), rho = k * r, ct = y / r, st = x / r, ph = rho - wt;
+    const c = Math.cos(ph), s = Math.sin(ph);
+    // real parts of e^{i ph} times the complex factors
+    const Eth = st * (-c / rho + s / (rho * rho) + c / (rho * rho * rho));  // (-1/rho - i/rho^2 + 1/rho^3)  (Jackson 9.18)
+    const Er = 2 * ct * (c / (rho * rho * rho) + s / (rho * rho));          // (1/rho^3 - i/rho^2)
+    // unit vectors: r-hat = (st, ct); theta-hat points toward increasing theta (away from the +y axis) = (ct, -st)
+    return [Er * st + Eth * ct, Er * ct - Eth * st];
+  }
+  // its field lines are the contours of a flux function Psi (constant along each line), so they can be drawn as contours
+  function dipolePsi(x, y, k, wt) {
+    const r = Math.hypot(x, y), rho = k * r, st = x / r, ph = rho - wt;
+    return st * st * (Math.cos(ph) / rho + Math.sin(ph));
+  }
+  // ---- end of core ----
+
+  // time runs slowed: 1 second on screen is SLOW seconds of the real thing
+  const SLOW = 8e-9, H = 0.02e-9, KEEP = 2400;          // history step 0.02 ns, 48 ns kept (light goes 14 m)
+  const S = { motion: 'wiggle', f: 100, A: 0.15, d: 6, orient: 'v' };
+  let tab = 1, playing = true, t = 0;
+  // the charge's recorded motion (ring of the last KEEP samples, oldest first when read out)
+  let hist = P1();
+  function P1() { const h = makeHistory(H, KEEP); return h; }
+  const Q = { x: 0, y: 0, vx: 0, vy: 0, target: null, joltStart: null, joltFrom: 0, joltTo: 0 };
+  const VMAX = 0.7 * CLIGHT, JOLT = { d: 0.5, T: 6e-9 };
+  function resetCharge() { hist = P1(); t = 0; Q.x = 0; Q.y = 0; Q.vx = 0; Q.vy = 0; Q.target = null; Q.aim = null; Q.joltStart = null; push(); }
+  function push() {
+    if (hist.len < KEEP) { const i = hist.len++; hist.t[i] = t; hist.x[i] = Q.x; hist.y[i] = Q.y; hist.vx[i] = Q.vx; hist.vy[i] = Q.vy; return; }
+    hist.t.copyWithin(0, 1); hist.x.copyWithin(0, 1); hist.y.copyWithin(0, 1); hist.vx.copyWithin(0, 1); hist.vy.copyWithin(0, 1);
+    const i = KEEP - 1; hist.t[i] = t; hist.x[i] = Q.x; hist.y[i] = Q.y; hist.vx[i] = Q.vx; hist.vy[i] = Q.vy;
+  }
+  const maxA = () => 0.8 * CLIGHT / (TAU * S.f * 1e6);   // the largest wiggle that keeps the charge under 0.8 c
+  const Aeff = () => Math.min(S.A, maxA());
+  let phase0 = 0;
+  // advance the charge by one step of the history
+  function stepCharge() {
+    t += H;
+    if (S.motion === 'wiggle') { const w = TAU * S.f * 1e6; Q.x = 0; Q.y = Aeff() * Math.sin(w * (t - phase0)); Q.vx = 0; Q.vy = Aeff() * w * Math.cos(w * (t - phase0)); }
+    else if (S.motion === 'jolt' && Q.joltStart !== null) {
+      const m = jolt(Q.joltTo - Q.joltFrom, JOLT.T)(t - Q.joltStart); Q.x = 0; Q.y = Q.joltFrom + m.y; Q.vx = 0; Q.vy = m.vy;
+    } else if (S.motion === 'drag' && Q.target) {
+      // follow the hand, smoothly (the hand's position is itself smoothed over ~2 ns, so the jumps between pointer
+      // events don't each make a kink), never faster than VMAX
+      if (!Q.aim) Q.aim = [Q.x, Q.y];
+      const a = H / 2e-9; Q.aim[0] += a * (Q.target[0] - Q.aim[0]); Q.aim[1] += a * (Q.target[1] - Q.aim[1]);
+      const w = 7e8, ax = w * w * (Q.aim[0] - Q.x) - 2 * w * Q.vx, ay = w * w * (Q.aim[1] - Q.y) - 2 * w * Q.vy;
+      Q.vx += ax * H; Q.vy += ay * H; const sp = Math.hypot(Q.vx, Q.vy); if (sp > VMAX) { Q.vx *= VMAX / sp; Q.vy *= VMAX / sp; }
+      Q.x += Q.vx * H; Q.y += Q.vy * H;
+    } else { Q.vx = 0; Q.vy = 0; }
+    push();
+  }
+  // the antenna screen: its own clock
+  let t2 = 0; const TR = []; // trace of [time, transmitter current, push on receiver]
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  // text with a halo in the panel's color, so it stays readable on top of field lines
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  function arrow(ctx, x0, y0, x1, y1, col, w, head) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head || 7, L * 0.6);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.6, y1 - uy * hd * 0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.5, y1 - uy * hd + ux * hd * 0.5); ctx.lineTo(x1 - ux * hd + uy * hd * 0.5, y1 - uy * hd - ux * hd * 0.5); ctx.closePath(); ctx.fill();
+  }
+  function scaleBar(ctx, x, y, s, m, lab) { ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + m * s, y); ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4); ctx.moveTo(x + m * s, y - 4); ctx.lineTo(x + m * s, y + 4); ctx.stroke(); font(ctx, 10); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(lab, x + m * s + 6, y + 3); }
+
+  function geom1(W, H) { const s = Math.min(W / 16, H / 12); return { s, cx: W / 2, cy: H / 2 }; }
+  function drawOne(ctx, W, H, compact) {
+    const g = geom1(W, H), s = g.s, X = x => g.cx + x * s, Y = y => g.cy - y * s;
+    // field lines: 24 directions, as seen by the charge
+    ctx.strokeStyle = C('--line'); ctx.lineWidth = 1.3;
+    const n = 24, every = compact ? 3 : 2;
+    for (let j = 0; j < n; j++) {
+      const pts = fieldLine(hist, t, (j + 0.5) / n * TAU, every);
+      ctx.beginPath(); ctx.moveTo(X(Q.x), Y(Q.y)); pts.forEach(p => ctx.lineTo(X(p[0]), Y(p[1])));
+      // beyond the oldest record the line carries straight on from where the charge was then
+      if (pts.length > 1) { const a = pts[pts.length - 2], b = pts[pts.length - 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; ctx.lineTo(X(b[0] + (b[0] - a[0]) / L * 30), Y(b[1] + (b[1] - a[1]) / L * 30)); }
+      ctx.stroke();
+    }
+    // the jolt's light front: how far light has gone since the jolt began and ended
+    if (S.motion === 'jolt' && Q.joltStart !== null) {
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = C('--front'); ctx.lineWidth = 1.2;
+      [[0, Q.joltFrom], [JOLT.T, Q.joltTo]].forEach(([dt, y0]) => { const r = CLIGHT * (t - Q.joltStart - dt); if (r > 0) { ctx.beginPath(); ctx.arc(X(0), Y(y0), r * s, 0, TAU); ctx.stroke(); } });
+      ctx.setLineDash([]);
+    }
+    // the charge
+    ctx.fillStyle = C('--charge'); ctx.beginPath(); ctx.arc(X(Q.x), Y(Q.y), 7, 0, TAU); ctx.fill();
+    font(ctx, 11, '700'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText('−', X(Q.x), Y(Q.y) + 4);
+    if (S.motion === 'drag' && !Q.target) { font(ctx, 12); ctx.fillStyle = C('--muted'); label(ctx, 'drag the charge', X(0), Y(0) + 26); }
+    scaleBar(ctx, 12, H - 14, s, 1, '1 m');
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    label(ctx, 't = ' + (t * 1e9).toFixed(1) + ' ns', W - 10, 16);
+    if (!compact) label(ctx, 'time slowed ' + Math.round(1 / SLOW / 1e6) + ' million times', W - 10, 31);
+  }
+
+  // the antenna screen: field lines as contours of the flux function, the transmitter at the left, the receiver
+  function geom2(W, H, compact) { const xr = compact ? [-1.2, 9] : [-1.6, 13.4], s = W / (xr[1] - xr[0]); return { s, X: x => (x - xr[0]) * s, Y: y => H / 2 - y * s, xr, yr: [-(H / 2) / s, (H / 2) / s] }; }
+  function drawTwo(ctx, W, H, compact) {
+    const g = geom2(W, H, compact), s = g.s, lam = CLIGHT / (S.f * 1e6), k = TAU / lam, wt = TAU * S.f * 1e6 * t2;
+    // contour the flux function on a grid
+    const step = compact ? 5 : 4, nx = Math.ceil(W / step), ny = Math.ceil(H / step), vals = new Float64Array((nx + 1) * (ny + 1));
+    for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) { const x = g.xr[0] + i * step / s, y = (H / 2 - j * step) / s; vals[j * (nx + 1) + i] = Math.hypot(x, y) < 0.2 ? NaN : dipolePsi(x, y, k, wt); }
+    ctx.strokeStyle = C('--line'); ctx.lineWidth = 1.2; ctx.beginPath();
+    const L0 = 0.2, NL = 5, row = nx + 1;   // levels (q + 1/2) L0 for q = -NL..NL-1
+    const cut = (a, b, L) => (L - a) / (b - a);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const v0 = vals[j * row + i], v1 = vals[j * row + i + 1], v2 = vals[(j + 1) * row + i + 1], v3 = vals[(j + 1) * row + i];
+      if (v0 !== v0 || v1 !== v1 || v2 !== v2 || v3 !== v3) continue;
+      const lo = Math.min(v0, v1, v2, v3), hi = Math.max(v0, v1, v2, v3);
+      const q0 = Math.max(-NL, Math.ceil(lo / L0 - 0.5)), q1 = Math.min(NL - 1, Math.floor(hi / L0 - 0.5));
+      const x0 = i * step, y0 = j * step;
+      for (let q = q0; q <= q1; q++) {
+        const L = (q + 0.5) * L0; let n = 0, ax0 = 0, ay0 = 0;
+        // edges: top (0-1), right (1-2), bottom (3-2), left (0-3)
+        const hit = (px, py) => { if (n === 0) { ax0 = px; ay0 = py; } else if (n === 1) { ctx.moveTo(ax0, ay0); ctx.lineTo(px, py); } else if (n === 2) { ax0 = px; ay0 = py; } else { ctx.moveTo(ax0, ay0); ctx.lineTo(px, py); } n++; };
+        if ((v0 < L) !== (v1 < L)) hit(x0 + cut(v0, v1, L) * step, y0);
+        if ((v1 < L) !== (v2 < L)) hit(x0 + step, y0 + cut(v1, v2, L) * step);
+        if ((v3 < L) !== (v2 < L)) hit(x0 + cut(v3, v2, L) * step, y0 + step);
+        if ((v0 < L) !== (v3 < L)) hit(x0, y0 + cut(v0, v3, L) * step);
+      }
+    }
+    ctx.stroke();
+    // the transmitting antenna: a short rod, its ends charged alternately, with the current sloshing along it
+    const ax = g.X(0), ay = g.Y(0), half = 0.3 * s, p = Math.cos(wt);
+    ctx.fillStyle = C('--panel'); ctx.beginPath(); ctx.arc(ax, ay, 0.2 * s, 0, TAU); ctx.fill();
+    ctx.strokeStyle = C('--rod'); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(ax, ay - half); ctx.lineTo(ax, ay + half); ctx.stroke();
+    const end = (y, q) => { const r = 3 + 6 * Math.abs(q); ctx.fillStyle = q > 0 ? C('--plus') : C('--minus'); ctx.globalAlpha = 0.3 + 0.7 * Math.abs(q); ctx.beginPath(); ctx.arc(ax, y, r, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; font(ctx, 10, '700'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; if (Math.abs(q) > 0.3) ctx.fillText(q > 0 ? '+' : '−', ax, y + 3.5); };
+    end(ay - half, p); end(ay + half, -p);
+    // the receiving antenna and the push on its electrons (the field along it)
+    const rx = g.X(S.d), ry = g.Y(0), E = dipoleE(S.d, 0, k, wt), along = S.orient === 'v' ? E[1] : E[0], scale = 0.12 * s / Math.max(1e-9, Math.hypot(...dipoleE(S.d, 0, k, 0)) + Math.hypot(...dipoleE(S.d, 0, k, Math.PI / 2)));
+    ctx.strokeStyle = C('--rod'); ctx.lineWidth = 5; ctx.beginPath();
+    if (S.orient === 'v') { ctx.moveTo(rx, ry - half); ctx.lineTo(rx, ry + half); } else { ctx.moveTo(rx - half, ry); ctx.lineTo(rx + half, ry); }
+    ctx.stroke();
+    // its electrons, pushed one way and the other (opposite to the field)
+    ctx.fillStyle = C('--minus');
+    for (let q = -2; q <= 2; q++) { const off = -along * scale * 1.5; if (S.orient === 'v') { ctx.beginPath(); ctx.arc(rx, ry + q * half * 0.4 - off, 2.6, 0, TAU); ctx.fill(); } else { ctx.beginPath(); ctx.arc(rx + q * half * 0.4 - off, ry, 2.6, 0, TAU); ctx.fill(); } }
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+    ctx.textAlign = ax < 40 ? 'left' : 'center'; label(ctx, 'transmitter', ax < 40 ? 4 : ax, ay + half + 16); ctx.textAlign = 'center'; label(ctx, 'receiver', rx, ry + half + 16);
+    // the light-travel distance marker
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ax, ry + half + 26); ctx.lineTo(rx, ry + half + 26); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); label(ctx, S.d.toFixed(1) + ' m: ' + (S.d / CLIGHT * 1e9).toFixed(1) + ' ns for light', (ax + rx) / 2, ry + half + 40);
+    scaleBar(ctx, 12, H - 14, s, 1, '1 m');
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; label(ctx, 'wavelength ' + lam.toFixed(2) + ' m · t = ' + (t2 * 1e9).toFixed(1) + ' ns', W - 10, 16);
+    if (!compact) label(ctx, 'time slowed ' + Math.round(1 / SLOW / 1e6) + ' million times', W - 10, 31);
+  }
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    if (tab === 1) drawOne(ctx, W, H, compact); else drawTwo(ctx, W, H, compact);
+  }
+  // the receiver's trace: transmitter current and the push on the receiver, against time
+  function drawGraph() {
+    if (tab !== 2) return;
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 80) return;
+    const b = { x: 12, y: 22, w: W - 24, h: H - 22 - 26 }, span = 3 / (S.f * 1e6), X = tt => b.x + b.w - (t2 - tt) / span * b.w, Y = v => b.y + b.h / 2 - v * b.h * 0.45;
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h); ctx.beginPath(); ctx.moveTo(b.x, b.y + b.h / 2); ctx.lineTo(b.x + b.w, b.y + b.h / 2); ctx.stroke();
+    font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = C('--rod'); ctx.fillText('current in the transmitter', b.x, b.y - 8);
+    ctx.fillStyle = C('--minus'); ctx.fillText('push on the receiver\'s electrons', b.x + (compact ? 150 : 190), b.y - 8);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText('last three periods, ' + (span * 1e9).toFixed(0) + ' ns; now at the right', b.x + b.w, b.y + b.h + 16);
+    const norm = TR.reduce((m, q) => Math.max(m, Math.abs(q[2])), 1e-12);
+    [[1, C('--rod'), 1], [2, C('--minus'), norm]].forEach(([k, col, nrm]) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); let pen = false;
+      TR.forEach(q => { if (q[0] < t2 - span) return; const xx = X(q[0]), yy = Y(q[k] / nrm); pen ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); pen = true; }); ctx.stroke(); });
+    if (S.orient === 'h') { font(ctx, 11); ctx.fillStyle = C('--minus'); ctx.textAlign = 'center'; ctx.fillText('lying flat, the receiver feels no push along its length', b.x + b.w / 2, b.y + b.h / 2 - 8); }
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    let html;
+    if (tab === 1) {
+      const beta = Math.hypot(Q.vx, Q.vy) / CLIGHT, lam = CLIGHT / (S.f * 1e6);
+      html = card('The charge\'s speed', (100 * beta).toFixed(0) + '% of c', 'exaggerated: electrons in a real antenna drift at a few millimeters per second; this one moves fast enough to bend its field lines visibly');
+      html += card(S.motion === 'wiggle' ? 'Wavelength' : 'Light travels', S.motion === 'wiggle' ? lam.toFixed(2) + ' m' : '30 cm per ns', S.motion === 'wiggle' ? 'c / f: the distance a kink travels during one wiggle; ' + S.f + ' MHz is in the FM radio band' : 'so the news that the charge moved spreads out at that speed, and no faster');
+      html += card('Far away', 'old news', 'the field ' + (CLIGHT * 20e-9).toFixed(0) + ' m out still points to where the charge was 20 ns ago');
+    } else {
+      const lam = CLIGHT / (S.f * 1e6), delay = S.d / CLIGHT;
+      html = card('Wavelength', lam.toFixed(2) + ' m', 'c / f at ' + S.f + ' MHz; loops of field pinch off and move out one every half period');
+      html += card('Delay', (delay * 1e9).toFixed(1) + ' ns', 'for the signal to cross ' + S.d.toFixed(1) + ' m: ' + (delay * S.f * 1e6).toFixed(2) + ' periods, so the receiver lags the transmitter by that much');
+      html += card('Receiver', S.orient === 'v' ? 'pushed up and down' : 'nothing', S.orient === 'v' ? 'the field at the receiver points along it, driving a current: that is the signal' : 'the field there points up and down, across this rod: turn it upright to pick up the signal');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'A charge sits still, its field lines pointing straight out. Predict: if you move it suddenly, does the whole field move with it at once, or does the change spread out? What happens to the field lines while it spreads?',
+         notes: '<p><b>What to try.</b> Jolt the charge and watch a kink race outward: inside the dashed circle the lines point to the charge\'s new position, outside it to the old one, and the kink joins them. Jolt it again. Wiggle it steadily and the kinks become a train of waves; a higher frequency packs them closer together. Move the charge by hand, slowly and then quickly: the faster you change its velocity, the sharper the kinks.</p>' +
+                '<p><b>Why.</b> No news travels faster than light, including the news that a charge has moved. Far away, the field still points to where the charge was when light left it; near the charge, the field has caught up. In between, the field lines must bend sideways to stay connected, and that sideways bend is a wave of electric field (with a magnetic field alongside) moving outward at <i>c</i>. Only acceleration makes a kink: a charge moving steadily drags its field along smoothly. This is how every antenna, light bulb and X-ray tube makes electromagnetic waves: by accelerating charges.</p>' +
+                '<p><b>The model.</b> Each field line is built from light rays that leave the charge at every past moment, in a fixed direction as the charge itself would see it; this gives the exact field lines of a point charge in any motion, and was checked against its exact (Liénard–Wiechert) field. The lines are those in the plane of the screen. The charge moves at up to 80% of the speed of light so that its kinks show; real electrons in an antenna move very slowly, and their waves are correspondingly faint, though many of them move together.</p>' },
+    2: { lede: 'A transmitter drives electrons up and down its antenna; a few meters away, a receiving antenna waits. Predict: when the transmitter starts, does the receiver respond at once? Does it matter which way the receiving antenna points?',
+         notes: '<p><b>What to try.</b> Watch the field lines near the transmitter stretch, pinch off into closed loops, and travel outward. Move the receiver farther away and compare its trace with the transmitter\'s: it lags by the time light takes to cross the gap. Change the frequency: higher frequency, shorter wavelength. Lay the receiving antenna flat, and the signal disappears.</p>' +
+                '<p><b>Why.</b> The charges sloshing up and down the antenna make an oscillating electric dipole. Close in, its field is the familiar dipole pattern, growing and shrinking with the charges; farther out, each half period a loop of field breaks free and moves off at the speed of light: radio waves, with wavelength λ = <i>c</i>/<i>f</i>. When the wave reaches the receiver, its electric field pushes the receiver\'s electrons back and forth along the rod, a small current that a radio amplifies. The field in the wave points parallel to the transmitting antenna (it is polarized), so a receiving rod lying across it feels no push along its length. Nothing at all goes out along the antenna\'s own line.</p>' +
+                '<p><b>The model.</b> A short antenna, treated as an oscillating electric dipole, with its exact field (near and far) in the plane containing the antenna; the field lines are drawn as contour lines of a flux function, which follow the field exactly. Real broadcast antennas are about half a wavelength long and their field is a little different close in. The receiver is assumed not to disturb the field.</p>' }
+  };
+
+  function visibility() {
+    const one = tab === 1;
+    $('lab_motion').hidden = !one; $('lab_A').hidden = !one || S.motion !== 'wiggle'; $('lab_f').hidden = one && S.motion !== 'wiggle';
+    $('lab_d').hidden = one; $('lab_orient').hidden = one; $('graph').hidden = one;
+    $('jolt').hidden = !(one && S.motion === 'jolt');
+    $('go').textContent = playing ? 'Pause' : 'Play';
+    document.querySelectorAll('#motion button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.motion)));
+    document.querySelectorAll('#orient button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.orient)));
+    $('hint').textContent = one && S.motion === 'drag' ? 'drag anywhere on the picture' : '';
+    $('scene').classList.toggle('grab', one && S.motion === 'drag');   // only take over touches when they move the charge
+  }
+  function vals() {
+    $('f_v').textContent = S.f + ' MHz'; $('d_v').textContent = S.d.toFixed(1) + ' m';
+    $('A_v').textContent = (100 * Aeff()).toFixed(0) + ' cm' + (S.A > maxA() ? ' (held to keep it below 0.8 c)' : '');
+  }
+  function sync() { $('f').value = String(S.f); $('A').value = String(S.A); $('d').value = String(S.d); vals(); }
+  function upd() { visibility(); vals(); readout(); draw(); }
+  function setTab(k) {
+    tab = k; playing = true;
+    [1, 2].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    resetCharge(); t2 = 0; TR.length = 0; sync(); upd();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#motion button').forEach(b => b.addEventListener('click', () => { S.motion = b.dataset.v; resetCharge(); phase0 = 0; upd(); }));
+  document.querySelectorAll('#orient button').forEach(b => b.addEventListener('click', () => { S.orient = b.dataset.v; TR.length = 0; upd(); }));
+  $('f').addEventListener('input', () => { S.f = +$('f').value; if (tab === 1) { resetCharge(); } else { TR.length = 0; } upd(); });
+  $('A').addEventListener('input', () => { S.A = +$('A').value; resetCharge(); upd(); });
+  $('d').addEventListener('input', () => { S.d = +$('d').value; TR.length = 0; upd(); });
+  $('go').addEventListener('click', () => { playing = !playing; upd(); });
+  $('reset').addEventListener('click', () => { resetCharge(); t2 = 0; TR.length = 0; upd(); });
+  $('jolt').addEventListener('click', () => { if (Q.joltStart !== null && t - Q.joltStart < JOLT.T) return; Q.joltFrom = Q.y; Q.joltTo = Q.y > 0.1 ? 0 : JOLT.d; Q.joltStart = t; });
+  window.addEventListener('resize', draw);
+  // dragging the charge
+  const sc = $('scene');
+  function toWorld(e) { const r = sc.getBoundingClientRect(), g = geom1(r.width, r.height); return [(e.clientX - r.left - g.cx) / g.s, (g.cy - (e.clientY - r.top)) / g.s]; }
+  let dragging = false;
+  sc.addEventListener('pointerdown', e => { if (tab !== 1 || S.motion !== 'drag') return; dragging = true; Q.target = toWorld(e); sc.setPointerCapture(e.pointerId); e.preventDefault(); });
+  sc.addEventListener('pointermove', e => { if (!dragging) return; const w = toWorld(e); Q.target = [Math.max(-6, Math.min(6, w[0])), Math.max(-4.5, Math.min(4.5, w[1]))]; });
+  const endDrag = () => { dragging = false; };
+  sc.addEventListener('pointerup', endDrag); sc.addEventListener('pointercancel', endDrag);
+  sc.addEventListener('keydown', e => {
+    if (tab !== 1 || S.motion !== 'drag') return;
+    const d = { ArrowLeft: [-0.3, 0], ArrowRight: [0.3, 0], ArrowUp: [0, 0.3], ArrowDown: [0, -0.3] }[e.key]; if (!d) return;
+    const base = Q.target || [Q.x, Q.y]; Q.target = [Math.max(-6, Math.min(6, base[0] + d[0])), Math.max(-4.5, Math.min(4.5, base[1] + d[1]))]; e.preventDefault();
+  });
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null, lastRead = 0;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (dt > 0 && !document.hidden && playing && !reduced) {
+      if (tab === 1) { const n = Math.round(dt * SLOW / H); for (let i = 0; i < n; i++) stepCharge(); }
+      else {
+        const lam = CLIGHT / (S.f * 1e6), k = TAU / lam, steps = 6;
+        for (let i = 0; i < steps; i++) { t2 += dt * SLOW / steps; const wt = TAU * S.f * 1e6 * t2, E = dipoleE(S.d, 0, k, wt); TR.push([t2, -Math.sin(wt), S.orient === 'v' ? -E[1] : -E[0]]); }
+        while (TR.length && TR[0][0] < t2 - 4 / (S.f * 1e6)) TR.shift();
+      }
+      drawScene(); drawGraph();
+      if (ts - lastRead > 150) { readout(); lastRead = ts; }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

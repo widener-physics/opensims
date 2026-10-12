@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'radio-waves',
+    title: 'Radio waves',
+    topic: 'em',
+    tags: ['radio waves', 'electromagnetic waves', 'radiation', 'accelerating charge', 'field lines', 'antenna', 'dipole', 'polarization', 'speed of light'],
+    blurb: "Jolt, wiggle or drag a charge and watch a kink in its field lines race outward at the speed of light: that kink is the wave. Then watch field loops pinch off an antenna and push the electrons in a receiver a few meters away, which only responds if it points the right way.",
+    level: 'intro',
+    added: '2026-10-11',
+    status: 'ready'
+  },
+  {
     slug: 'stern-gerlach',
     title: 'Stern–Gerlach: spin',
     topic: 'modern',
