@@ -16,6 +16,16 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'stern-gerlach',
+    title: 'Stern–Gerlach: spin',
+    topic: 'modern',
+    tags: ['spin', 'Stern-Gerlach', 'quantum measurement', 'magnetic moment', 'Bohr magneton', 'probability', 'superposition'],
+    blurb: "Silver atoms fly one at a time through a magnet and land in two spots, not the smear tiny compass needles would make. Then chain magnets at any angles, block beams, and watch measuring along x erase what was learned along z, with the split following cos²(θ/2).",
+    level: 'intermediate',
+    added: '2026-10-11',
+    status: 'ready'
+  },
+  {
     slug: 'tunneling',
     title: 'Quantum tunneling',
     topic: 'modern',

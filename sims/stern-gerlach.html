@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<!--
+  Stern-Gerlach: spin - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The deflection matches a
+  step-by-step integration; the oven's speed distribution and the classical smear were checked by sampling;
+  the expected screen pattern matches 300,000 simulated atoms; the spin probabilities match the spinor
+  overlap and the Pauli-matrix expectation; and rows of analyzers match 200,000 simulated atoms each.
+  Credit: replaces PhET's Stern-Gerlach Experiment, a Java simulation never moved to HTML5.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stern–Gerlach: spin</title>
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --atom: #3A4750; --up: #1D4F73; --down: #C8321E; --magnet: #5C6B73; --north: #C8321E; --south: #1D4F73; --plate: #E9EEF1; --deposit: #39444B;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 340; }
+  #graph { aspect-ratio: 900 / 200; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.95; }
+    #graph { aspect-ratio: 1 / 0.6; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Stern–Gerlach: spin</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>The original experiment</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Magnets in a row</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="Silver atoms passing through magnets"></canvas>
+  <div class="row2">
+    <button id="go">Start the atoms</button>
+    <button id="clear" class="secondary">Clear</button>
+    <label><input type="checkbox" id="expect"> <span id="expect_t">show what to expect</span></label>
+    <span class="hint" id="hint"></span>
+  </div>
+  <div class="row2" id="lab_preset"><span>Try:</span>
+    <span class="seg" id="preset" role="group" aria-label="Arrangements"><button data-v="zz">z then z</button><button data-v="zx">z then x</button><button data-v="zxz">z, x, z</button><button data-v="zbz">z, both x, z</button><button data-v="z60">z then 60°</button></span></div>
+  <canvas id="graph" aria-label="Where the atoms land"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_mode"><div>Silver atoms behave</div>
+      <div class="seg" id="mode" role="group" aria-label="Model"><button data-v="quantum">as they really do</button><button data-v="classical">like tiny compass needles</button><button data-v="off">magnet removed</button></div></div>
+    <label id="lab_G"><div class="row"><span>Magnet's field gradient</span><span class="val" id="G_v"></span></div><input type="range" id="G" min="0" max="1500" step="50"></label>
+    <label id="lab_T"><div class="row"><span>Oven temperature</span><span class="val" id="T_v"></span></div><input type="range" id="T" min="1000" max="1600" step="25"></label>
+    <div class="grp" id="lab_n"><div>Magnets</div>
+      <div class="seg" id="n" role="group" aria-label="Number of magnets"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div></div>
+    <label id="lab_a0"><div class="row"><span>Magnet 1's axis</span><span class="val" id="a0_v"></span></div><input type="range" id="a0" min="-180" max="180" step="5"></label>
+    <div class="grp" id="lab_p0"><div>Magnet 1 sends on</div>
+      <div class="seg" id="p0" role="group" aria-label="Magnet 1 sends on"><button data-v="up">the up beam</button><button data-v="down">the down beam</button><button data-v="both">both</button></div></div>
+    <label id="lab_a1"><div class="row"><span>Magnet 2's axis</span><span class="val" id="a1_v"></span></div><input type="range" id="a1" min="-180" max="180" step="5"></label>
+    <div class="grp" id="lab_p1"><div>Magnet 2 sends on</div>
+      <div class="seg" id="p1" role="group" aria-label="Magnet 2 sends on"><button data-v="up">the up beam</button><button data-v="down">the down beam</button><button data-v="both">both</button></div></div>
+    <label id="lab_a2"><div class="row"><span>Magnet 3's axis</span><span class="val" id="a2_v"></span></div><input type="range" id="a2" min="-180" max="180" step="5"></label>
+    <label id="lab_rate"><div class="row"><span>Atoms per second</span><span class="val" id="rate_v"></span></div><input type="range" id="rate" min="1" max="60" step="1"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement);
+  const C = n => css.getPropertyValue(n).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI, D2R = Math.PI / 180;
+
+  // ================================================================
+  // 1. MODEL
+  //    The block between the markers was tested on its own: the deflection, the oven's speeds, the expected
+  //    pattern against simulated atoms, the spin probabilities and rows of analyzers. It is copied in unchanged.
+  // ================================================================
+  // ---- physics core: the Stern-Gerlach experiment ----
+  // SI units. Silver atoms leave a hot oven, are narrowed to a beam, and pass between the poles of a magnet whose
+  // field grows steeply along z (gradient G). An atom's magnetic moment along z, mu_z, feels a force mu_z G along z,
+  // so the beam is deflected by that force for the time it spends in the magnet, and keeps drifting to the screen.
+  // Classically (a tiny magnet pointing any which way) mu_z can be anything from -mu to +mu; in fact a silver atom's
+  // moment along any axis is found only as +mu_B or -mu_B (spin 1/2).
+  const SG = { muB: 9.2740e-24, m: 107.8682 * 1.66054e-27, kB: 1.380649e-23, L: 0.035, D: 0 };   // magnet 3.5 cm long, screen at its end
+  // deflection along z of an atom with moment muz (J/T) and speed v, gradient G (T/m), magnet length L, drift D after it
+  const deflection = (muz, v, G, L, D) => muz * G / SG.m * (L * L / 2 + L * D) / (v * v);
+  // speeds in a beam leaving an oven at temperature T: f(v) ~ v^3 exp(-v^2 / vp^2), vp = sqrt(2 kT / m).
+  // With u = v^2 / vp^2 the distribution of u is u e^{-u}, the sum of two exponentials.
+  const vp = T => Math.sqrt(2 * SG.kB * T / SG.m);
+  const sampleSpeed = (T, rnd) => vp(T) * Math.sqrt(-Math.log(rnd() * rnd()));
+  const meanSpeed = T => 3 * Math.sqrt(Math.PI) / 4 * vp(T);
+  // a tiny classical magnet pointing in a random direction: mu_z = mu cos(theta) with cos(theta) evenly spread
+  const classicalMuz = rnd => SG.muB * (2 * rnd() - 1);
+
+  // The expected pattern across the screen (z, in m) at the middle of the beam, for G (T/m) and T (K): a histogram
+  // over nb bins from -zMax to zMax, for 'quantum' (mu_z = +-mu_B), 'classical' (mu_z spread evenly) or 'off'.
+  // Speeds enter through u = v^2/vp^2, distributed as u e^{-u}; quantiles of u and of mu_z are summed, each spread
+  // over the beam's own width (standard deviation sb).
+  // the normal distribution's cumulative probability (Abramowitz and Stegun 7.1.26, good to 1.5e-7)
+  function Phi(x) { const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x / 2); return x >= 0 ? (1 + y) / 2 : (1 - y) / 2; }
+  function gammaQuantile(p) { let lo = 0, hi = 60; for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2, cdf = 1 - Math.exp(-m) * (1 + m); if (cdf < p) lo = m; else hi = m; } return (lo + hi) / 2; }
+  const UQ = []; for (let i = 0; i < 400; i++) UQ.push(gammaQuantile((i + 0.5) / 400));
+  function pattern(mode, G, T, zMax, nb, sb) {
+    const h = new Float64Array(nb), dz = 2 * zMax / nb, c = SG.muB * G / SG.m * (SG.L * SG.L / 2 + SG.L * SG.D) / (vp(T) ** 2);
+    const ms = mode === 'quantum' ? [1, -1] : mode === 'off' ? [0] : Array.from({ length: 101 }, (_, i) => -1 + (i + 0.5) * 2 / 101);
+    const w = 1 / (ms.length * UQ.length), reach = Math.ceil(4 * sb / dz);
+    ms.forEach(m => UQ.forEach(u => {
+      const z = m * c / u, j0 = Math.floor((z + zMax) / dz);
+      for (let j = Math.max(0, j0 - reach); j <= Math.min(nb - 1, j0 + reach); j++) { const z0 = -zMax + j * dz; h[j] += w * (Phi((z0 + dz - z) / sb) - Phi((z0 - z) / sb)); }
+    }));
+    return h;
+  }
+
+  // ---- spin 1/2 along directions in the x-z plane ----
+  // An axis at angle a from +z toward +x. The state "up along a" is the spinor (cos a/2, sin a/2); "down along a" is
+  // up along a + 180 deg. The chance that a spin up along s is found up along a is |<a|s>|^2 = cos^2((a - s)/2).
+  const spinor = a => [Math.cos(a / 2), Math.sin(a / 2)];
+  const probUp = (s, a) => Math.cos((a - s) / 2) ** 2;
+  // measure along axis a a spin pointing along s (null: an atom straight from the oven, unpolarized): returns +1 or -1
+  // and the direction it now points along
+  function measure(s, a, rnd) {
+    const p = s === null ? 0.5 : probUp(s, a), up = rnd() < p;
+    return { up, s: up ? a : a + Math.PI };
+  }
+  // A row of analyzers: each { a: angle, pass: 'up' | 'down' | 'both' } (pass: which beam goes on to the next one; the
+  // last analyzer's beams both go to counters). Exact fractions of the atoms from the oven that end at each counter,
+  // worked out by following each beam's spin direction: a list of { k: analyzer index, up, frac, s }.
+  function expected(row) {
+    const out = []; let beams = [{ s: null, frac: 1 }];
+    row.forEach((an, k) => {
+      const next = [];
+      beams.forEach(bm => {
+        const pu = bm.s === null ? 0.5 : probUp(bm.s, an.a);
+        [[true, pu], [false, 1 - pu]].forEach(([up, p]) => {
+          const f = bm.frac * p, s = up ? an.a : an.a + Math.PI, last = k === row.length - 1;
+          if (f < 1e-15) { if (last || !(an.pass === 'both' || (an.pass === 'up') === up)) out.push({ k, up, frac: 0, s }); return; }
+          if (!last && (an.pass === 'both' || (an.pass === 'up') === up)) next.push({ s, frac: f, from: up });
+          else out.push({ k, up, frac: f, s });
+        });
+      });
+      beams = next;
+    });
+    // merge equal counters
+    const m = {}; out.forEach(o => { const key = o.k + (o.up ? '+' : '-'); m[key] = m[key] || { k: o.k, up: o.up, frac: 0 }; m[key].frac += o.frac; });
+    return Object.values(m);
+  }
+  // how much of the beam goes into each analyzer and out of each of its two exits (fractions of the oven's atoms)
+  function flows(row) {
+    let beams = [{ s: null, frac: 1 }]; const out = [];
+    row.forEach((an, k) => {
+      let fin = 0, up = 0, down = 0; const next = [];
+      beams.forEach(bm => { fin += bm.frac; const pu = bm.s === null ? 0.5 : probUp(bm.s, an.a); up += bm.frac * pu; down += bm.frac * (1 - pu);
+        if (k < row.length - 1) { if (an.pass !== 'down') next.push({ s: an.a, frac: bm.frac * pu }); if (an.pass !== 'up') next.push({ s: an.a + Math.PI, frac: bm.frac * (1 - pu) }); } });
+      out.push({ in: fin, up, down }); beams = next;
+    });
+    return out;
+  }
+  // one atom through the row: where it ends up
+  function runAtom(row, rnd) {
+    let s = null;
+    for (let k = 0; k < row.length; k++) {
+      const r = measure(s, row[k].a, rnd); s = r.s;
+      const last = k === row.length - 1, goesOn = !last && (row[k].pass === 'both' || (row[k].pass === 'up') === r.up);
+      if (!goesOn) return { k, up: r.up, s };
+    }
+  }
+  // ---- end of core ----
+
+  const rnd = Math.random;
+  const S = { mode: 'quantum', G: 1000, T: 1300, n: 3, a: [0, 90, 0], p: ['up', 'up'], rate: 6 };
+  let tab = 1, running = false;
+  // screen 1: atoms in flight and atoms on the plate (x across the beam, z the deflection, both in meters)
+  const ONE = { flying: [], plate: [], spawn: 0 };
+  const XW = 4e-4, SB = 1.5e-5, ZMAX = 4e-4, NB = 80;
+  function newAtom1() {
+    const v = sampleSpeed(S.T, rnd), muz = S.mode === 'quantum' ? (rnd() < 0.5 ? 1 : -1) * SG.muB : S.mode === 'off' ? 0 : classicalMuz(rnd);
+    const g = Math.sqrt(-2 * Math.log(rnd() || 1e-12)) * Math.cos(TAU * rnd());
+    const G = S.mode === 'off' ? 0 : S.G;
+    return { t: 0, v, muz, x: (2 * rnd() - 1) * XW, z0: g * SB, zEnd: g * SB + deflection(muz, v, G, SG.L, SG.D), G };
+  }
+  // screen 2: the row of magnets, and atoms traveling along the path their measurements choose
+  const TWO = { flying: [], counts: {}, sent: 0, done: 0, spawn: 0 };
+  const row = () => { const r = []; for (let k = 0; k < S.n; k++) r.push({ a: S.a[k] * D2R, pass: k < S.n - 1 ? S.p[k] : 'both' }); return r; };
+  function newAtom2() {
+    // decide its fate as it goes: a list of (analyzer, up?) steps, ending at a counter
+    const r = row(), steps = []; let s = null;
+    for (let k = 0; k < r.length; k++) { const m = measure(s, r[k].a, rnd); s = m.s; steps.push(m.up); const last = k === r.length - 1;
+      if (last || !(r[k].pass === 'both' || (r[k].pass === 'up') === m.up)) break; }
+    return { steps, t: 0 };
+  }
+  const fmtA = a => (a === 0 ? '0°' : (a > 0 ? '+' : '−') + Math.abs(a) + '°');
+  const axisName = a => { const m = ((a % 360) + 360) % 360; return m === 0 ? 'z' : m === 90 ? 'x' : m === 180 ? '−z' : m === 270 ? '−x' : fmtA(a); };
+
+  // ================================================================
+  // 2. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function arrow(ctx, x0, y0, x1, y1, col, w, head) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 2) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(head || 7, L * 0.6);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 2;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.6, y1 - uy * hd * 0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.5, y1 - uy * hd + ux * hd * 0.5); ctx.lineTo(x1 - ux * hd + uy * hd * 0.5, y1 - uy * hd - ux * hd * 0.5); ctx.closePath(); ctx.fill();
+  }
+  // a spin arrow pointing at angle a (radians from +z, toward +x): up on screen is +z, right is +x
+  function spinArrow(ctx, cx, cy, a, len, col) { const dx = Math.sin(a) * len, dy = -Math.cos(a) * len; arrow(ctx, cx - dx / 2, cy - dy / 2, cx + dx / 2, cy + dy / 2, col, 2, 6); }
+  function oven(ctx, x, y, w, h, compact) {
+    ctx.fillStyle = '#39444B'; ctx.fillRect(x, y - h / 2, w, h);
+    const g = ctx.createRadialGradient(x + w * 0.5, y, 2, x + w * 0.5, y, w * 0.6); g.addColorStop(0, '#F2A65A'); g.addColorStop(1, 'rgba(242,166,90,0)');
+    ctx.fillStyle = g; ctx.fillRect(x + 3, y - h / 2 + 3, w - 6, h - 6);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText(compact ? 'oven' : 'oven, silver', x + w / 2, y + h / 2 + 13);
+  }
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;            // a canvas squeezed to almost nothing: nothing sensible to draw
+    if (tab === 1) drawOne(ctx, W, H, compact); else drawTwo(ctx, W, H, compact);
+  }
+  // the original experiment: the apparatus from the side (left), the glass plate face on, magnified (right)
+  function drawOne(ctx, W, H, compact) {
+    const sideW = compact ? W : W * 0.58, sideH = compact ? H * 0.46 : H, cy = sideH * 0.5;
+    const xO = 12, xM0 = sideW * 0.38, xM1 = sideW * 0.72, xP = sideW * 0.86, zs = sideH * 0.3 / ZMAX;   // z drawn hugely magnified
+    oven(ctx, xO, cy, sideW * 0.1, 34, compact);
+    // slits
+    ctx.fillStyle = '#5C6B73'; [sideW * 0.2, sideW * 0.28].forEach(x => { ctx.fillRect(x, cy - 40, 3, 37); ctx.fillRect(x, cy + 3, 3, 37); });
+    // the magnet: a sharp pole above a grooved pole below, so the field is strongest near the top edge
+    const mag = S.mode !== 'off';
+    ctx.globalAlpha = mag ? 1 : 0.25;
+    const gapH = ZMAX * 1.12 * zs;      // the poles stand just outside the widest deflection drawn
+    ctx.fillStyle = C('--north'); ctx.fillRect(xM0, cy - sideH * 0.46, xM1 - xM0, sideH * 0.46 - gapH);
+    ctx.fillStyle = C('--south'); ctx.fillRect(xM0, cy + gapH, xM1 - xM0, sideH * 0.46 - gapH);
+    ctx.globalAlpha = 1;
+    font(ctx, 11, '700'); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; if (mag) { ctx.fillText('N', (xM0 + xM1) / 2, cy - sideH * 0.41 + 2); font(ctx, 10, '600'); ctx.fillText('S    magnet, 3.5 cm long', (xM0 + xM1) / 2, cy + sideH * 0.44); }
+    if (!mag) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.fillText('no magnet', (xM0 + xM1) / 2, cy + sideH * 0.44); }
+    // the plate (edge on)
+    ctx.fillStyle = '#8E9BA3'; ctx.fillRect(xP, cy - sideH * 0.38, 4, sideH * 0.76);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.fillText('glass plate', xP + 2, cy - sideH * 0.38 - 5);
+    // atoms in flight: their up-down position magnified enormously so the deflection shows
+    ctx.fillStyle = C('--atom');
+    ONE.flying.forEach(at => {
+      const f = at.t, x = xO + sideW * 0.1 + f * (xP - xO - sideW * 0.1);
+      const inM = Math.max(0, Math.min(1, (x - xM0) / (xM1 - xM0))), z = at.z0 + (at.zEnd - at.z0) * inM * inM;
+      if (Math.abs(z) < ZMAX * 1.1) { ctx.beginPath(); ctx.arc(x, cy - z * zs, 2.2, 0, TAU); ctx.fill(); }
+    });
+    if (!compact) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText('up-down deflection drawn about 100 times larger than life', 10, 14); }
+    // the plate face on, magnified
+    const px = compact ? 30 : W * 0.62, py = compact ? sideH + 22 : 30, pw = compact ? W - 60 : W * 0.36, ph = compact ? H - sideH - 40 : H - 60;
+    ctx.fillStyle = C('--plate'); ctx.fillRect(px, py, pw, ph); ctx.strokeStyle = C('--rule'); ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1);
+    const sx = pw / (2 * 6e-4), sz = ph / (2 * ZMAX), X = x => px + pw / 2 + x * sx, Z = z => py + ph / 2 - z * sz;
+    ctx.fillStyle = 'rgba(57,68,75,0.55)';
+    ONE.plate.forEach(d => { const yy = Z(d[1]); if (yy > py && yy < py + ph) ctx.fillRect(X(d[0]) - 0.8, yy - 0.8, 1.6, 1.6); });
+    font(ctx, 11, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('the plate, face on, magnified', px, py - 8);
+    // scale bar: 0.1 mm
+    const bar = 1e-4 * sz; ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px + pw - 12, py + ph - 10); ctx.lineTo(px + pw - 12, py + ph - 10 - bar); ctx.stroke();
+    font(ctx, 10); ctx.fillStyle = C('--ink'); ctx.textAlign = 'right'; ctx.fillText('0.1 mm', px + pw - 16, py + ph - 10 - bar / 2 + 3);
+  }
+
+  // the row of magnets, drawn as boxes with their axes, beams between them, and counters
+  function layoutTwo(W, H, compact) {
+    const n = S.n, x0 = compact ? 8 : 14, ow = compact ? W * 0.1 : W * 0.07, y = H * 0.52;
+    const span = W - x0 - ow - (compact ? 56 : 90), bw = Math.min(compact ? W * 0.16 : 110, span / (n * 1.9)), gap = (span - n * bw) / n;
+    const boxes = []; for (let k = 0; k < n; k++) { const bx = x0 + ow + gap * (k + 0.55) + bw * k; boxes.push({ x: bx, y, w: bw, h: Math.min(H * 0.42, bw * 1.15) }); }
+    return { x0, ow, y, boxes, outX: W - (compact ? 50 : 80), dy: Math.min(H * 0.17, 46) };
+  }
+  // the path an atom takes: points along the way, given its list of results
+  function path2(L, steps) {
+    const pts = [[L.x0 + L.ow, L.y]];
+    for (let k = 0; k < steps.length; k++) {
+      const b = L.boxes[k], up = steps[k], last = k === steps.length - 1, yo = L.y + (up ? -1 : 1) * L.dy * 0.55;
+      pts.push([b.x, L.y], [b.x + b.w, yo]);
+      if (last) { const stopX = k === S.n - 1 ? L.outX : b.x + b.w + Math.min(70, (L.boxes[k + 1] ? L.boxes[k + 1].x - b.x - b.w : 80) * 0.55); pts.push([stopX, L.y + (up ? -1 : 1) * L.dy]); }
+      else pts.push([(b.x + b.w + L.boxes[k + 1].x) / 2, L.y + (up ? -1 : 1) * L.dy * 0.35]);
+    }
+    return pts;
+  }
+  function counterPos(L, k, up) { const b = L.boxes[k], stopX = k === S.n - 1 ? L.outX : b.x + b.w + Math.min(70, (L.boxes[k + 1] ? L.boxes[k + 1].x - b.x - b.w : 80) * 0.55); return [stopX, L.y + (up ? -1 : 1) * L.dy]; }
+  function drawTwo(ctx, W, H, compact) {
+    const L = layoutTwo(W, H, compact), r = row(), fl = flows(r), show = $('expect').checked;
+    oven(ctx, L.x0, L.y, L.ow, 30, compact);
+    // beams: thickness by expected strength when asked
+    const beamW = f => show ? Math.max(1, 14 * f) : 1.5;
+    const line = (pts, wdt, col) => { ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.lineCap = 'round'; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); };
+    line([[L.x0 + L.ow, L.y], [L.boxes[0].x, L.y]], beamW(1), 'rgba(58,71,80,0.35)');
+    r.forEach((an, k) => {
+      const b = L.boxes[k];
+      [true, false].forEach(up => {
+        const f = up ? fl[k].up : fl[k].down, last = k === r.length - 1, goes = !last && (an.pass === 'both' || (an.pass === 'up') === up);
+        const yo = L.y + (up ? -1 : 1) * L.dy * 0.55, col = up ? 'rgba(29,79,115,0.4)' : 'rgba(200,50,30,0.4)';
+        if (goes) line([[b.x + b.w, yo], [(b.x + b.w + L.boxes[k + 1].x) / 2, L.y + (up ? -1 : 1) * L.dy * 0.35], [L.boxes[k + 1].x, L.y]], beamW(f), col);
+        else {
+          const cp = counterPos(L, k, up);
+          line([[b.x + b.w, yo], cp], beamW(f), col);
+          // the counter (or a block, for a beam not passed on)
+          const cnt = TWO.counts[k + (up ? '+' : '-')] || 0;
+          ctx.fillStyle = '#39444B'; ctx.fillRect(cp[0] - 3, cp[1] - 9, 6, 18);
+          font(ctx, compact ? 10 : 11, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+          const label = String(cnt) + (TWO.done ? ' (' + Math.round(100 * cnt / TWO.done) + '%)' : '');
+          ctx.fillText(label, Math.min(cp[0] + 6, W - ctx.measureText(label).width - 4), cp[1] + (up ? -6 : 14));
+          if (show) { font(ctx, 10); ctx.fillStyle = C('--muted'); const ex = 'expect ' + (100 * f).toFixed(f < 0.1 ? 1 : 0) + '%'; ctx.fillText(ex, Math.min(cp[0] + 6, W - ctx.measureText(ex).width - 4), cp[1] + (up ? -18 : 26)); }
+        }
+        // the spin arrow for the atoms leaving this exit
+        spinArrow(ctx, b.x + b.w + 12, yo + (up ? -12 : 12), up ? an.a : an.a + Math.PI, 14, up ? C('--up') : C('--down'));
+      });
+      // the magnet box with its axis
+      ctx.fillStyle = '#E9EEF1'; ctx.strokeStyle = C('--magnet'); ctx.lineWidth = 2; ctx.fillRect(b.x, b.y - b.h / 2, b.w, b.h); ctx.strokeRect(b.x, b.y - b.h / 2, b.w, b.h);
+      const rr = Math.min(b.w, b.h) * 0.3, cx = b.x + b.w / 2, cy = b.y;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.stroke();
+      spinArrow(ctx, cx, cy, an.a, rr * 1.7, C('--magnet'));
+      font(ctx, 11, '600'); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText('axis ' + axisName(S.a[k]), cx, b.y - b.h / 2 - 7);
+      if (show) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.fillText((100 * fl[k].in).toFixed(fl[k].in < 0.1 ? 1 : 0) + '% enter', cx, b.y + b.h / 2 + 13); }
+    });
+    // atoms in flight
+    TWO.flying.forEach(at => {
+      const pts = path2(L, at.steps); let lens = 0; const seg = []; for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); lens += d; }
+      let s = at.t * lens, i = 0; while (i < seg.length - 1 && s > seg[i]) { s -= seg[i]; i++; }
+      const f = Math.min(1, s / seg[i]), p = [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f];
+      ctx.fillStyle = C('--atom'); ctx.beginPath(); ctx.arc(p[0], p[1], 3.2, 0, TAU); ctx.fill();
+    });
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    if (!compact) ctx.fillText('axes as seen looking along the beam: 0° is z (up), 90° is x (to the right)', 10, H - 8);
+  }
+
+  // ---- the graph: the pattern across the plate (screen 1), or the counts at the last magnet (screen 2)
+  function drawGraph() {
+    const { ctx, W, H, compact } = fit($('graph'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 100) return;
+    const ml = compact ? 40 : 50, b = { x: ml, y: 22, w: W - ml - 14, h: H - 22 - 38 };
+    if (tab === 1) {
+      // histogram across the plate (z), atoms per bin, with the expected pattern
+      const dz = 2 * ZMAX / NB, cnt = new Float64Array(NB); ONE.plate.forEach(d => { const j = Math.floor((d[1] + ZMAX) / dz); if (j >= 0 && j < NB) cnt[j]++; });
+      const N = ONE.plate.length, ex = $('expect').checked ? pattern(S.mode === 'off' ? 'off' : S.mode, S.mode === 'off' ? 0 : S.G, S.T, ZMAX, NB, SB) : null;
+      let top = Math.max(5, ...cnt); if (ex) top = Math.max(top, ...Array.from(ex, e => e * Math.max(N, 1)));
+      const X = z => b.x + (z + ZMAX) / (2 * ZMAX) * b.w, Y = c => b.y + b.h - c / top * b.h;
+      ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+      for (let z = -0.4; z <= 0.401; z += 0.1) { ctx.fillRect(X(z * 1e-3), b.y + b.h, 1, 4); ctx.fillText((Math.abs(z) < 1e-9 ? '0' : z.toFixed(1)).replace('-', '−'), X(z * 1e-3), b.y + b.h + 14); }
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.fillText('up-down position on the plate (mm)', b.x + b.w / 2, b.y + b.h + 30);
+      ctx.textAlign = 'left'; ctx.fillText('atoms landing, ' + N + ' so far', b.x, b.y - 8);
+      ctx.fillStyle = 'rgba(57,68,75,0.6)'; for (let j = 0; j < NB; j++) if (cnt[j]) ctx.fillRect(X(-ZMAX + j * dz) + 0.5, Y(cnt[j]), b.w / NB - 1, b.y + b.h - Y(cnt[j]));
+      if (ex) { ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2; ctx.beginPath(); for (let j = 0; j < NB; j++) { const xx = X(-ZMAX + (j + 0.5) * dz), yy = Y(ex[j] * Math.max(N, 1)); j ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); } ctx.stroke();
+        font(ctx, 10); ctx.fillStyle = C('--hot'); ctx.textAlign = 'right'; ctx.fillText(N ? 'expected for this many atoms' : 'expected shape', b.x + b.w - 6, b.y + 12); }
+      return;
+    }
+    // screen 2: bars for every counter, counted against expected
+    const r = row(), ex = expected(r).sort((a, c) => a.k - c.k || (a.up ? -1 : 1)), N = TWO.done;
+    const bw = b.w / ex.length;
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(b.x, b.y, b.w, b.h);
+    const Y = f => b.y + b.h - f * b.h;
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; [0, 0.25, 0.5, 0.75, 1].forEach(f => { ctx.fillText(Math.round(f * 100) + '%', b.x - 4, Y(f) + 3); });
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('share of the atoms counted so far, at each counter (' + N + ' counted)', b.x, b.y - 8);
+    ex.forEach((e, i) => {
+      const c = (TWO.counts[e.k + (e.up ? '+' : '-')] || 0) / Math.max(1, N), x = b.x + i * bw;
+      ctx.fillStyle = e.up ? C('--up') : C('--down'); ctx.globalAlpha = 0.8; ctx.fillRect(x + bw * 0.2, Y(c), bw * 0.6, b.y + b.h - Y(c)); ctx.globalAlpha = 1;
+      if ($('expect').checked) { ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(x + bw * 0.12, Y(e.frac)); ctx.lineTo(x + bw * 0.88, Y(e.frac)); ctx.stroke(); ctx.setLineDash([]); }
+      font(ctx, compact ? 9 : 10); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText('magnet ' + (e.k + 1) + (e.up ? ' up' : ' down'), x + bw / 2, b.y + b.h + 14);
+    });
+    if ($('expect').checked) { font(ctx, 10); ctx.fillStyle = C('--ink'); ctx.textAlign = 'right'; ctx.fillText('dashed: expected', b.x + b.w - 6, b.y + 12); }
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 3. READOUTS AND CONTROLS
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const N = ONE.plate.length, up = ONE.plate.filter(d => d[1] > 0).length, sep = 2 * deflection(SG.muB, meanSpeed(S.T), S.G, SG.L, SG.D) * 1000;
+      html = card('Atoms on the plate', String(N), N ? (S.mode === 'off' ? 'all in one line' : Math.round(100 * up / N) + '% above the middle, ' + Math.round(100 * (N - up) / N) + '% below') : 'start the atoms');
+      html += card('Spots apart', S.mode === 'off' ? '–' : sep.toFixed(2) + ' mm', S.mode === 'quantum' ? 'for an atom at the average speed, ' + meanSpeed(S.T).toFixed(0) + ' m/s; slower atoms are deflected more' : S.mode === 'classical' ? 'tiny compass needles would not make spots at all: they would smear the beam over this whole range' : 'with no magnet, the beam goes straight');
+      html += card('Force on each atom', S.mode === 'off' ? 'none' : (SG.muB * S.G * 1e21).toFixed(1) + ' × 10⁻²¹ N', 'μ_B × field gradient, up or down; tiny, but a silver atom is only 1.8 × 10⁻²⁵ kg');
+    } else {
+      const r = row(), ex = expected(r), N = TWO.sent, last = S.n - 1;
+      const lu = TWO.counts[last + '+'] || 0, ld = TWO.counts[last + '-'] || 0, reach = lu + ld, f = flows(r)[last];
+      html = card('At the last magnet', reach ? Math.round(100 * lu / reach) + '% up, ' + Math.round(100 * ld / reach) + '% down' : '–', 'of the ' + reach + ' atoms that reached it (' + N + ' sent); expected ' + (f.in > 0 ? Math.round(100 * f.up / f.in) + '% up' : '—'));
+      const rule = S.n >= 2 ? 'chance of up: cos²(θ/2), θ the angle between the spin and the new axis' : 'atoms from the oven: half up, half down, along any axis';
+      html += card('The rule', S.n >= 2 ? 'cos²(θ/2)' : '50 : 50', rule);
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'Silver atoms stream from a hot oven through a magnet whose field is much stronger at the top than the bottom, and land on a glass plate. Each atom is a tiny magnet. Predict: what pattern builds up on the plate?',
+         notes: '<p><b>What to try.</b> Start the atoms as tiny compass needles first: pointing every which way, they would be pushed up or down by any amount, smearing the beam. Then switch to how silver atoms really behave: two separate spots, with nothing in between. Take the magnet away and they land in one line. Turn up the gradient and the spots move apart; heat the oven and the faster atoms are deflected less.</p>' +
+                '<p><b>Why.</b> A magnet in a field that changes from place to place feels a force: <i>F</i><sub>z</sub> = μ<sub>z</sub> d<i>B</i>/d<i>z</i>, where μ<sub>z</sub> is the part of its magnetic moment along the field. Classically μ<sub>z</sub> could be anything from −μ to +μ. Stern and Gerlach found, in 1922, only two values: the silver atom\'s magnetism along any direction you measure is either +μ<sub>B</sub> or −μ<sub>B</sub> (the Bohr magneton, 9.27 × 10<sup>−24</sup> J/T). It comes from one unpaired electron\'s spin, an intrinsic angular momentum of ħ/2 that, measured along any axis, is always found "up" or "down". Which one, for a given atom from the oven, is random: half and half. The spots are smeared sideways a little because the atoms leave the oven at different speeds, and slow atoms spend longer in the magnet.</p>' +
+                '<p><b>The model.</b> A magnet 3.5 cm long with a steady field gradient, the plate at its end, and an oven beam whose speeds follow <i>v</i><sup>3</sup>e<sup>−<i>mv</i><sup>2</sup>/2<i>kT</i></sup>; the beam itself is about 0.03 mm thick. Stern and Gerlach\'s real magnet had a gradient that varied across the beam, which bent their two lines into the shape of lips; here it is the same everywhere.</p>' },
+    2: { lede: 'Send atoms through magnets one after another, each turned to its own axis, and block one beam or pass it on. Predict: atoms that came out "up" along z go through a second z magnet. Then through an x magnet, and then z again. What comes out?',
+         notes: '<p><b>What to try.</b> Use the "Try" buttons. z then z: every atom that came out up comes out up again. z then x: half and half, as if the first magnet had done nothing. z, x, z: the z-down atoms are back, a quarter of those leaving the x magnet each way, though they had all been selected as up along z. Turn a magnet to any angle and watch the split follow cos²(θ/2). Turn on "show what to expect" for the beam strengths and the predicted shares.</p>' +
+                '<p><b>Why.</b> A spin-1/2 atom measured along an axis is found either up or down along it, and afterward it is in that state: measure the same axis again and you get the same answer every time. Measure along an axis at angle θ to its spin and the chance of "up" is cos²(θ/2): 1 for θ = 0, ½ for 90°, 0 for 180°. Which result a single atom gives is random; only the proportions are predictable, which is why the atoms are shown one at a time. Measuring along x leaves the atom up or down along x, which is an even mixture of up and down along z: the earlier z result is erased. That is not a flaw of the apparatus; there is no state that is up along both z and x.</p>' +
+                '<p><b>The model.</b> Ideal magnets that split the beam completely, with the beams kept apart: an atom that went through the "up" exit is up, and one through "down" is down. (If the two beams from a magnet were brought back together perfectly, with no trace of which way each atom went, the original state would be restored: the deeper puzzle Feynman discusses with his "modified Stern–Gerlach apparatus".) Axes are in the plane across the beam: 0° is z, 90° is x.</p>' }
+  };
+
+  const PRESETS = { zz: { n: 2, a: [0, 0, 0], p: ['up', 'up'] }, zx: { n: 2, a: [0, 90, 0], p: ['up', 'up'] }, zxz: { n: 3, a: [0, 90, 0], p: ['up', 'up'] }, zbz: { n: 3, a: [0, 90, 0], p: ['up', 'both'] }, z60: { n: 2, a: [0, 60, 0], p: ['up', 'up'] } };
+  function visibility() {
+    const one = tab === 1;
+    ['lab_mode', 'lab_G', 'lab_T'].forEach(id => { $(id).hidden = !one; });
+    ['lab_preset', 'lab_n', 'lab_a0', 'lab_rate'].forEach(id => { $(id).hidden = one; });
+    $('lab_a1').hidden = one || S.n < 2; $('lab_a2').hidden = one || S.n < 3; $('lab_p0').hidden = one || S.n < 2; $('lab_p1').hidden = one || S.n < 3;
+    $('go').textContent = running ? 'Pause' : 'Start the atoms';
+    $('expect_t').textContent = one ? 'show the expected pattern' : 'show what to expect';
+    const pr = (id, v) => document.querySelectorAll('#' + id + ' button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(v))));
+    pr('mode', S.mode); pr('n', S.n); pr('p0', S.p[0]); pr('p1', S.p[1]);
+    const pk = Object.keys(PRESETS).find(k => { const q = PRESETS[k]; return q.n === S.n && q.a.slice(0, S.n).every((v, i) => v === S.a[i]) && q.p.slice(0, S.n - 1).every((v, i) => v === S.p[i]); });
+    pr('preset', pk || '');
+    $('hint').textContent = !one && !running && TWO.sent === 0 ? 'atoms go one at a time' : '';
+  }
+  function vals() {
+    $('G_v').textContent = S.G + ' T/m'; $('T_v').textContent = S.T + ' K';
+    [0, 1, 2].forEach(k => { $('a' + k + '_v').textContent = fmtA(S.a[k]) + (axisName(S.a[k]) === 'z' || axisName(S.a[k]) === 'x' || axisName(S.a[k]) === '−z' || axisName(S.a[k]) === '−x' ? ' (' + axisName(S.a[k]) + ')' : ''); });
+    $('rate_v').textContent = String(S.rate);
+  }
+  function sync() { $('G').value = String(S.G); $('T').value = String(S.T); [0, 1, 2].forEach(k => { $('a' + k).value = String(S.a[k]); }); $('rate').value = String(S.rate); vals(); }
+  function clearAll() { ONE.flying = []; ONE.plate = []; TWO.flying = []; TWO.counts = {}; TWO.sent = 0; TWO.done = 0; }
+  function upd() { visibility(); vals(); readout(); draw(); }
+  function setTab(k) {
+    tab = k; running = false; clearAll();
+    [1, 2].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    sync(); upd();
+  }
+  [1, 2].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  const seg = (id, fn) => document.querySelectorAll('#' + id + ' button').forEach(b => b.addEventListener('click', () => { fn(b.dataset.v); upd(); }));
+  seg('mode', v => { S.mode = v; clearAll(); });
+  seg('n', v => { S.n = +v; clearAll(); });
+  seg('p0', v => { S.p[0] = v; clearAll(); });
+  seg('p1', v => { S.p[1] = v; clearAll(); });
+  seg('preset', v => { const q = PRESETS[v]; S.n = q.n; S.a = q.a.slice(); S.p = q.p.slice(); clearAll(); sync(); });
+  $('G').addEventListener('input', () => { S.G = +$('G').value; clearAll(); upd(); });
+  $('T').addEventListener('input', () => { S.T = +$('T').value; clearAll(); upd(); });
+  [0, 1, 2].forEach(k => $('a' + k).addEventListener('input', () => { S.a[k] = +$('a' + k).value; clearAll(); upd(); }));
+  $('rate').addEventListener('input', () => { S.rate = +$('rate').value; vals(); });
+  $('go').addEventListener('click', () => { running = !running; upd(); });
+  $('clear').addEventListener('click', () => { clearAll(); upd(); });
+  $('expect').addEventListener('change', draw);
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 4. LOOP
+  // ================================================================
+  let last = null, lastRead = 0;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (dt > 0 && !document.hidden) {
+      const busy = running || (tab === 1 ? ONE.flying.length : TWO.flying.length) > 0;
+      if (tab === 1) {
+        if (running) { ONE.spawn += dt * 150; while (ONE.spawn >= 1) { ONE.flying.push(newAtom1()); ONE.spawn--; } }
+        // atoms cross the picture in about 1.2 s, faster atoms a little quicker
+        ONE.flying.forEach(at => { at.t += dt / 1.2 * (at.v / 600); });
+        ONE.flying = ONE.flying.filter(at => { if (at.t >= 1) { ONE.plate.push([at.x, at.zEnd]); return false; } return true; });
+        if (ONE.plate.length > 20000) ONE.plate.splice(0, ONE.plate.length - 20000);
+      } else {
+        if (running) { TWO.spawn += dt * S.rate; while (TWO.spawn >= 1) { TWO.flying.push(newAtom2()); TWO.sent++; TWO.spawn--; } }
+        TWO.flying.forEach(at => { at.t += dt / (1.4 + 0.5 * at.steps.length); });
+        TWO.flying = TWO.flying.filter(at => { if (at.t >= 1) { const k = at.steps.length - 1, key = k + (at.steps[k] ? '+' : '-'); TWO.counts[key] = (TWO.counts[key] || 0) + 1; TWO.done++; return false; } return true; });
+      }
+      if (busy) { drawScene(); if (ts - lastRead > 150) { drawGraph(); readout(); lastRead = ts; } }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
