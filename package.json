@@ -1,0 +1,10 @@
+{
+  "name": "opensims",
+  "private": true,
+  "description": "Open Physics Sims: single-file physics simulations for teaching. No dependencies; this file only names the scripts.",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "build": "node deploy/add-analytics.js",
+    "test": "node tests/run.js && node deploy/add-analytics.test.js"
+  }
+}

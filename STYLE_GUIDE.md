@@ -6,7 +6,7 @@ This is what makes a simulation feel like part of the library rather than a stra
 
 A simulation is a single `.html` file. Everything it needs is inside it: CSS, JavaScript, and any images as inline SVG or data URLs. No external scripts, fonts, stylesheets, analytics, or CDN links, ever. The file must work when opened from a desktop with no network connection.
 
-This is the library's promise to teachers ("nothing loaded from anyone else's server") and it also means the file keeps working after it has been downloaded, emailed, or uploaded to a learning management system.
+This is the library's promise to teachers ("nothing to install, no accounts, no cookies, and each file works offline"), and it means the file keeps working after it has been downloaded, emailed, or uploaded to a learning management system. (A site that hosts the library may count its visitors; that is added when the site is deployed, never written into a simulation. See "Analytics" in README.md.)
 
 ## 2. Page structure
 

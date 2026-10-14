@@ -13,6 +13,8 @@ PROMPT.md         how to draft a simulation with an AI model, with the prompt to
 STYLE_GUIDE.md    what a simulation should look and behave like, and why
 style.json        the same rules in machine-readable form, for AI-assisted authoring
 tests/            physics tests, run against the sims as they ship (node tests/run.js)
+package.json      names the two scripts: npm test, npm run build (no dependencies)
+deploy/           the optional deploy step that adds a site owner's analytics (see Deploying)
 LICENSE           GPL v3
 README.md
 ```
@@ -56,7 +58,32 @@ To add a topic, add a key to `TOPICS` in `sims.js` with a display name and a col
 
 ## Deploying on Cloudflare Pages
 
-The whole site is static. In the Cloudflare dashboard: Workers & Pages → Create → Pages → connect the GitHub repository. Build command: none. Build output directory: `/`. Every push to `main` redeploys. Add a custom domain from the project's *Custom domains* tab.
+The whole site is static. In the Cloudflare dashboard: Workers & Pages → Create → Pages → connect the GitHub repository. Build command: `npm run build` (it runs `deploy/add-analytics.js`; there are no dependencies to install). Build output directory: `/`. Every push to `main` redeploys. Add a custom domain from the project's *Custom domains* tab.
+
+### Analytics (optional)
+
+The repository contains no analytics and never will: a fork, a clone or a downloaded file is clean. If you want
+to count visits to *your* deployment, give Cloudflare your analytics service's snippet and the deploy step adds it
+to the copy it serves. Without it, the deploy step does nothing, so forks need no changes.
+
+In the Pages project: *Settings → Variables and Secrets*, for **Production** only (so preview builds aren't counted):
+
+| Variable | Value |
+|---|---|
+| `ANALYTICS_SNIPPET` | the whole HTML snippet your service gives you for the page's `<head>` (Plausible, Umami, GoatCounter, …) |
+| `ANALYTICS_HOSTS` | the host name the site is served from, e.g. `opensims.wu-physics.net` (comma-separate several) |
+
+Then redeploy. The snippet goes into `index.html` and every page in `sims/` (not `TEMPLATE.html`), switched off
+by a three-line check unless the page is being viewed on one of `ANALYTICS_HOSTS`. The directory's *Download
+file* button cuts the block back out, so a downloaded simulation is byte-for-byte the file in this repository; and
+a page saved some other way (*Save as*) still sends nothing to anyone once it is opened from a USB stick or hosted
+on someone else's course site. A bad setting (no host, or a site ID instead of the snippet) stops the deploy with a message rather than
+deploying something half-working.
+
+To see the result without deploying: `ANALYTICS_SNIPPET='…' ANALYTICS_HOSTS=… node deploy/add-analytics.js --out /tmp/site`.
+The script refuses to edit the repository's own files; on Cloudflare it edits the build's throwaway copy.
+`node deploy/add-analytics.test.js` checks all of this. Other static hosts work the same way with `--out` as the
+build step and that directory as the output.
 
 ## License and contributions
 

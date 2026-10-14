@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Open Physics Sims</title>
-<meta name="description" content="Free, open, single-file physics simulations for teaching. No accounts, no tracking, nothing loaded from anyone else's server.">
+<meta name="description" content="Free, open, single-file physics simulations for teaching. Nothing to install, no accounts, no cookies, and each one works offline.">
 <style>
   :root {
     --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #E7EDF1;
@@ -104,7 +104,7 @@
   <div class="wrap">
     <p class="nameplate"><b>Open Physics Sims</b>, a shared library for teaching</p>
     <h1>Simulations you can read.</h1>
-    <p class="deck">Interactive physics for the classroom, each one a single file with the model written out in plain code. Nothing to install, no accounts, nothing loaded from anyone else's server. Open it, hand it to students, or download it and keep it.</p>
+    <p class="deck">Interactive physics for the classroom, each one a single file with the model written out in plain code. Nothing to install, no accounts, no cookies, and each file works offline. Open it, hand it to students, or download it and keep it.</p>
     <form class="search" role="search" onsubmit="return false">
       <input type="search" id="q" placeholder="Search by topic, concept, or apparatus" autocomplete="off" aria-label="Search simulations">
       <button type="button" id="clear" aria-label="Clear search">Clear</button>
@@ -243,6 +243,23 @@
   $('clear').addEventListener('click', () => { $('q').value = ''; state.q = ''; sync(); render(); $('q').focus(); });
   $('sort').addEventListener('change', () => { state.sort = $('sort').value; render(); });
   rail(); render();
+
+  // ---------- Downloads: the file exactly as it is in the repository ----------
+  // A deployment can add its owner's analytics to the pages (deploy/add-analytics.js). If this one has, "Download
+  // file" cuts that block back out before saving, so what people take away is the clean file. Otherwise the link
+  // is left to work as an ordinary download.
+  if (document.getElementById('site-analytics')) {
+    const save = (href, name) => { const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+    $('entries').addEventListener('click', e => {
+      const a = e.target.closest('a.dl'); if (!a) return;
+      e.preventDefault();
+      const href = a.getAttribute('href'), name = href.split('/').pop();
+      fetch(href).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(html => {
+        const url = URL.createObjectURL(new Blob([html.replace(/<!-- site-analytics:[\s\S]*?<!-- \/site-analytics -->\n/, '')], { type: 'text/html' }));
+        save(url, name); setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }).catch(() => save(href, name));   // if that fails, the ordinary download (whose analytics only run on this site)
+    });
+  }
 
   // ---------- Hero: a strobe photograph of a bouncing ball, drawn live ----------
   (function strobe() {
