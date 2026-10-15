@@ -107,5 +107,5 @@ Below those sizes the page is the stacked column described next, identical to th
 - [ ] At 1920x950, 1536x730 and 1366x650, every slider and button is on screen without scrolling, and no canvas label overlaps another.
 - [ ] Reduced-motion respected; loop pauses when hidden.
 - [ ] Home link, license header, "What to try", readouts with formulas.
-- [ ] Entry added to `sims.js` with a real `added` date.
+- [ ] Entry added to `sims.js` with a real `added` date, and a `pageTitle` in the words a teacher would search for if the title alone doesn't have them; then `npm run meta` to write the page's title and description.
 - [ ] Someone other than the author has tried it for two minutes without instructions.

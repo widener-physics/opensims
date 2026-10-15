@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- The link-preview picture (share.png, 1200 × 630) used by deploy/add-site-meta.js. To remake it, e.g. with your own
+     site name: open this file in a browser window sized 1200 × 630 and take a screenshot, or run
+     npx playwright screenshot --viewport-size=1200,630 tools/share-image.html share.png -->
+<html><head><meta charset="utf-8"><style>
+:root { --paper:#F2F5F7; --ink:#172128; --muted:#5C6B73; --blue:#1D4F73; --marigold:#E8A317; --grid:rgba(29,79,115,0.10);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif; --sans:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+html,body { margin:0; width:1200px; height:630px; overflow:hidden; background:var(--paper); color:var(--ink); }
+body { background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 28px 28px; }
+canvas { position:absolute; inset:0; }
+.t { position:absolute; left:80px; top:92px; width:640px; }
+.name { font:600 30px var(--sans); color:var(--blue); letter-spacing:.01em; margin:0 0 28px; }
+h1 { font:400 70px/1.06 var(--serif); margin:0 0 30px; }
+p { font:400 29px/1.4 var(--serif); color:var(--muted); margin:0; }
+.bar { position:absolute; left:80px; top:64px; width:64px; height:6px; background:var(--marigold); }
+</style></head><body>
+<canvas id="c" width="1200" height="630"></canvas>
+<div class="bar"></div>
+<div class="t"><div class="name">Open Physics Sims</div>
+<h1>Free interactive physics simulations for teaching</h1>
+<p>One file each. Open source. Works offline.</p></div>
+<script>
+// a strobe photograph of a bouncing ball, as on the home page
+const ctx = document.getElementById('c').getContext('2d'), G = 9.8, e = 0.72, vx = 0.75, S = 110, x0 = 760, y0 = 560;
+let t = 0, x = 0, y = 3.4, vy = 0, n = 0; const dt = 0.026;
+ctx.strokeStyle = 'rgba(23,33,40,0.35)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0 - 20, y0 + 8.5); ctx.lineTo(1180, y0 + 8.5); ctx.stroke();
+const pts = [];
+for (let k = 0; k < 4000 && x0 + x * S < 1150; k++) { vy -= G * dt; y += vy * dt; x += vx * dt; if (y < 0) { y = -y; vy = -vy * e; } pts.push([x0 + x * S, y0 - y * S]); }
+pts.forEach((p, i) => { if (i % 3) return; const a = 0.25 + 0.6 * i / pts.length; ctx.fillStyle = 'rgba(29,79,115,' + a.toFixed(2) + ')'; ctx.beginPath(); ctx.arc(p[0], p[1], 7.5, 0, 7); ctx.fill(); });
+const L = pts[pts.length - 1]; ctx.fillStyle = '#E8A317'; ctx.strokeStyle = '#172128'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(L[0], L[1], 10, 0, 7); ctx.fill(); ctx.stroke();
+</script></body></html>

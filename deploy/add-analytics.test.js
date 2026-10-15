@@ -22,7 +22,7 @@ let r = run([], {});
 ok(r.status === 0 && /not set/.test(r.stdout), 'no snippet: exits cleanly and says so');
 // 2. snippet set but not on Cloudflare: refuses to edit the repository in place
 r = run([], { ANALYTICS_SNIPPET: SNIPPET, ANALYTICS_HOSTS: HOSTS });
-ok(r.status === 1 && /only runs in a Cloudflare build/.test(r.stderr), 'snippet set outside Cloudflare without --out: refuses');
+ok(r.status === 1 && /only runs in a deploy build/.test(r.stderr), 'snippet set outside Cloudflare without --out: refuses');
 // 3. bad settings stop the deploy
 r = run(['--out', tmp()], { ANALYTICS_SNIPPET: SNIPPET });
 ok(r.status === 1 && /ANALYTICS_HOSTS is not/.test(r.stderr), 'snippet without hosts: stops with a message');
@@ -56,7 +56,7 @@ ok(fs.readFileSync(path.join(out, 'TEMPLATE.html'), 'utf8') === fs.readFileSync(
 ok(!fs.existsSync(path.join(out, '.git')), 'repository history not copied');
 // the directory page's download button cuts the block out with its own pattern: check that pattern gives back
 // exactly the repository's file, for every page
-const m = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').match(/html\.replace\((\/<!-- site-analytics:.*?\/)\s*,\s*''\)/);
+const m = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').match(/html\.replace\((\/<!-- site-.*?\/g?)\s*,\s*''\)/);
 ok(!!m, 'index.html has the download button\'s cleaning pattern');
 if (m) { const re = eval(m[1]); let clean = 0;
   pages.forEach(f => { if (fs.readFileSync(path.join(out, f), 'utf8').replace(re, '') === fs.readFileSync(path.join(ROOT, f), 'utf8')) clean++; });

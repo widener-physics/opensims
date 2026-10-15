@@ -1,6 +1,9 @@
 // One entry per simulation. Add a new sim by dropping its HTML file into /sims/ and adding an entry here.
 // Fields: slug (file name without .html), title, topic (one of the keys in TOPICS), tags (free-form),
 // blurb (one or two sentences), level ("intro" | "intermediate"), added (YYYY-MM-DD), status ("ready" | "beta").
+// Optional: pageTitle, the page's <title> for search engines, in the words people search for
+// ("Brachistochrone simulation: the fastest slide"); without it the <title> is the title plus "simulation".
+// Each sim's <title> and <meta name="description"> (the blurb) are written from here: run `npm run meta`.
 window.TOPICS = {
   kinematics:   { name: 'Kinematics & frames', color: '#1D4F73' },
   dynamics:     { name: 'Forces & momentum',   color: '#2E7D32' },
@@ -28,6 +31,7 @@ window.SIMS = [
   {
     slug: 'stern-gerlach',
     title: 'Stern–Gerlach: spin',
+    pageTitle: 'Stern–Gerlach experiment simulation: spin',
     topic: 'modern',
     tags: ['spin', 'Stern-Gerlach', 'quantum measurement', 'magnetic moment', 'Bohr magneton', 'probability', 'superposition'],
     blurb: "Silver atoms fly one at a time through a magnet and land in two spots, not the smear tiny compass needles would make. Then chain magnets at any angles, block beams, and watch measuring along x erase what was learned along z, with the split following cos²(θ/2).",
@@ -48,6 +52,7 @@ window.SIMS = [
   {
     slug: 'coriolis',
     title: 'Turning frames: the Coriolis effect',
+    pageTitle: 'Coriolis effect simulation: rotating frames',
     topic: 'rotation',
     tags: ['Coriolis', 'centrifugal', 'rotating frame', 'fictitious forces', 'inertial frame', "Newton's first law", 'merry-go-round', 'reference frames'],
     blurb: "A puck slid across a spinning merry-go-round, seen at once from above and from the platform: straight over the ground, curved on the platform. Play catch with a friend across the platform and miss until you aim off, then watch the centrifugal and Coriolis forces a rider needs to explain the curve.",
@@ -58,6 +63,7 @@ window.SIMS = [
   {
     slug: 'collisions',
     title: 'Colliding carts',
+    pageTitle: 'Collisions and momentum simulation: colliding carts',
     topic: 'dynamics',
     tags: ['momentum', 'collisions', 'elastic', 'inelastic', 'coefficient of restitution', 'impulse', "Newton's third law", 'center of mass', 'kinetic energy'],
     blurb: "Two lab carts collide with magnetic, spring, rubber or Velcro bumpers. Watch the bumpers squeeze in slow motion, with equal and opposite forces, while the momentum bars trade off and the kinetic energy drains into the bumpers and back, or into heat. A second view rides along with the center of mass, where every collision looks the same.",
@@ -68,6 +74,7 @@ window.SIMS = [
   {
     slug: 'induction',
     title: 'Electromagnetic induction',
+    pageTitle: 'Electromagnetic induction simulation: Faraday\'s and Lenz\'s laws',
     topic: 'em',
     tags: ["Faraday's law", "Lenz's law", 'induction', 'flux', 'emf', 'motional emf', 'right-hand rule', 'magnet', 'coil', 'prediction'],
     blurb: "Move a magnet through a coil and watch the flux and the emf graphed in real units, then measure how the peak emf depends on speed and turns. Pull a rod along rails in a magnetic field to find its terminal speed. Then predict which way the current in a loop will flow as you move a magnet or the loop, and check your reasoning against Lenz's law, step by step.",
@@ -78,6 +85,7 @@ window.SIMS = [
   {
     slug: 'polarization',
     title: 'Polarized light',
+    pageTitle: 'Polarized light simulation: polarizers and Malus\'s law',
     topic: 'optics',
     tags: ['polarization', "Malus's law", 'polarizer', "Brewster's angle", 'glare', 'wave plate', 'circular polarization', 'LCD'],
     blurb: "Watch the electric field of a light wave as it passes through polarizers, reflects off water as glare, and goes through quarter- and half-wave plates. Record a light meter to find Malus's law, the three-polarizer surprise, Brewster's angle, and why many small turns pass almost all the light.",
@@ -98,6 +106,7 @@ window.SIMS = [
   {
     slug: 'brachistochrone',
     title: 'The fastest slide',
+    pageTitle: 'Brachistochrone simulation: the fastest slide',
     topic: 'dynamics',
     tags: ['brachistochrone', 'cycloid', 'energy conservation', 'calculus of variations', 'Bernoulli', 'Galileo', 'tautochrone', 'frictionless'],
     blurb: "Bend a wire and race a bead down it against the straight line and your own best try: the shortest path is not the fastest. Then drag the end point and watch the cycloid, traced by a rolling circle, fit between the two points and beat every rival, Galileo's circular arc included.",
@@ -108,6 +117,7 @@ window.SIMS = [
   {
     slug: 'pulling-crate',
     title: 'Pulling a crate',
+    pageTitle: 'Friction simulation: pulling a crate at an angle',
     topic: 'dynamics',
     tags: ['vector components', 'normal force', 'friction', 'free-body diagram', 'angled pull', 'vector addition', 'net force', "Newton's second law"],
     blurb: "Pull a crate with a rope at an angle and watch the pull split into components: one drags it forward, the other lifts on it and lightens the load on the floor. Find the angle that starts it moving with the least force, then add a second rope and combine the pulls as vectors.",
@@ -118,6 +128,7 @@ window.SIMS = [
   {
     slug: 'driven-oscillator',
     title: 'Damped, driven oscillator',
+    pageTitle: 'Damped, driven oscillator simulation: resonance',
     topic: 'oscillations',
     tags: ['damping', 'critical damping', 'driven oscillator', 'resonance', 'phase lag', 'Q factor', 'transient', 'steady state', 'mass on a spring'],
     blurb: "A mass on a spring, slowed by a paddle in liquid and shaken by a motor. Watch swings die away and find critical damping, see the mass move with the motor, lag it by a quarter cycle, then oppose it, and build the resonance curve point by point as the motion settles.",
@@ -128,6 +139,7 @@ window.SIMS = [
   {
     slug: 'exoplanets',
     title: 'Finding exoplanets',
+    pageTitle: 'Exoplanet simulation: transits and radial velocity',
     topic: 'astronomy',
     tags: ['exoplanets', 'transit method', 'radial velocity', 'Doppler shift', "Kepler's third law", 'center of mass', 'density', 'light curve', 'limb darkening'],
     blurb: "Watch a star dim as a planet crosses it and wobble as the planet tugs on it, with data as noisy as the real thing. Find out why Earth-size planets are so hard to see, then measure a mystery planet's orbit, size and mass from its light curve and Doppler shifts, and decide whether it is rocky or gas-rich.",
@@ -138,6 +150,7 @@ window.SIMS = [
   {
     slug: 'ramp',
     title: 'A crate on a ramp',
+    pageTitle: 'Inclined plane simulation: a crate on a ramp with friction',
     topic: 'dynamics',
     tags: ['inclined plane', 'friction', 'static friction', 'kinetic friction', 'free-body diagram', 'work', 'energy', 'work-energy theorem', 'thermal energy'],
     blurb: "Push a crate up or down a ramp, or let it go and see whether it slides. A free-body diagram shows static friction holding until it can't, energy bars show your work turning into motion, height and heat with the books always balancing, and a mystery crate challenges you to measure both friction coefficients.",
@@ -148,6 +161,7 @@ window.SIMS = [
   {
     slug: 'photoelectric',
     title: 'The photoelectric effect',
+    pageTitle: 'Photoelectric effect simulation',
     topic: 'modern',
     tags: ['photoelectric effect', 'photons', 'work function', 'stopping voltage', "Planck's constant", 'Einstein', 'Millikan', 'quantum'],
     blurb: "Shine light on a metal in a vacuum tube and watch for electrons. Find the color below which no brightness will do, stop the fastest electrons with a battery, measure Planck's constant from your own stopping voltages, and identify a mystery metal by its work function.",
@@ -178,6 +192,7 @@ window.SIMS = [
   {
     slug: 'relativity',
     title: 'Moving clocks and the twin paradox',
+    pageTitle: 'Time dilation simulation: moving clocks and the twin paradox',
     topic: 'modern',
     tags: ['special relativity', 'time dilation', 'length contraction', 'simultaneity', 'light clock', 'twin paradox', 'Doppler'],
     blurb: "Light clocks on a platform and a passing train, with a switch to ride either one: each observer finds the other's clocks slow and short. A toggle shows why length contraction is forced. Then the twin paradox, told with birthday flashes, from Earth's frame and then the traveler's: when he turns round, his 'now' on Earth jumps forward 12.8 years.",
@@ -188,6 +203,7 @@ window.SIMS = [
   {
     slug: 'magnet-tube',
     title: 'Magnet falling through a copper tube',
+    pageTitle: 'Magnet in a copper tube simulation: eddy currents',
     topic: 'em',
     tags: ["Lenz's law", 'eddy currents', 'induction', 'terminal velocity', 'conductivity', 'energy'],
     blurb: 'Race one magnet down copper, aluminum, brass and slotted copper tubes, then ride along inside the wall to see the induced currents circling above and below it. The drag model has no fitted constants and reproduces a published measurement: two stacked discs fall more slowly than one or three.',
@@ -198,6 +214,7 @@ window.SIMS = [
   {
     slug: 'heat-engines',
     title: 'Heat engines on a PV diagram',
+    pageTitle: 'Heat engine simulation: PV diagrams and efficiency',
     topic: 'thermo',
     tags: ['PV diagram', 'first law', 'heat engine', 'efficiency', 'Carnot', 'Otto', 'Stirling', 'Brayton', 'refrigerator'],
     blurb: 'Run Carnot, Otto, Stirling and Brayton cycles beside a piston, with the work of each leg shaded as the area under it and the net work as the area the loop encloses. Or build your own cycle leg by leg, and find that the internal energy always returns to where it started while the work and heat depend on the route.',
@@ -208,6 +225,7 @@ window.SIMS = [
   {
     slug: 'newtons-cannon',
     title: "Newton's cannonball",
+    pageTitle: 'Newton\'s cannonball simulation: orbits and escape velocity',
     topic: 'astronomy',
     tags: ['orbits', 'gravitation', 'escape speed', 'Kepler', 'conic sections', 'projectile motion'],
     blurb: "Fire a cannon horizontally from a mountain above the air, harder and harder, and leave the shots on the screen to build Newton's family of curves. The path is the exact conic throughout, so you can watch the impact point race away, the perigee rise above the ground before circular speed is reached, and the ellipse finally refuse to close at escape speed.",
@@ -228,6 +246,7 @@ window.SIMS = [
   {
     slug: 'forces-1d',
     title: 'Forces in one dimension',
+    pageTitle: 'Newton\'s second law simulation: forces in one dimension',
     topic: 'dynamics',
     tags: ["Newton's laws", 'friction', 'free-body diagram', 'acceleration'],
     blurb: 'Push a crate while the graphs build up underneath, and watch the force trace look nothing like the velocity trace. A second screen plots friction against your push, showing the diagonal static region, the break-free point, and the flat sliding value that explains the lurch.',
@@ -238,6 +257,7 @@ window.SIMS = [
   {
     slug: 'laser',
     title: 'How a laser works',
+    pageTitle: 'Laser simulation: how stimulated emission works',
     topic: 'modern',
     tags: ['stimulated emission', 'population inversion', 'threshold', 'optical cavity', 'energy levels'],
     blurb: 'One atom first: absorption, spontaneous emission, and stimulated emission making a copy of the photon that caused it. Then a tube of atoms between mirrors, where a two-level scheme can never lase, three levels need a hard push, and four levels light up easily.',
@@ -288,6 +308,7 @@ window.SIMS = [
   {
     slug: 'rolling-race',
     title: 'Rolling race',
+    pageTitle: 'Rolling race simulation: moment of inertia',
     topic: 'rotation',
     tags: ['moment of inertia', 'rotational energy', 'rolling without slipping', 'inclined plane'],
     blurb: 'A hoop, disc, sphere, hollow sphere and sliding block race down the same ramp. Energy bars show how much each one has to put into spinning, which is exactly the order they finish in. Mass and radius change nothing.',
@@ -298,6 +319,7 @@ window.SIMS = [
   {
     slug: 'river-crossing',
     title: 'River crossing',
+    pageTitle: 'River crossing simulation: relative velocity',
     topic: 'kinematics',
     tags: ['relative velocity', 'vector addition', 'reference frames', 'optimization'],
     blurb: 'A boat crosses a flowing river. Set its heading and watch the two velocities add: fastest crossing, landing straight across, or least drift when the current wins. A water-frame view straightens the path.',
@@ -318,6 +340,7 @@ window.SIMS = [
   {
     slug: 'boat-walker',
     title: 'Walking on a boat',
+    pageTitle: 'Walking on a boat simulation: center of mass',
     topic: 'dynamics',
     tags: ['center of mass', 'momentum', 'drag', 'impulse'],
     blurb: 'A person walks the length of a floating boat. Without drag the boat slides back and stays; with linear drag it drifts home while the center of mass moves. Both cases side by side with x(t) plots.',

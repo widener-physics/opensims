@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Open Physics Sims</title>
+<title>Open Physics Sims: free interactive physics simulations for teaching</title>
 <meta name="description" content="Free, open, single-file physics simulations for teaching. Nothing to install, no accounts, no cookies, and each one works offline.">
 <style>
   :root {
@@ -170,24 +170,45 @@
   if (hash.get('topic') && (hash.get('topic') === 'all' || TOPICS[hash.get('topic')])) state.topic = hash.get('topic');
   if (hash.get('q')) { state.q = hash.get('q'); $('q').value = state.q; }
 
-  // ---------- Thumbnails: a schematic per topic in the topic color ----------
-  function thumb(sim) {
-    const c = TOPICS[sim.topic] ? TOPICS[sim.topic].color : '#5C6B73';
-    if (sim.thumb) return '<img src="' + sim.thumb + '" alt="">';
-    const glyph = {
-      kinematics: '<path d="M30 130 Q 120 -20 220 130" fill="none" stroke="C" stroke-width="3" stroke-dasharray="7 6"/><circle cx="125" cy="55" r="7" fill="C"/><rect x="40" y="130" width="60" height="18" rx="3" fill="C" opacity=".85"/><line x1="0" y1="152" x2="320" y2="152" stroke="C" stroke-width="2"/>',
-      dynamics: '<line x1="0" y1="118" x2="320" y2="118" stroke="C" stroke-width="2"/><rect x="70" y="80" width="110" height="38" rx="4" fill="C" opacity=".85"/><line x1="180" y1="99" x2="270" y2="99" stroke="C" stroke-width="3"/><path d="M262 92 L276 99 L262 106 Z" fill="C"/><line x1="125" y1="80" x2="125" y2="30" stroke="C" stroke-width="3"/><path d="M118 38 L125 24 L132 38 Z" fill="C"/>',
-      rotation: '<circle cx="160" cy="90" r="52" fill="none" stroke="C" stroke-width="3"/><circle cx="160" cy="90" r="6" fill="C"/><line x1="160" y1="90" x2="205" y2="64" stroke="C" stroke-width="3"/><path d="M212 40 A 60 60 0 0 1 226 80" fill="none" stroke="C" stroke-width="3"/><path d="M220 84 L230 78 L230 90 Z" fill="C"/>',
-      oscillations: '<path d="M0 90 C 30 30, 60 30, 90 90 S 150 150, 180 90 S 240 30, 270 90 S 330 150, 360 90" fill="none" stroke="C" stroke-width="3"/><path d="M0 90 C 45 50, 90 50, 135 90 S 225 130, 270 90 S 360 50, 405 90" fill="none" stroke="C" stroke-width="2" opacity=".45"/>',
-      thermo: '<rect x="70" y="40" width="180" height="100" rx="6" fill="none" stroke="C" stroke-width="3"/><path d="M90 125 C 130 60, 190 60, 230 55" fill="none" stroke="C" stroke-width="3"/><path d="M90 125 C 150 120, 200 100, 230 55" fill="none" stroke="C" stroke-width="3" stroke-dasharray="6 5"/>',
-      em: '<circle cx="110" cy="90" r="9" fill="C"/><circle cx="210" cy="90" r="9" fill="none" stroke="C" stroke-width="3"/><path d="M119 90 Q 160 30 201 90 M119 90 Q 160 150 201 90 M119 90 L201 90" fill="none" stroke="C" stroke-width="2" opacity=".7"/><path d="M110 20 Q 160 90 110 160 M210 20 Q 160 90 210 160" fill="none" stroke="C" stroke-width="2" opacity=".35"/>',
-      optics: '<line x1="0" y1="90" x2="320" y2="90" stroke="C" stroke-width="1.5" stroke-dasharray="4 5"/><path d="M150 30 Q 175 90 150 150 Q 125 90 150 30 Z" fill="C" opacity=".35" stroke="C" stroke-width="2"/><path d="M20 55 L150 55 L280 100 M20 125 L150 125 L280 80" fill="none" stroke="C" stroke-width="2.5"/>',
-      modern: '<circle cx="160" cy="90" r="8" fill="C"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5" transform="rotate(60 160 90)"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5" transform="rotate(-60 160 90)"/>',
-      astronomy: '<circle cx="150" cy="95" r="12" fill="C"/><ellipse cx="160" cy="95" rx="110" ry="46" fill="none" stroke="C" stroke-width="2.5"/><ellipse cx="156" cy="95" rx="60" ry="24" fill="none" stroke="C" stroke-width="2" stroke-dasharray="5 5"/><circle cx="262" cy="70" r="6" fill="C"/><circle cx="102" cy="112" r="4" fill="C"/>',
-      materials: '<path d="M20 60 L130 60 Q 160 60 160 90 Q 160 120 190 120 L300 120" fill="none" stroke="C" stroke-width="3"/><path d="M20 120 L130 120 Q 160 120 160 150 Q 160 180 190 180 L300 180" fill="none" stroke="C" stroke-width="3" transform="translate(0,-25)"/><circle cx="60" cy="50" r="5" fill="C"/><circle cx="95" cy="50" r="5" fill="C"/><circle cx="230" cy="105" r="5" fill="none" stroke="C" stroke-width="2"/><circle cx="265" cy="105" r="5" fill="none" stroke="C" stroke-width="2"/>'
-    }[sim.topic] || '<circle cx="160" cy="90" r="40" fill="none" stroke="C" stroke-width="3"/>';
-    return '<svg viewBox="0 0 320 180" aria-hidden="true"><rect width="320" height="180" fill="#fff"/>' + glyph.split('C"').join(c + '"') + '</svg>';
+  // ---- cards: one directory entry as HTML. Also run when the site is deployed (deploy/add-site-meta.js), to write
+  // the list into the page for search engines that don't run scripts, so keep it free of anything but TOPICS. ----
+  function cards(TOPICS) {
+    // ---------- Thumbnails: a schematic per topic in the topic color ----------
+    function thumb(sim) {
+      const c = TOPICS[sim.topic] ? TOPICS[sim.topic].color : '#5C6B73';
+      if (sim.thumb) return '<img src="' + sim.thumb + '" alt="">';
+      const glyph = {
+        kinematics: '<path d="M30 130 Q 120 -20 220 130" fill="none" stroke="C" stroke-width="3" stroke-dasharray="7 6"/><circle cx="125" cy="55" r="7" fill="C"/><rect x="40" y="130" width="60" height="18" rx="3" fill="C" opacity=".85"/><line x1="0" y1="152" x2="320" y2="152" stroke="C" stroke-width="2"/>',
+        dynamics: '<line x1="0" y1="118" x2="320" y2="118" stroke="C" stroke-width="2"/><rect x="70" y="80" width="110" height="38" rx="4" fill="C" opacity=".85"/><line x1="180" y1="99" x2="270" y2="99" stroke="C" stroke-width="3"/><path d="M262 92 L276 99 L262 106 Z" fill="C"/><line x1="125" y1="80" x2="125" y2="30" stroke="C" stroke-width="3"/><path d="M118 38 L125 24 L132 38 Z" fill="C"/>',
+        rotation: '<circle cx="160" cy="90" r="52" fill="none" stroke="C" stroke-width="3"/><circle cx="160" cy="90" r="6" fill="C"/><line x1="160" y1="90" x2="205" y2="64" stroke="C" stroke-width="3"/><path d="M212 40 A 60 60 0 0 1 226 80" fill="none" stroke="C" stroke-width="3"/><path d="M220 84 L230 78 L230 90 Z" fill="C"/>',
+        oscillations: '<path d="M0 90 C 30 30, 60 30, 90 90 S 150 150, 180 90 S 240 30, 270 90 S 330 150, 360 90" fill="none" stroke="C" stroke-width="3"/><path d="M0 90 C 45 50, 90 50, 135 90 S 225 130, 270 90 S 360 50, 405 90" fill="none" stroke="C" stroke-width="2" opacity=".45"/>',
+        thermo: '<rect x="70" y="40" width="180" height="100" rx="6" fill="none" stroke="C" stroke-width="3"/><path d="M90 125 C 130 60, 190 60, 230 55" fill="none" stroke="C" stroke-width="3"/><path d="M90 125 C 150 120, 200 100, 230 55" fill="none" stroke="C" stroke-width="3" stroke-dasharray="6 5"/>',
+        em: '<circle cx="110" cy="90" r="9" fill="C"/><circle cx="210" cy="90" r="9" fill="none" stroke="C" stroke-width="3"/><path d="M119 90 Q 160 30 201 90 M119 90 Q 160 150 201 90 M119 90 L201 90" fill="none" stroke="C" stroke-width="2" opacity=".7"/><path d="M110 20 Q 160 90 110 160 M210 20 Q 160 90 210 160" fill="none" stroke="C" stroke-width="2" opacity=".35"/>',
+        optics: '<line x1="0" y1="90" x2="320" y2="90" stroke="C" stroke-width="1.5" stroke-dasharray="4 5"/><path d="M150 30 Q 175 90 150 150 Q 125 90 150 30 Z" fill="C" opacity=".35" stroke="C" stroke-width="2"/><path d="M20 55 L150 55 L280 100 M20 125 L150 125 L280 80" fill="none" stroke="C" stroke-width="2.5"/>',
+        modern: '<circle cx="160" cy="90" r="8" fill="C"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5" transform="rotate(60 160 90)"/><ellipse cx="160" cy="90" rx="70" ry="26" fill="none" stroke="C" stroke-width="2.5" transform="rotate(-60 160 90)"/>',
+        astronomy: '<circle cx="150" cy="95" r="12" fill="C"/><ellipse cx="160" cy="95" rx="110" ry="46" fill="none" stroke="C" stroke-width="2.5"/><ellipse cx="156" cy="95" rx="60" ry="24" fill="none" stroke="C" stroke-width="2" stroke-dasharray="5 5"/><circle cx="262" cy="70" r="6" fill="C"/><circle cx="102" cy="112" r="4" fill="C"/>',
+        materials: '<path d="M20 60 L130 60 Q 160 60 160 90 Q 160 120 190 120 L300 120" fill="none" stroke="C" stroke-width="3"/><path d="M20 120 L130 120 Q 160 120 160 150 Q 160 180 190 180 L300 180" fill="none" stroke="C" stroke-width="3" transform="translate(0,-25)"/><circle cx="60" cy="50" r="5" fill="C"/><circle cx="95" cy="50" r="5" fill="C"/><circle cx="230" cy="105" r="5" fill="none" stroke="C" stroke-width="2"/><circle cx="265" cy="105" r="5" fill="none" stroke="C" stroke-width="2"/>'
+      }[sim.topic] || '<circle cx="160" cy="90" r="40" fill="none" stroke="C" stroke-width="3"/>';
+      return '<svg viewBox="0 0 320 180" aria-hidden="true"><rect width="320" height="180" fill="#fff"/>' + glyph.split('C"').join(c + '"') + '</svg>';
+    }
+    const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const newestFirst = (a, b) => (b.added || '').localeCompare(a.added || '') || a.title.localeCompare(b.title);
+    function entry(s) {
+      const t = TOPICS[s.topic] || { name: s.topic, color: '#5C6B73' };
+      const href = 'sims/' + s.slug + '.html';
+      return '<article class="entry" style="--c:' + t.color + '">' +
+        '<a class="figure" href="' + href + '" tabindex="-1" aria-hidden="true">' + thumb(s) + '</a>' +
+        '<div class="topicline">' + esc(t.name) + (s.status === 'beta' ? '<span class="beta">beta</span>' : '') + '</div>' +
+        '<h3><a href="' + href + '">' + esc(s.title) + '</a></h3>' +
+        '<p>' + esc(s.blurb) + '</p>' +
+        '<div class="meta">' + (s.level === 'intermediate' ? 'Intermediate' : 'Introductory') + (s.tags.length ? '. ' + s.tags.slice(0, 4).map(esc).join(', ') : '') + '</div>' +
+        '<div class="go"><a class="open" href="' + href + '">Open simulation</a><a class="dl" href="' + href + '" download>Download file</a></div>' +
+        '</article>';
+    }
+    return { thumb, esc, newestFirst, entry };
   }
+  // ---- end of cards ----
+  const { esc, newestFirst, entry } = cards(TOPICS);
 
   // ---------- Rail, entries ----------
   function rail() {
@@ -204,12 +225,11 @@
     const hay = [s.title, s.blurb, s.tags.join(' '), TOPICS[s.topic] ? TOPICS[s.topic].name : ''].join(' ').toLowerCase();
     return state.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w));
   }
-  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
   function render() {
     const list = SIMS.filter(matches);
     list.sort((a, b) => state.sort === 'az' ? a.title.localeCompare(b.title)
       : state.sort === 'topic' ? (a.topic.localeCompare(b.topic) || a.title.localeCompare(b.title))
-      : (b.added || '').localeCompare(a.added || '') || a.title.localeCompare(b.title));
+      : newestFirst(a, b));
     const topicName = state.topic === 'all' ? '' : ' in ' + TOPICS[state.topic].name;
     $('status').textContent = state.q ? list.length + ' match' + (list.length === 1 ? '' : 'es') + ' for \u201C' + state.q + '\u201D' + topicName
       : (state.topic === 'all' ? SIMS.length + ' simulation' + (SIMS.length === 1 ? '' : 's') : list.length + topicName);
@@ -219,18 +239,7 @@
       $('showall').addEventListener('click', e => { e.preventDefault(); state.q = ''; state.topic = 'all'; $('q').value = ''; sync(); rail(); render(); });
       return;
     }
-    $('entries').innerHTML = list.map(s => {
-      const t = TOPICS[s.topic] || { name: s.topic, color: '#5C6B73' };
-      const href = 'sims/' + s.slug + '.html';
-      return '<article class="entry" style="--c:' + t.color + '">' +
-        '<a class="figure" href="' + href + '" tabindex="-1" aria-hidden="true">' + thumb(s) + '</a>' +
-        '<div class="topicline">' + esc(t.name) + (s.status === 'beta' ? '<span class="beta">beta</span>' : '') + '</div>' +
-        '<h3><a href="' + href + '">' + esc(s.title) + '</a></h3>' +
-        '<p>' + esc(s.blurb) + '</p>' +
-        '<div class="meta">' + (s.level === 'intermediate' ? 'Intermediate' : 'Introductory') + (s.tags.length ? '. ' + s.tags.slice(0, 4).map(esc).join(', ') : '') + '</div>' +
-        '<div class="go"><a class="open" href="' + href + '">Open simulation</a><a class="dl" href="' + href + '" download>Download file</a></div>' +
-        '</article>';
-    }).join('');
+    $('entries').innerHTML = list.map(entry).join('');
   }
   function sync() {
     const p = new URLSearchParams();
@@ -245,19 +254,20 @@
   rail(); render();
 
   // ---------- Downloads: the file exactly as it is in the repository ----------
-  // A deployment can add its owner's analytics to the pages (deploy/add-analytics.js). If this one has, "Download
-  // file" cuts that block back out before saving, so what people take away is the clean file. Otherwise the link
-  // is left to work as an ordinary download.
-  if (document.getElementById('site-analytics')) {
+  // When the site is deployed, the pages can get extra blocks in their <head>: the owner's analytics
+  // (deploy/add-analytics.js) and tags for search engines and link previews (deploy/add-site-meta.js). "Download
+  // file" cuts those blocks back out before saving, so what people take away is the repository's file. If that
+  // can't be done (say, this page was opened from a disk), the link works as an ordinary download.
+  if (/^https?:$/.test(location.protocol)) {
     const save = (href, name) => { const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
     $('entries').addEventListener('click', e => {
       const a = e.target.closest('a.dl'); if (!a) return;
       e.preventDefault();
       const href = a.getAttribute('href'), name = href.split('/').pop();
       fetch(href).then(r => { if (!r.ok) throw new Error(r.status); return r.text(); }).then(html => {
-        const url = URL.createObjectURL(new Blob([html.replace(/<!-- site-analytics:[\s\S]*?<!-- \/site-analytics -->\n/, '')], { type: 'text/html' }));
+        const url = URL.createObjectURL(new Blob([html.replace(/<!-- site-(analytics|meta):[\s\S]*?<!-- \/site-\1 -->\n/g, '')], { type: 'text/html' }));
         save(url, name); setTimeout(() => URL.revokeObjectURL(url), 10000);
-      }).catch(() => save(href, name));   // if that fails, the ordinary download (whose analytics only run on this site)
+      }).catch(() => save(href, name));
     });
   }
 

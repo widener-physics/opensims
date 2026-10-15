@@ -12,9 +12,11 @@ TEMPLATE.html     a complete starter simulation to copy from
 PROMPT.md         how to draft a simulation with an AI model, with the prompt to use
 STYLE_GUIDE.md    what a simulation should look and behave like, and why
 style.json        the same rules in machine-readable form, for AI-assisted authoring
-tests/            physics tests, run against the sims as they ship (node tests/run.js)
-package.json      names the two scripts: npm test, npm run build (no dependencies)
-deploy/           the optional deploy step that adds a site owner's analytics (see Deploying)
+tests/            physics tests, run against the sims as they ship, and a check that each page's title and description match sims.js
+package.json      names the scripts: npm test, npm run meta, npm run build (no dependencies)
+tools/            page-meta.js (writes each sim's <title> and description from sims.js); share-image.html (source of share.png)
+deploy/           the deploy steps: the home page's list, sitemap and link previews, and optional analytics (see Deploying)
+share.png         the picture shown when a link to the site is shared
 LICENSE           GPL v3
 README.md
 ```
@@ -47,18 +49,41 @@ for a new simulation.
   blurb: 'Hoop, disc and sphere down the same ramp, with kinetic energy split into translational and rotational.',
   level: 'intro',                        // 'intro' or 'intermediate'
   added: '2026-10-01',
-  status: 'ready'                        // or 'beta' to show a badge
+  status: 'ready',                       // or 'beta' to show a badge
+  pageTitle: 'Rolling race simulation: moment of inertia'   // optional; see below
 }
 ```
 
-3. Optionally add `thumb: 'thumbs/rolling-race.png'` for a real screenshot (16:9). Without it the card gets a schematic drawn from the topic.
-4. Run through the checklist at the end of `STYLE_GUIDE.md`, then open a pull request.
+3. Run `npm run meta`. It writes the page's `<title>` and `<meta name="description">` from this entry: the
+   description is the blurb, and the title is `pageTitle` (or the title plus "simulation") followed by the site's
+   name. Search engines show these, so give `pageTitle` the words a teacher would type: "Brachistochrone
+   simulation: the fastest slide" rather than just "The fastest slide". The tests fail if a page has drifted from
+   its entry.
+4. Optionally add `thumb: 'thumbs/rolling-race.png'` for a real screenshot (16:9). Without it the card gets a schematic drawn from the topic.
+5. Run through the checklist at the end of `STYLE_GUIDE.md`, then open a pull request.
 
 To add a topic, add a key to `TOPICS` in `sims.js` with a display name and a color.
 
 ## Deploying on Cloudflare Pages
 
-The whole site is static. In the Cloudflare dashboard: Workers & Pages → Create → Pages → connect the GitHub repository. Build command: `npm run build` (it runs `deploy/add-analytics.js`; there are no dependencies to install). Build output directory: `/`. Every push to `main` redeploys. Add a custom domain from the project's *Custom domains* tab.
+The whole site is static. In the Cloudflare dashboard: Workers & Pages → Create → Pages → connect the GitHub repository. Framework preset: *None*. Build command: `npm run build` (it runs the two steps in `deploy/`; there are no dependencies to install). Build output directory: `/`. Every push to `main` redeploys. Add a custom domain from the project's *Custom domains* tab.
+
+### Search engines and link previews
+
+The build always writes the list of simulations into the home page's HTML (the same markup its script draws), so
+search engines that don't run scripts still see every simulation and follow the links.
+
+Set one more variable, for **Production and Preview**, and it also adds what needs the site's address:
+
+| Variable | Value |
+|---|---|
+| `SITE_URL` | the address the site is served from, e.g. `https://opensims.wu-physics.net` |
+
+With it, every page gets a canonical address (so search engines treat that address as the real one, not the
+`pages.dev` copy) and link-preview tags with `share.png`, and the build writes `sitemap.xml` and `robots.txt`.
+Submit `https://<your site>/sitemap.xml` in Google Search Console and Bing Webmaster Tools. Like the analytics,
+these tags go in a marked block that the *Download file* button cuts out. If you fork the project under another
+name, remake `share.png` from `tools/share-image.html`.
 
 ### Analytics (optional)
 
@@ -82,8 +107,8 @@ deploying something half-working.
 
 To see the result without deploying: `ANALYTICS_SNIPPET='…' ANALYTICS_HOSTS=… node deploy/add-analytics.js --out /tmp/site`.
 The script refuses to edit the repository's own files; on Cloudflare it edits the build's throwaway copy.
-`node deploy/add-analytics.test.js` checks all of this. Other static hosts work the same way with `--out` as the
-build step and that directory as the output.
+`node deploy/add-analytics.test.js` and `node deploy/add-site-meta.test.js` check all of this. On another host's
+build service, set `DEPLOY_BUILD=1` along with the other variables and use the same build command.
 
 ## License and contributions
 

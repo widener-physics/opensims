@@ -75,8 +75,9 @@ function run(argv, env) {
   if (k >= 0 && !argv[k + 1]) throw new Error('--out needs a directory');
   const cfg = settings(env);
   if (!cfg && !out) { console.log('analytics: ANALYTICS_SNIPPET not set; pages left as they are'); return 0; }
-  // Cloudflare sets CF_PAGES in a Pages build and WORKERS_CI in a Workers build
-  if (!out && !env.CF_PAGES && !env.WORKERS_CI) throw new Error('this edits the pages in place, so it only runs in a Cloudflare build; to try it here, use --out DIR');
+  // Cloudflare sets CF_PAGES in a Pages build and WORKERS_CI in a Workers build; on another host's build service,
+  // set DEPLOY_BUILD=1 there
+  if (!out && !env.CF_PAGES && !env.WORKERS_CI && !env.DEPLOY_BUILD) throw new Error('this edits the pages in place, so it only runs in a deploy build (Cloudflare, or DEPLOY_BUILD=1); to try it here, use --out DIR');
   if (out) {
     if (out === ROOT || out.startsWith(ROOT + path.sep)) throw new Error('--out must be outside the repository');
     fs.rmSync(out, { recursive: true, force: true });
