@@ -19,6 +19,17 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'gyroscope',
+    title: 'Gyroscope precession',
+    pageTitle: 'Gyroscope simulation: precession and nutation',
+    topic: 'rotation',
+    tags: ['gyroscope', 'precession', 'nutation', 'angular momentum', 'torque', 'spinning wheel', 'rigid body'],
+    blurb: "A spinning wheel on the end of an axle, held up at only one end, swings slowly around instead of falling. Let it go and watch it dip and bob before it settles, then follow the angular momentum and torque arrows to see why a spinning wheel turns sideways when gravity pulls it down.",
+    level: 'intro',
+    added: '2026-10-16',
+    status: 'ready'
+  },
+  {
     slug: 'radio-waves',
     title: 'Radio waves',
     topic: 'em',

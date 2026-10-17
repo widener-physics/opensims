@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<!--
+  Gyroscope precession - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The motion of the axle
+  agrees with a separate rigid-body integration (dL/dt = torque, in vectors rather than angles); energy and
+  the conserved angular momenta hold; steady precession, the dip and cusps after letting go, the nutation
+  rate, and the no-spin pendulum match their exact or limiting values.
+  Credit: none needed; PhET has no gyroscope simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gyroscope simulation: precession and nutation | Open Physics Sims</title>
+<meta name="description" content="A spinning wheel on the end of an axle, held up at only one end, swings slowly around instead of falling. Let it go and watch it dip and bob before it settles, then follow the angular momentum and torque arrows to see why a spinning wheel turns sideways when gravity pulls it down.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --stand: #8C979E; --support: #B9C3CA; --axle: #3A4A54; --tire: #24323B; --mark: #E8A317; --spin: #5C6B73;
+    --angmom: #2563A8; --torque: #C8321E; --weight: #2E7D32;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 520; touch-action: pan-y; cursor: grab; }
+  #scene:active { cursor: grabbing; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--body); }
+  .checks { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 4px 18px; font-size: 13px; }
+  .checks .check { white-space: nowrap; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.08; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Gyroscope precession</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Wheel on a pivot</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Let it go</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Why it turns</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="A spinning wheel on the end of an axle, the other end on a pivot, in a view you can turn by dragging"></canvas>
+  <div class="row2">
+    <button id="act">Take the support away</button>
+    <button id="go" class="secondary">Pause</button>
+    <span class="hint" id="hint">drag the picture to turn it</span>
+  </div>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_spin"><div class="row"><span>Spin</span><span class="val" id="spin_v"></span></div><input type="range" id="spin" min="3" max="15" step="0.5"></label>
+    <label id="lab_d"><div class="row"><span>Wheel's distance from the pivot</span><span class="val" id="d_v"></span></div><input type="range" id="d" min="0.10" max="0.35" step="0.01"></label>
+    <div class="grp" id="lab_spinning"><div>The wheel</div>
+      <div class="seg" id="spinning" role="group" aria-label="The wheel"><button data-v="1">spinning</button><button data-v="0">not spinning</button></div></div>
+    <div class="grp" id="lab_slow"><div>Speed</div>
+      <div class="seg" id="slow" role="group" aria-label="Playback speed"><button data-v="0">real time</button><button data-v="1">&frac14; speed</button></div></div>
+    <label class="check" id="lab_friction"><input type="checkbox" id="friction"> friction at the pivot</label>
+    <div class="grp" id="lab_show"><div>Show</div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="show_L"> <i>L</i>, angular momentum</label>
+        <label class="check"><input type="checkbox" id="show_tq"> <i>&tau;</i>, gravity's torque</label>
+        <label class="check"><input type="checkbox" id="show_w"> weight</label>
+        <label class="check"><input type="checkbox" id="show_F"> pivot's force</label>
+        <label class="check"><input type="checkbox" id="show_path"> wheel's path</label>
+      </div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI, LEVEL = Math.PI / 2;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/gyroscope.test.js)
+  // ================================================================
+  // ---- physics core: a spinning wheel on a pivot (a heavy symmetric top) ----
+  // SI units. A wheel of mass M and radius R spins on a light axle; one end of the axle rests on a frictionless pivot
+  // (free to turn any way), and the wheel's center is a distance d out along the axle. z points up.
+  // The axle's direction is given by two angles: theta, from straight up (90 degrees is level), and phi, around the
+  // vertical. psi is how far the wheel has turned on its axle.
+  // Moments of inertia: I3 about the axle (a bicycle-style wheel with most of its mass in the rim), and I1 about any
+  // line through the pivot at right angles to the axle: half of I3 (any flat wheel) plus M d^2 (the wheel is d away).
+  const GYRO = { M: 1.5, R: 0.2, g: 9.8, rim: 0.85 };   // rim: I3 = rim * M R^2
+  function params(spinRevPerS, d, friction) {
+    const I3 = GYRO.rim * GYRO.M * GYRO.R * GYRO.R, I1 = I3 / 2 + GYRO.M * d * d;
+    return { I1, I3, d, w3: 2 * Math.PI * spinRevPerS, mgd: GYRO.M * GYRO.g * d, c: friction || 0 };
+  }
+  // Two things stay fixed while it moves (with no friction): the spin w3 = psi' + phi' cos(theta), and the angular
+  // momentum about the vertical, p = I1 phi' sin^2(theta) + I3 w3 cos(theta). The state is { th, thd, ph, psi, p }.
+  // (with no spin and no swinging around, the top of that fraction is exactly zero and the axle swings like a pendulum)
+  const phiDot = (S, P) => { const s = Math.sin(S.th), top = S.p - P.I3 * P.w3 * Math.cos(S.th); return top === 0 ? 0 : top / (P.I1 * s * s); };
+  // rates of change. Gravity's torque tips the axle down; the spin turns that into motion sideways.
+  // Friction at the pivot (rate c) slows the axle's up-and-down motion only, which is what makes a real gyroscope's
+  // wobble die away.
+  function rates(S, P) {
+    const s = Math.sin(S.th), co = Math.cos(S.th), pd = phiDot(S, P);
+    const thdd = (P.I1 * pd * pd * s * co - P.I3 * P.w3 * pd * s + P.mgd * s) / P.I1 - P.c * S.thd;
+    return { th: S.thd, thd: thdd, ph: pd, psi: P.w3 - pd * co };
+  }
+  function step(S, P, dt) {   // one fourth-order Runge-Kutta step
+    const add = (A, k, h) => ({ th: A.th + h * k.th, thd: A.thd + h * k.thd, ph: A.ph + h * k.ph, psi: A.psi + h * k.psi, p: A.p });
+    const k1 = rates(S, P), k2 = rates(add(S, k1, dt / 2), P), k3 = rates(add(S, k2, dt / 2), P), k4 = rates(add(S, k3, dt), P);
+    const f = key => S[key] + dt / 6 * (k1[key] + 2 * k2[key] + 2 * k3[key] + k4[key]);
+    return { th: f('th'), thd: f('thd'), ph: f('ph'), psi: f('psi'), p: S.p };
+  }
+  // advance by T in steps no longer than h (shorter steps when the axle swings fast)
+  function advance(S, P, T, h) {
+    h = h || 1e-3; let t = 0;
+    while (t < T - 1e-12) { const r = rates(S, P), hh = Math.min(h, T - t, 0.02 / (Math.abs(r.ph) + Math.abs(r.th) + 1e-9)); S = step(S, P, hh); t += hh; }
+    return S;
+  }
+  // steady precession at tilt th: the axle keeps its tilt and swings around at a constant rate. Of the two rates that
+  // work, the slow one is what a gyroscope does. With the axle level (th = 90 degrees) it is exactly M g d / (I3 w3).
+  function steadyRate(th, P) {
+    const co = Math.cos(th);
+    if (Math.abs(co) < 1e-12) return P.mgd / (P.I3 * P.w3);
+    const b = P.I3 * P.w3, disc = b * b - 4 * P.I1 * co * P.mgd;
+    if (disc < 0) return NaN;          // spinning too slowly to precess steadily at this tilt
+    return 2 * P.mgd / (b + Math.sqrt(disc));   // the slow root of I1 cos th W^2 - I3 w3 W + M g d = 0, written stably
+  }
+  function steadyState(th, P) { const W = steadyRate(th, P), s = Math.sin(th); return { th, thd: 0, ph: 0, psi: 0, p: P.I1 * W * s * s + P.I3 * P.w3 * Math.cos(th) }; }
+  // held still at tilt th, then let go
+  function heldState(th, P) { return { th, thd: 0, ph: 0, psi: 0, p: P.I3 * P.w3 * Math.cos(th) }; }
+  // the textbook (gyroscopic) estimate: precession rate M g d / (I3 w3) at any tilt, ignoring the axle's own swinging
+  const gyroRate = P => P.mgd / (P.I3 * P.w3);
+
+  // ---- vectors, for drawing and for checking ----
+  const axle = S => [Math.sin(S.th) * Math.cos(S.ph), Math.sin(S.th) * Math.sin(S.ph), Math.cos(S.th)];
+  function axleRate(S, P) {   // d(axle)/dt
+    const r = rates(S, P), s = Math.sin(S.th), co = Math.cos(S.th), cp = Math.cos(S.ph), sp = Math.sin(S.ph);
+    return [co * cp * r.th - s * sp * r.ph, co * sp * r.th + s * cp * r.ph, -s * r.th];
+  }
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  // angular momentum about the pivot: the spin part along the axle, plus the part from the axle swinging around
+  function angMom(S, P) { const n = axle(S), nd = axleRate(S, P), sw = cross(n, nd); return [0, 1, 2].map(i => P.I3 * P.w3 * n[i] + P.I1 * sw[i]); }
+  // gravity's torque about the pivot: (d n) x (-M g z)
+  function torque(S, P) { const n = axle(S); return [n[1] * -P.mgd, -n[0] * -P.mgd, 0]; }
+  // the pivot's push on the axle: M times the wheel center's acceleration, minus its weight
+  function pivotForce(S, P, h) {
+    h = h || 1e-4; const a = axleRate(step(S, P, h), P), b = axleRate(step(S, P, -h), P);   // d(axle rate)/dt, centered
+    return [0, 1, 2].map(i => GYRO.M * P.d * (a[i] - b[i]) / (2 * h) + (i === 2 ? GYRO.M * GYRO.g : 0));
+  }
+  function energy(S, P) { const s = Math.sin(S.th), pd = phiDot(S, P); return 0.5 * P.I1 * (S.thd * S.thd + pd * pd * s * s) + 0.5 * P.I3 * P.w3 * P.w3 + P.mgd * Math.cos(S.th); }
+  // let go from rest with the axle at tilt th0 (and no friction): the lowest the axle gets, from energy and the
+  // vertical angular momentum. With c = cos(theta) and a = (I3 w3)^2 / (2 I1 M g d), the turning points other than the
+  // start solve a (c0 - c) = 1 - c^2, that is c^2 - a c + a c0 - 1 = 0; the lower one is the bottom of the dip.
+  function lowestTilt(th0, P) {
+    const a = (P.I3 * P.w3) ** 2 / (2 * P.I1 * P.mgd), c0 = Math.cos(th0);
+    const c = (a - Math.sqrt(a * a - 4 * (a * c0 - 1))) / 2;
+    return Math.acos(Math.max(-1, Math.min(1, c)));
+  }
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. STATE
+  // ================================================================
+  const FLOOR = -0.6, CEIL = 0.6, FRICTION = 2.0, SUPPORT_AT = 0.05;   // m, m, 1/s, m past the wheel
+  const S = { spin: 5, d: 0.2, spinning: true, slow: false, friction: true,
+              show: { L: false, tq: false, w: false, F: false, path: true } };
+  const SHOW_DEFAULT = { 1: { L: false, tq: false, w: false, F: false, path: true },
+                         2: { L: false, tq: false, w: false, F: false, path: true },
+                         3: { L: true, tq: true, w: false, F: false, path: false } };
+  let lastTrail = -1, tab = 1, playing = true, held = true, P = null, st = null, simT = 0, relT = 0, relPh = 0, maxDip = 0, trail = [], lastPsi = 0, psiStep = 0;
+  const view = { az: -1.05, el: 0.33 };
+  const spinNow = () => (tab === 3 && !S.spinning) ? 0 : S.spin;
+  function makeP() { P = params(spinNow(), S.d, tab === 2 && S.friction ? FRICTION : 0); }
+  function hold() { makeP(); const ph = st ? st.ph : view.az + 1.1, psi = st ? st.psi : 0; st = heldState(LEVEL, P); st.ph = ph; st.psi = psi; held = true; trail = []; lastTrail = -1; maxDip = 0; }
+  function letGo() {
+    makeP(); const ph = st.ph, psi = st.psi;
+    // tabs 1 and 3: set going smoothly, as if given just the right push sideways; tab 2 (and no spin): simply let go
+    st = (tab === 2 || P.w3 === 0) ? heldState(LEVEL, P) : steadyState(LEVEL, P); st.ph = ph; st.psi = psi;
+    held = false; relT = simT; relPh = ph; maxDip = 0; trail = []; lastTrail = -1;
+  }
+  // a change of spin or axle while it moves: tabs 1 and 3 carry on steadily at the new rate; tab 2 goes back on its support
+  function changed() { if (held || tab === 2 || P.w3 === 0 || spinNow() === 0) { hold(); return; } const ph = st.ph, psi = st.psi; makeP(); st = steadyState(LEVEL, P); st.ph = ph; st.psi = psi; relT = simT; relPh = ph; trail = []; lastTrail = -1; }
+
+  // ================================================================
+  // 3. DRAWING: a 3D view you can turn, and a small view from above
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  const add = (a, b, k) => [a[0] + (k === undefined ? 1 : k) * b[0], a[1] + (k === undefined ? 1 : k) * b[1], a[2] + (k === undefined ? 1 : k) * b[2]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const unit = a => { const m = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / m, a[1] / m, a[2] / m]; };
+  // the camera: toward-viewer direction c, screen right r, screen up u; mild perspective
+  function camera(W, H, compact) {
+    const a = view.az, e = view.el, c = [Math.cos(e) * Math.cos(a), Math.cos(e) * Math.sin(a), Math.sin(e)];
+    const r = [-Math.sin(a), Math.cos(a), 0], u = [-Math.sin(e) * Math.cos(a), -Math.sin(e) * Math.sin(a), Math.cos(e)];
+    const s = compact ? Math.min(W / 1.12, H / 1.0) : Math.min(W / 1.6, H / 1.12), D = 3.2, cx = compact ? W / 2 : W * 0.45, cy = H * (compact ? 0.36 : 0.40);
+    const pr = p => { const k = D / (D - dot(p, c)); return [cx + s * k * dot(p, r), cy - s * k * dot(p, u), dot(p, c), k]; };
+    return { c, r, u, s, pr };
+  }
+  function arrow(ctx, x0, y0, x1, y1, col, w, lab) {
+    const L = Math.hypot(x1 - x0, y1 - y0); if (L < 3) return;
+    const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hd = Math.min(11, L * 0.45);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * hd * 0.7, y1 - uy * hd * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - ux * hd - uy * hd * 0.45, y1 - uy * hd + ux * hd * 0.45); ctx.lineTo(x1 - ux * hd + uy * hd * 0.45, y1 - uy * hd - ux * hd * 0.45); ctx.closePath(); ctx.fill();
+    if (lab) { font(ctx, 13, '600'); ctx.textAlign = 'left'; label(ctx, lab, x1 + 6 + ux * 4, y1 + 4 + uy * 4); }
+  }
+  // fixed scales, so arrows can be compared as the settings change
+  const SC = { L: 0.22, tq: 0.06, F: 0.013 };   // m of picture per kg m^2/s, per N m, per N
+
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;
+    const cam = camera(W, H, compact), pr = cam.pr, s = cam.s;
+    const n = axle(st), cen = [S.d * n[0], S.d * n[1], S.d * n[2]];
+    // the floor, with a grid
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1;
+    for (let k = -2; k <= 2; k++) { const g = 0.25 * k; [[[g, -0.5, FLOOR], [g, 0.5, FLOOR]], [[-0.5, g, FLOOR], [0.5, g, FLOOR]]].forEach(([a, b]) => { const A = pr(a), B = pr(b); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); }); }
+    // the wheel's frame: u along the line of nodes (level, at right angles to the axle), v = n x u
+    let u = cross([0, 0, 1], n); if (Math.hypot(...u) < 1e-6) u = [1, 0, 0]; u = unit(u); const v = cross(n, u);
+    const rimPt = (a, rr) => add(cen, add([u[0] * Math.cos(a), u[1] * Math.cos(a), u[2] * Math.cos(a)], [v[0] * Math.sin(a), v[1] * Math.sin(a), v[2] * Math.sin(a)]), rr);
+    // its shadow
+    ctx.fillStyle = 'rgba(23,33,40,0.07)'; ctx.beginPath();
+    for (let j = 0; j <= 36; j++) { const p = rimPt(j / 36 * TAU, GYRO.R), q = pr([p[0], p[1], FLOOR]); j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); } ctx.fill();
+    // the path of the wheel's center
+    if (S.show.path && trail.length > 1) {
+      ctx.lineWidth = 2;
+      for (let j = 1; j < trail.length; j++) { const a = pr(trail[j - 1]), b = pr(trail[j]); ctx.strokeStyle = 'rgba(29,79,115,' + (0.08 + 0.5 * j / trail.length).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    }
+    const items = [];
+    // the stand: a rigid rod down from the ceiling to the pivot
+    items.push({ z: dot([0, 0, 0.2], cam.c) - 0.05, f: () => { const A = pr([0, 0, CEIL]), B = pr([0, 0, 0.02]); ctx.strokeStyle = C('--stand'); ctx.lineWidth = 7; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.fillStyle = C('--stand'); ctx.fillRect(A[0] - 40, A[1] - 6, 80, 8); } });
+    // the support under the wheel's end of the axle, while it is held
+    if (held) { const tip = [n[0] * (S.d + SUPPORT_AT), n[1] * (S.d + SUPPORT_AT), n[2] * (S.d + SUPPORT_AT)];
+      items.push({ z: dot([tip[0], tip[1], 0], cam.c), f: () => { const A = pr([tip[0], tip[1], FLOOR]), B = pr(tip); ctx.strokeStyle = C('--support'); ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.fillStyle = C('--support'); ctx.beginPath(); ctx.ellipse(A[0], A[1], 16, 5, 0, 0, TAU); ctx.fill();
+        font(ctx, 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; label(ctx, 'support', A[0], A[1] + 18); } }); }
+    // the axle and the pivot
+    items.push({ z: dot(cen, cam.c) * 0.5, f: () => { const A = pr([0, 0, 0]), B = pr(add([0, 0, 0], n, S.d + SUPPORT_AT + 0.01)); ctx.strokeStyle = C('--axle'); ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+      ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(A[0], A[1], 5, 0, TAU); ctx.fill(); } });
+    // the wheel: tire, spokes (blurred when they turn too far between frames to follow), hub, spin arrow
+    items.push({ z: dot(cen, cam.c), f: () => {
+      const k = pr(cen)[3];
+      ctx.fillStyle = 'rgba(29,79,115,0.06)'; ctx.beginPath();
+      for (let j = 0; j <= 48; j++) { const q = pr(rimPt(j / 48 * TAU, GYRO.R)); j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); } ctx.fill();
+      const blur = Math.min(1, Math.abs(psiStep) / 0.6), nsub = blur > 0.05 ? 5 : 1;
+      ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(92,107,115,' + (blur > 0.05 ? 0.25 : 0.9) + ')';
+      for (let sub = 0; sub < nsub; sub++) for (let j = 0; j < 6; j++) { const a = st.psi - psiStep * sub / nsub + j * TAU / 6, A = pr(rimPt(a, 0.03)), B = pr(rimPt(a, GYRO.R * 0.93)); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); }
+      ctx.strokeStyle = C('--tire'); ctx.lineWidth = Math.max(3, 0.028 * s * k); ctx.lineJoin = 'round'; ctx.beginPath();
+      for (let j = 0; j <= 48; j++) { const q = pr(rimPt(j / 48 * TAU, GYRO.R)); j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); } ctx.closePath(); ctx.stroke();
+      // a mark on the tire, so the spin can be followed at low speed
+      const m = pr(rimPt(st.psi, GYRO.R)); ctx.fillStyle = C('--mark'); ctx.globalAlpha = 1 - 0.8 * blur; ctx.beginPath(); ctx.arc(m[0], m[1], 4.5, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
+      const h = pr(cen); ctx.fillStyle = C('--axle'); ctx.beginPath(); ctx.arc(h[0], h[1], 4, 0, TAU); ctx.fill();
+      // which way it spins: an arrow around the rim, outside the tire
+      if (P.w3 > 0) { ctx.strokeStyle = C('--spin'); ctx.lineWidth = 2; ctx.beginPath(); let q;
+        for (let j = 0; j <= 16; j++) { q = pr(rimPt(TAU * 0.6 + j / 16 * 1.4, GYRO.R * 1.22)); j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); } ctx.stroke();
+        const q0 = pr(rimPt(TAU * 0.6 + 1.2, GYRO.R * 1.22)), dx = q[0] - q0[0], dy = q[1] - q0[1], m = Math.hypot(dx, dy) || 1, ex = dx / m, ey = dy / m;
+        ctx.fillStyle = C('--spin'); ctx.beginPath(); ctx.moveTo(q[0] + ex * 4, q[1] + ey * 4); ctx.lineTo(q[0] - ex * 7 - ey * 5, q[1] - ey * 7 + ex * 5); ctx.lineTo(q[0] - ex * 7 + ey * 5, q[1] - ey * 7 - ex * 5); ctx.closePath(); ctx.fill(); }
+    } });
+    items.sort((a, b) => a.z - b.z).forEach(it => it.f());
+
+    // arrows, on top
+    const O = pr([0, 0, 0]);
+    if (S.show.w) { const A = pr(cen), B = pr(add(cen, [0, 0, -GYRO.M * GYRO.g * SC.F])); arrow(ctx, A[0], A[1], B[0], B[1], C('--weight'), 3, 'weight'); }
+    if (S.show.F) { const F = held ? [0, 0, GYRO.M * GYRO.g * SUPPORT_AT / (S.d + SUPPORT_AT)] : pivotForce(st, P);
+      const B = pr([F[0] * SC.F, F[1] * SC.F, F[2] * SC.F]); arrow(ctx, O[0], O[1], B[0], B[1], C('--weight'), 3, 'pivot'); }
+    const L = held ? [P.I3 * P.w3 * n[0], P.I3 * P.w3 * n[1], P.I3 * P.w3 * n[2]] : angMom(st, P), tq = torque(st, P);
+    const Lend = [L[0] * SC.L, L[1] * SC.L, L[2] * SC.L];
+    if (S.show.tq) { const B = pr([tq[0] * SC.tq, tq[1] * SC.tq, tq[2] * SC.tq]); arrow(ctx, O[0], O[1], B[0], B[1], C('--torque'), 3.5, 'τ'); }
+    if (S.show.L && Math.hypot(...L) > 1e-6) { const B = pr(Lend); arrow(ctx, O[0], O[1], B[0], B[1], C('--angmom'), 4, 'L'); }
+    // why it turns: the change in L over the next half second, drawn from L's tip; and the circle L's tip goes around
+    if (tab === 3 && S.show.L && S.show.tq && !held) {
+      const dt = 0.5, tip2 = add(Lend, [tq[0] * dt * SC.L, tq[1] * dt * SC.L, tq[2] * dt * SC.L]);
+      const A = pr(Lend), B = pr(tip2); arrow(ctx, A[0], A[1], B[0], B[1], C('--torque'), 2.5);
+      font(ctx, 12); ctx.fillStyle = C('--torque'); const tx = 'ΔL in the next ½ s', fits = B[0] + 8 + ctx.measureText(tx).width < W - 6;
+      ctx.textAlign = fits ? 'left' : 'right'; label(ctx, tx, fits ? B[0] + 8 : B[0] - 4, B[1] + (fits ? 16 : 24));
+      if (P.w3 > 0) { const rh = Math.hypot(Lend[0], Lend[1]); ctx.setLineDash([4, 4]); ctx.strokeStyle = C('--angmom'); ctx.globalAlpha = 0.5; ctx.lineWidth = 1.2; ctx.beginPath();
+        for (let j = 0; j <= 64; j++) { const q = pr([rh * Math.cos(j / 64 * TAU), rh * Math.sin(j / 64 * TAU), Lend[2]]); j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); } ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
+    }
+    // the view from above
+    const box = compact ? 96 : 132, bx = W - box - 10, by = 10, bc = [bx + box / 2, by + box / 2], bs = box / 2 / 0.42;
+    ctx.fillStyle = C('--panel'); ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.fillRect(bx, by, box, box); ctx.strokeRect(bx, by, box, box);
+    const ch = [Math.cos(view.az), Math.sin(view.az), 0], top = p => [bc[0] + bs * dot(p, cam.r), bc[1] + bs * dot(p, ch)];
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.arc(bc[0], bc[1], bs * S.d, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    if (trail.length > 1) { ctx.lineWidth = 1.5; for (let j = 1; j < trail.length; j++) { const a = top(trail[j - 1]), b = top(trail[j]); ctx.strokeStyle = 'rgba(29,79,115,' + (0.1 + 0.6 * j / trail.length).toFixed(3) + ')'; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); } }
+    const wc = top(cen); ctx.strokeStyle = C('--axle'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bc[0], bc[1]); ctx.lineTo(wc[0], wc[1]); ctx.stroke();
+    // the wheel seen edge-on from above: a short bar across the axle
+    const uu = top(add(cen, u, GYRO.R)), ud = top(add(cen, u, -GYRO.R)); ctx.strokeStyle = C('--tire'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(uu[0], uu[1]); ctx.lineTo(ud[0], ud[1]); ctx.stroke();
+    ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(bc[0], bc[1], 3, 0, TAU); ctx.fill();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('from above', bc[0], by + box - 6);
+    // time
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, 't = ' + simT.toFixed(1) + ' s' + (S.slow && tab === 2 ? ' (¼ speed)' : ''), 10, 18);
+  }
+
+  // ================================================================
+  // 4. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const per = W => W > 1e-9 ? (TAU / W).toFixed(1) + ' s' : '—';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    const Om = P.w3 > 0 ? gyroRate(P) : 0, spinTxt = spinNow() + ' turns per second';
+    if (tab === 1) {
+      html = card('Spin', spinTxt, 'ω = ' + P.w3.toFixed(0) + ' rad/s; the wheel\'s moment of inertia about its axle is I₃ = ' + P.I3.toFixed(3) + ' kg·m²');
+      html += held ? card('The axle', 'held level', 'by the support under its far end') : card('Swinging around', 'one turn every ' + per(phiDot(st, P)), 'precession, at Ω = M g d / (I₃ ω) = ' + Om.toFixed(2) + ' rad/s: twice the spin, half as fast; twice the distance, twice as fast');
+      html += card('Height of the wheel', held ? 'level with the pivot' : (Math.abs(st.th - LEVEL) < 0.002 ? 'stays level' : ((st.th - LEVEL) * 180 / Math.PI).toFixed(1) + '° below level'), held ? 'gravity pulls it down with ' + (GYRO.M * GYRO.g).toFixed(1) + ' N' : 'gravity still pulls it down with ' + (GYRO.M * GYRO.g).toFixed(1) + ' N, but it doesn\'t fall');
+    } else if (tab === 2) {
+      const wob = P.I3 * P.w3 / P.I1 / TAU, avg = !held && simT - relT > 0.3 ? (st.ph - relPh) / (simT - relT) : 0;
+      html = card('Deepest dip', held ? '—' : (maxDip * 180 / Math.PI).toFixed(1) + '° below level', 'less with a faster spin');
+      html += card('Wobble', 'about ' + wob.toFixed(1) + ' per second', 'nutation, at about I₃ω / I₁' + (S.friction ? '; friction makes it die away' : ''));
+      html += card('Swinging around', held ? '—' : 'on average one turn every ' + per(avg), 'smoothly, it would take ' + per(Om) + ', from M g d / (I₃ ω)');
+    } else {
+      const L = held || P.w3 === 0 ? P.I3 * P.w3 : Math.hypot(...angMom(st, P)), tq = P.mgd * Math.abs(Math.sin(st.th));
+      if (P.w3 > 0) {
+        html = card('Angular momentum L', L.toFixed(2) + ' kg·m²/s', 'I₃ ω, pointing along the axle, away from the pivot (right-hand rule for the spin)');
+        html += card('Gravity\'s torque τ', tq.toFixed(2) + ' N·m', 'M g d, about the pivot: level, and at right angles to the axle');
+        html += card('So L turns at', held ? '—' : (tq / L).toFixed(2) + ' rad/s', held ? 'the support\'s torque cancels gravity\'s while it is held' : 'τ / L: each moment the torque adds a little to L sideways, so L, and the axle with it, swings around instead of tipping down');
+      } else {
+        html = card('Angular momentum L', held ? '0' : Math.hypot(...angMom(st, P)).toFixed(2) + ' kg·m²/s', 'not spinning, so it starts from nothing');
+        html += card('Gravity\'s torque τ', tq.toFixed(2) + ' N·m', 'the same as when it spins');
+        html += card('So', held ? '—' : 'it falls', 'L grows from zero in the direction of τ: a turning about a level line at right angles to the axle, which is the wheel tipping down');
+      }
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'A wheel spins fast on the end of an axle. The other end of the axle rests on a pivot, and a support holds up the wheel\'s end. Predict: when the support is taken away, what does the wheel do?',
+         notes: '<p><b>What to try.</b> Take the support away and watch from the side, then drag the picture to look from above. Change the spin: faster spin, slower swinging around. Move the wheel farther from the pivot: faster.</p>' +
+                '<p><b>Why.</b> Gravity pulls the wheel down, which twists the axle about the pivot: a torque. For a wheel that isn\'t spinning, that twist starts it tipping. A spinning wheel already has a lot of angular momentum along its axle, and the torque, which points sideways, changes that angular momentum sideways. So the axle swings around rather than falling: precession, at a rate Ω = M g d / (I₃ ω). The third tab shows the arrows.</p>' +
+                '<p><b>The model.</b> A ' + GYRO.M + ' kg wheel of radius ' + (GYRO.R * 100) + ' cm with most of its mass in the rim (I₃ = ' + GYRO.rim + ' M R²), on a light axle, on a frictionless pivot; g = ' + GYRO.g + ' m/s². Here the wheel is set going with exactly the right sideways push for smooth, level precession; the second tab shows what happens if you simply let go. The motion is the exact motion of a rigid wheel on a fixed pivot, checked against a separate calculation.</p>' },
+    2: { lede: 'With a real gyroscope you just let go of it. Predict: does the axle stay level and swing smoothly around, or does something else happen first? What changes if the wheel spins more slowly?',
+         notes: '<p><b>What to try.</b> Let go at a slow spin and watch the wheel dip and bob as it starts to swing around. Try ¼ speed, and look at the path of the wheel: it stops for an instant at the top of every bob. Turn off friction and the bobbing goes on forever; with friction it dies away. Spin faster and the dip gets smaller and the bobbing faster, until you can hardly see it.</p>' +
+                '<p><b>Why.</b> Held still, the axle isn\'t swinging around yet. Gravity first pulls the wheel down a little, and that drop is what gets it moving sideways; it overshoots, comes back up, and repeats: nutation. On average it swings around at about the smooth rate from the first tab. The faster the spin, the less it has to drop before it gets going.</p>' +
+                '<p><b>The model.</b> The same wheel and pivot as the first tab, let go from rest with the axle level. With friction on, a little damping slows the axle\'s up-and-down motion only, as friction in a real pivot does; the energy it takes is why the wheel settles a little below level. The deepest dip and the stopping points at the top agree with energy and angular momentum conservation exactly.</p>' },
+    3: { lede: 'Gravity pulls the wheel down, so why doesn\'t it fall? The arrows show what\'s going on. Predict: if the wheel isn\'t spinning at all, what happens when the support is taken away?',
+         notes: '<p><b>What to try.</b> Take the support away and follow the tip of L: it moves in the direction of the torque τ, around the dashed circle. Drag to look from above. Then stop the wheel spinning and try again. Turn on the weight and the pivot force: the pivot holds the wheel up, and pulls it in a little to keep it going in a circle.</p>' +
+                '<p><b>Why.</b> Torque is the rate of change of angular momentum: in each instant, L gains τ Δt, in the direction of τ. Gravity\'s torque about the pivot is level and at right angles to the axle. When the wheel spins, L is large and points along the axle, so adding a small sideways piece turns L, and the axle with it, around the pivot; L never gets longer, and the wheel never drops. When it doesn\'t spin, L starts at zero and simply grows in the direction of τ, which is the wheel starting to tip down.</p>' +
+                '<p><b>The model.</b> As in the first tab. L is drawn from the pivot, and includes the small part that comes from the axle swinging around, which is why it tips up slightly from the axle. The arrows keep fixed scales, so their sizes can be compared as you change things.</p>' }
+  };
+
+  // ================================================================
+  // 5. CONTROLS
+  // ================================================================
+  function visibility() {
+    $('lab_spinning').hidden = tab !== 3; $('lab_slow').hidden = tab !== 2; $('lab_friction').hidden = tab !== 2;
+    $('lab_spin').hidden = tab === 3 && !S.spinning;
+    $('act').textContent = held ? (tab === 2 ? 'Let go' : 'Take the support away') : 'Put the support back';
+    $('go').textContent = playing ? 'Pause' : 'Play';
+    document.querySelectorAll('#spinning button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === S.spinning)));
+    document.querySelectorAll('#slow button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === S.slow)));
+    $('friction').checked = S.friction;
+    ['L', 'tq', 'w', 'F', 'path'].forEach(k => { $('show_' + k).checked = S.show[k]; });
+  }
+  function vals() { $('spin_v').textContent = S.spin + ' turns/s'; $('d_v').textContent = (S.d * 100).toFixed(0) + ' cm'; }
+  function sync() { $('spin').value = String(S.spin); $('d').value = String(S.d); vals(); }
+  function upd() { visibility(); vals(); readout(); drawScene(); }
+  function setTab(k) {
+    tab = k; playing = true; S.show = Object.assign({}, SHOW_DEFAULT[k]); if (k === 3) S.spinning = true;
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    view.el = k === 3 ? 0.62 : 0.33; st = null; simT = 0; hold(); sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  $('act').addEventListener('click', () => { if (held) letGo(); else hold(); playing = true; upd(); });
+  $('go').addEventListener('click', () => { playing = !playing; upd(); });
+  $('spin').addEventListener('input', () => { S.spin = +$('spin').value; changed(); upd(); });
+  $('d').addEventListener('input', () => { S.d = +$('d').value; changed(); upd(); });
+  document.querySelectorAll('#spinning button').forEach(b => b.addEventListener('click', () => { S.spinning = b.dataset.v === '1'; hold(); upd(); }));
+  document.querySelectorAll('#slow button').forEach(b => b.addEventListener('click', () => { S.slow = b.dataset.v === '1'; upd(); }));
+  $('friction').addEventListener('change', () => { S.friction = $('friction').checked; const keep = st; makeP(); st = keep; upd(); });
+  ['L', 'tq', 'w', 'F', 'path'].forEach(k => $('show_' + k).addEventListener('change', () => { S.show[k] = $('show_' + k).checked; upd(); }));
+  window.addEventListener('resize', drawScene);
+  // turning the view: drag sideways to go around, up and down (with a mouse) to look from higher or lower
+  const sc = $('scene'); let drag = null;
+  sc.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, az: view.az, el: view.el, mouse: e.pointerType === 'mouse' }; sc.setPointerCapture(e.pointerId); });
+  sc.addEventListener('pointermove', e => { if (!drag) return; view.az = drag.az - (e.clientX - drag.x) * 0.01; if (drag.mouse) view.el = Math.max(0.02, Math.min(1.5, drag.el + (e.clientY - drag.y) * 0.01)); if (!playing) drawScene(); });
+  const endDrag = () => { drag = null; }; sc.addEventListener('pointerup', endDrag); sc.addEventListener('pointercancel', endDrag);
+  sc.addEventListener('keydown', e => { const d = { ArrowLeft: [0.15, 0], ArrowRight: [-0.15, 0], ArrowUp: [0, 0.1], ArrowDown: [0, -0.1] }[e.key]; if (!d) return;
+    view.az += d[0]; view.el = Math.max(0.02, Math.min(1.5, view.el + d[1])); e.preventDefault(); drawScene(); });
+
+  // ================================================================
+  // 6. LOOP
+  // ================================================================
+  let last = null, lastRead = 0;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+    if (dt > 0 && !document.hidden && playing && !reduced) {
+      const h = dt * (tab === 2 && S.slow ? 0.25 : 1); simT += h;
+      const psi0 = st.psi;
+      if (held) st.psi += P.w3 * h;
+      else {
+        st = advance(st, P, h, 1e-3);
+        maxDip = Math.max(maxDip, st.th - LEVEL);
+        if (simT - lastTrail > 0.015) { const n = axle(st); trail.push([S.d * n[0], S.d * n[1], S.d * n[2]]); lastTrail = simT; if (trail.length > 420) trail.shift(); }
+        if (!isFinite(st.th)) hold();
+      }
+      psiStep = st.psi - psi0;
+      drawScene();
+      if (ts - lastRead > 150) { readout(); visibility(); lastRead = ts; }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
