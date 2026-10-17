@@ -42,13 +42,14 @@ files(out).forEach(f => {
   const h = fs.readFileSync(path.join(out, f), 'utf8'), url = f === 'index.html' ? SITE + '/' : SITE + '/' + f.replace(/\.html$/, '');
   if (h.split('<!-- site-meta:').length === 2) one++;
   if (h.indexOf('<!-- /site-meta -->') < h.search(/<\/head>/i)) inHead++;
-  if (h.includes('<link rel="canonical" href="' + url + '">') && h.includes('<meta property="og:url" content="' + url + '">')) canon++;
-  const s = SIMS.find(x => 'sims/' + x.slug + '.html' === f);
+  const s = SIMS.find(x => 'sims/' + x.slug + '.html' === f), draft = f !== 'index.html' && !s;
+  if (draft ? (h.includes('<meta name="robots" content="noindex">') && !h.includes('rel="canonical"')) : (h.includes('<link rel="canonical" href="' + url + '">') && h.includes('<meta property="og:url" content="' + url + '">'))) canon++;
   if (!s || (h.includes('<meta property="og:title" content="' + META.esc(s.pageTitle || s.title + ' simulation') + '">') && h.includes('<meta property="og:description" content="' + META.esc(s.blurb) + '">'))) titles++;
 });
 const n = files(out).length;
 ok(one === n && inHead === n, 'every page (' + n + ') has the block exactly once, in <head>');
-ok(canon === n, 'canonical address and og:url: the site\'s address, without .html (what Cloudflare serves)');
+const nDrafts = files(out).filter(f => f !== 'index.html' && !SIMS.some(x => 'sims/' + x.slug + '.html' === f)).length;
+ok(canon === n, 'canonical address and og:url: the site\'s address, without .html (what Cloudflare serves); ' + nDrafts + ' unlisted draft(s) marked noindex instead');
 ok(titles === n, 'link-preview title and description match sims.js');
 ok(fs.readFileSync(path.join(out, 'index.html'), 'utf8').includes('<meta property="og:image" content="' + SITE + '/share.png">'), 'preview picture at an absolute address');
 const sm = fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8'), locs = [...sm.matchAll(/<loc>([^<]*)<\/loc>/g)].map(m => m[1]);

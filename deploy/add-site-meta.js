@@ -52,6 +52,8 @@ function block(site, file, title, description) {
     '<meta name="twitter:card" content="summary_large_image">\n' +
     '<!-- /' + MARK + ' -->\n';
 }
+const draftBlock = () => '<!-- ' + MARK + ': added when this copy of the site was deployed. This page is not listed in the directory yet, so search engines are asked to leave it out. You can delete it. -->\n' +
+  '<meta name="robots" content="noindex">\n<!-- /' + MARK + ' -->\n';
 function addBlock(html, b, name) {
   if (html.includes('<!-- ' + MARK + ':')) return html;
   const i = html.search(/<\/head>/i);
@@ -111,13 +113,17 @@ function run(argv, env) {
     const f = 'sims/' + s.slug + '.html', p = path.join(dir, f); if (!fs.existsSync(p)) return;
     fs.writeFileSync(p, addBlock(fs.readFileSync(p, 'utf8'), block(site, f, s.pageTitle || s.title + ' simulation', s.blurb), f));
   });
+  // a page in sims/ not listed in sims.js is a draft: ask search engines to leave it out until it is listed
+  const drafts = fs.readdirSync(path.join(dir, 'sims')).filter(f => f.endsWith('.html') && !SIMS.some(s => s.slug + '.html' === f));
+  drafts.forEach(f => { const p = path.join(dir, 'sims', f);
+    fs.writeFileSync(p, addBlock(fs.readFileSync(p, 'utf8'), draftBlock(), 'sims/' + f)); });
   fs.writeFileSync(path.join(dir, 'sitemap.xml'), sitemap(site, SIMS));
   fs.writeFileSync(path.join(dir, 'robots.txt'), robots(site));
-  console.log('site-meta: list written into index.html; canonical addresses and link previews on ' + (SIMS.length + 1) + ' pages; sitemap.xml and robots.txt for ' + site + (out ? ' (in ' + out + ')' : ''));
+  console.log('site-meta: list written into index.html; canonical addresses and link previews on ' + (SIMS.length + 1) + ' pages' + (drafts.length ? '; ' + drafts.length + ' unlisted draft(s) marked noindex' : '') + '; sitemap.xml and robots.txt for ' + site + (out ? ' (in ' + out + ')' : ''));
 }
 
 if (require.main === module) {
   try { run(process.argv.slice(2), process.env); }
   catch (e) { console.error('site-meta: ' + e.message); process.exit(1); }
 }
-module.exports = { MARK, IMAGE, siteUrl, pageUrl, block, addBlock, cardBuilder, prerender, sitemap, robots, run };
+module.exports = { MARK, IMAGE, siteUrl, pageUrl, block, draftBlock, addBlock, cardBuilder, prerender, sitemap, robots, run };

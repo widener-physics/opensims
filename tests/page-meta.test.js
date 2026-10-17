@@ -1,10 +1,12 @@
-// The pages' titles and descriptions: every simulation in sims/ is listed in sims.js, and its <title> and
-// <meta name="description"> match its entry there (run `npm run meta` to update them).
+// The pages' titles and descriptions: every simulation listed in sims.js has its page, and the page's <title> and
+// <meta name="description"> match its entry there (run `npm run meta` to update them). Pages in sims/ that aren't
+// listed yet are drafts, noted but not checked.
 'use strict';
 const M = require('../tools/page-meta.js');
 let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 const res = M.check();
-res.forEach(r => ok(r.ok, r.file + (r.ok ? '' : ': ' + r.problem)));
+res.filter(r => !r.draft).forEach(r => ok(r.ok, r.file + (r.ok ? '' : ': ' + r.problem)));
+res.filter(r => r.draft).forEach(r => console.log('NOTE ' + r.file + ' is not listed in sims.js, so it is treated as a draft: not in the directory, the sitemap or these checks'));
 // sanity of the rule itself
 const s = { title: 'Rolling race', blurb: 'Hoop & disc "race".' };
 ok(M.titleFor(s) === 'Rolling race simulation | ' + M.SITE_NAME, 'title without pageTitle: the title plus "simulation"');

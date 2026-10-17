@@ -6,7 +6,8 @@
 //   npm run meta                 (node tools/page-meta.js)           update the pages in sims/
 //   node tools/page-meta.js --check                                  report pages that are out of date; change nothing
 //
-// tests/page-meta.test.js runs the check, so a page that has drifted from sims.js fails the tests.
+// tests/page-meta.test.js runs the check, so a page that has drifted from sims.js fails the tests. A page in sims/
+// that isn't listed in sims.js yet is treated as a draft and left alone.
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 
@@ -42,7 +43,8 @@ function check(root) {
     let want; try { want = apply(html, s, file); } catch (e) { out.push({ slug: s.slug, file, ok: false, problem: e.message }); return; }
     out.push({ slug: s.slug, file, ok: want === html, problem: want === html ? '' : 'title or description differs from sims.js (run npm run meta)' });
   });
-  files.filter(f => !SIMS.some(s => s.slug + '.html' === f)).forEach(f => out.push({ slug: f, file: 'sims/' + f, ok: false, problem: 'not listed in sims.js' }));
+  // a page in sims/ that isn't listed yet is a draft: it isn't in the directory, and isn't checked here
+  files.filter(f => !SIMS.some(s => s.slug + '.html' === f)).forEach(f => out.push({ slug: f, file: 'sims/' + f, ok: true, draft: true, problem: '' }));
   return out;
 }
 
@@ -56,7 +58,8 @@ function write(root) {
 
 if (require.main === module) {
   if (process.argv.includes('--check')) {
-    const bad = check().filter(r => !r.ok);
+    const res = check(), bad = res.filter(r => !r.ok);
+    res.filter(r => r.draft).forEach(r => console.log(r.file + ': not listed in sims.js, so treated as a draft (left alone)'));
     bad.forEach(r => console.log(r.file + ': ' + r.problem));
     console.log(bad.length ? bad.length + ' page(s) out of date' : 'all pages match sims.js');
     process.exit(bad.length ? 1 : 0);

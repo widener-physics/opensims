@@ -50,6 +50,28 @@ window.SIMS = [
     status: 'ready'
   },
   {
+    slug: 'atwood-machine',
+    title: 'Atwood machine',
+    pageTitle: 'Atwood machine simulation: pulleys, tension and acceleration',
+    topic: 'dynamics',
+    tags: ['Atwood machine', 'pulley', 'tension', 'acceleration', "Newton's second law", 'rotational inertia'],
+    blurb: "Hang two masses over a pulley and let go: the heavier side falls with a steady acceleration, set by the difference in weight over the total mass. Then give the pulley some mass and watch the acceleration drop and the tensions on the two sides pull apart.",
+    level: 'intro',
+    added: '2026-10-10',
+    status: 'ready'
+  },
+  {
+    slug: 'ballistic-pendulum',
+    title: 'Ballistic pendulum',
+    pageTitle: 'Ballistic pendulum simulation: momentum and energy',
+    topic: 'dynamics',
+    tags: ['ballistic pendulum', 'momentum', 'inelastic collision', 'conservation of energy', 'pendulum', 'projectile speed'],
+    blurb: "Fire a projectile into a hanging block and watch the pair swing up. Momentum carries through the collision and energy carries through the swing, so the height of the swing gives back the projectile's speed, just as the device was first used in 1742 to measure the speed of musket balls.",
+    level: 'intro',
+    added: '2026-10-10',
+    status: 'ready'
+  },
+  {
     slug: 'coriolis',
     title: 'Turning frames: the Coriolis effect',
     pageTitle: 'Coriolis effect simulation: rotating frames',
