@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<!--
+  The Michelson interferometer - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The ring pattern matches
+  two waves added over their exact paths; fringe counts match the mirror's travel and the gas cell's phase;
+  the index of air matches Edlen's published value; LIGO's arm change and the 2015 chirp's sweep match
+  published numbers.
+  Credit: none; PhET has no interferometer simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Michelson interferometer simulation: fringes, refractive index and LIGO | Open Physics Sims</title>
+<meta name="description" content="Slide a mirror a fraction of a micrometer and watch rings stream out of the center, one for every half wavelength. Let air into a cell in one arm and count the rings as the light slows, then see LIGO's 4 km version catch the 2015 gravitational wave from two merging black holes.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --mirror: #B9C7D0; --stage: #8C979E; --tube: #DDE3E7; --curve: #1D4F73;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 470; touch-action: pan-y; }
+  #scene.grab { touch-action: none; cursor: grab; }
+  #graph { aspect-ratio: 900 / 170; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--body); }
+  .checks { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 4px 18px; font-size: 13px; }
+  .checks .check { white-space: nowrap; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.3; }
+    #graph { aspect-ratio: 1 / 0.55; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>The Michelson interferometer</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Move a mirror</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Something in one arm</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>LIGO</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="The interferometer seen from above, and the pattern on its screen"></canvas>
+  <div class="row2">
+    <button id="go">Move it slowly</button>
+    <button id="reset" class="secondary">Reset</button>
+    <button id="waves" class="secondary" aria-pressed="false">Show the waves</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="The strain of the gravitational wave against time"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_laser"><div>Laser</div><div class="seg" id="laser" role="group" aria-label="Laser"><button data-v="red">red (helium-neon)</button><button data-v="green">green</button><button data-v="blue">blue</button></div></div>
+    <label id="lab_lam"><div class="row"><span>Wavelength</span><span class="val" id="lam_v"></span></div><input type="range" id="lam" min="400" max="700" step="0.1"></label>
+    <label id="lab_d"><div class="row"><span>Movable mirror: arm difference</span><span class="val" id="d_v"></span></div><input type="range" id="d" min="0" max="2000" step="5"></label>
+    <label id="lab_fine"><div class="row"><span>Fine screw</span><span class="val" id="fine_v"></span></div><input type="range" id="fine" min="-1.5" max="1.5" step="0.005"></label>
+    <div class="grp" id="lab_obj"><div>In the right arm</div><div class="seg" id="obj" role="group" aria-label="In the right arm"><button data-v="cell">a 3 cm gas cell</button><button data-v="warm">warm air</button></div></div>
+    <label id="lab_P"><div class="row"><span>Air pressure in the cell</span><span class="val" id="P_v"></span></div><input type="range" id="P" min="0" max="101.3" step="0.1"></label>
+    <label id="lab_T"><div class="row"><span>Temperature of 10 cm of air</span><span class="val" id="T_v"></span></div><input type="range" id="T" min="20" max="120" step="0.5"></label>
+    <div class="grp" id="lab_gw"><div>The gravitational wave</div><div class="seg" id="gw" role="group" aria-label="Gravitational wave"><button data-v="steady">a steady wave</button><button data-v="merger">two black holes merging (2015)</button></div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/michelson-interferometer.test.js)
+  // ================================================================
+  // ---- physics core: the Michelson interferometer ----
+  // SI units (lengths in meters). A beam splitter sends half the light down each arm; each returns from a mirror and the
+  // two halves meet again at the screen. What the screen shows depends only on the difference in the light's trip:
+  // twice the difference in arm lengths, plus anything that slows the light in one arm.
+  const LASERS = [{ id: 'red', name: 'helium-neon, red', lam: 632.8e-9 }, { id: 'green', name: 'green', lam: 532.0e-9 }, { id: 'blue', name: 'blue', lam: 450.0e-9 }];
+
+  // ---- the ring pattern ----
+  // The light spreads out a little from the laser (a lens in front of it), so it crosses the arms at small angles theta.
+  // The returning beams look as if they came from two point sources, one 2d behind the other along the axis, so light
+  // at angle theta has traveled 2 d cos(theta) farther in one arm, plus extra (the slowing in one arm).
+  // Brightness (0 to 1, the two beams equal): cos^2(pi * difference / lambda)
+  const pathDiff = (d, th, extra) => 2 * d * Math.cos(th) + (extra || 0);
+  const brightness = (d, th, lam, extra) => Math.cos(Math.PI * pathDiff(d, th, extra) / lam) ** 2;
+  // the bright rings on a screen covering angles up to thMax: orders m with 2 d cos(theta) + extra = m lambda
+  function rings(d, lam, thMax, extra) {
+    extra = extra || 0; const out = [], a = (2 * Math.abs(d) * Math.cos(thMax) + extra) / lam, b = (2 * Math.abs(d) + extra) / lam;
+    for (let m = Math.ceil(Math.min(a, b)); m <= Math.floor(Math.max(a, b)); m++) { const c = (m * lam - extra) / (2 * Math.abs(d)); if (Math.abs(d) > 0 && c <= 1 && c >= Math.cos(thMax)) out.push({ m, th: Math.acos(c) }); }
+    return out.sort((p, q) => p.th - q.th);
+  }
+  // moving the mirror by dx changes the trip by 2 dx: one ring appears (or vanishes) at the center for every lambda/2
+  const fringesPassed = (dx, lam) => 2 * dx / lam;
+
+  // ---- slowing the light in one arm ----
+  // the refractive index of air (Edlen 1966, standard dry air at 15 C and 101 325 Pa), at vacuum wavelength lam
+  function airIndex15(lam) { const s2 = (1e-6 / lam) ** 2; return 1 + 1e-8 * (8342.13 + 2406030 / (130 - s2) + 15997 / (38.9 - s2)); }
+  // at pressure P (Pa) and temperature T (K): n - 1 is proportional to the gas's density, P / T (ideal gas)
+  const airIndex = (lam, P, T) => 1 + (airIndex15(lam) - 1) * (P / 101325) * (288.15 / T);
+  // a cell of length Lc in one arm, holding air at (P, T): the light crosses it twice
+  const cellExtra = (lam, Lc, P, T) => 2 * Lc * (airIndex(lam, P, T) - 1);
+
+  // ---- LIGO ----
+  // arms L = 4 km; the light bounces back and forth about 280 times in each arm (an optical cavity) before returning;
+  // infrared laser at 1064 nm. A gravitational wave of strain h passing straight down stretches one arm by h L / 2 and
+  // squeezes the other by as much.
+  const LIGO = { L: 4000, bounces: 280, lam: 1064e-9 };
+  const armChange = (h, L) => h * (L || LIGO.L) / 2;
+  // the change in the light's trip difference, and the phase it makes
+  const ligoExtra = h => 2 * (2 * armChange(h)) * LIGO.bounces;
+  const ligoPhase = h => 2 * Math.PI * ligoExtra(h) / LIGO.lam;
+  // two black holes spiraling together: the wave's frequency rises as they close in. To leading order (Newtonian
+  // "chirp"), with chirp mass Mc, the time left before they merge at frequency f is
+  //   tau = (5/256) (pi f)^(-8/3) (G Mc / c^3)^(-5/3); the wave's frequency is twice the orbital frequency.
+  const GC3 = 6.6743e-11 * 1.98841e30 / 2.99792458e8 ** 3;      // G Msun / c^3, seconds
+  const chirpTau = (f, McSun) => 5 / 256 * Math.pow(Math.PI * f, -8 / 3) * Math.pow(McSun * GC3, -5 / 3);
+  const chirpFreq = (tau, McSun) => Math.pow(256 / 5 * tau, -3 / 8) * Math.pow(McSun * GC3, -5 / 8) / Math.PI;
+  // the wave itself, a time tau before merger: amplitude grows as f^(2/3); phase from integrating the frequency
+  // (phi = -2 (tau / (5 G Mc/c^3))^(5/8)); scaled so its peak (at fMax) is hPeak
+  function chirpStrain(tau, McSun, hPeak, fMax) {
+    if (tau <= 0) return 0;
+    const f = Math.min(chirpFreq(tau, McSun), fMax), ph = -2 * Math.pow(tau / (5 * McSun * GC3), 5 / 8);
+    return hPeak * Math.pow(f / fMax, 2 / 3) * Math.cos(ph);
+  }
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. STATE
+  // ================================================================
+  const TH_MAX = 0.075, TH_BEAM = 0.06;         // the screen shows angles up to 0.075 rad; the beam's own spread
+  const S = { laser: 'red', lam: 632.8e-9, d: 1000e-6, fine: 0, obj: 'cell', P: 0, T: 20, gw: 'steady', waves: false };
+  let tab = 1, moving = false, t = 0, count0 = null, gwT = 0, gwRun = false, trace = [];
+  const MOVE_RATE = 0.25e-6;     // m per second when "Move it slowly"
+  const LEAK_RATE = 2000;        // Pa per second when air is let into the cell
+  const HEAT_RATE = 4;           // degrees per second when the air is warmed
+  const D2 = 1000e-6;     // tab 2 keeps the arms at a fixed difference
+  const dTotal = () => tab === 2 ? D2 : S.d + S.fine * 1e-6;
+  // the extra trip in the right arm from what is in it (tab 2): relative to an empty, evacuated cell, or to 20 C air
+  const extra = () => tab !== 2 ? 0 : S.obj === 'cell' ? cellExtra(S.lam, 0.03, S.P * 1000, 293.15) : -(cellExtra(S.lam, 0.10, 101325, 293.15) - cellExtra(S.lam, 0.10, 101325, S.T + 273.15));
+  const phaseNow = () => (2 * dTotal() + extra()) / S.lam;       // trip difference in wavelengths at the center
+  function resetCount() { count0 = phaseNow(); }
+
+  // ================================================================
+  // 3. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560, dpr };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  // the color of light of wavelength lam (approximate, for drawing)
+  function rgb(lam) { const nm = lam * 1e9; let r = 0, g = 0, b = 0;
+    if (nm < 440) { r = (440 - nm) / 60; b = 1; } else if (nm < 490) { g = (nm - 440) / 50; b = 1; } else if (nm < 510) { g = 1; b = (510 - nm) / 20; } else if (nm < 580) { r = (nm - 510) / 70; g = 1; } else if (nm < 645) { r = 1; g = (645 - nm) / 65; } else r = 1;
+    return [Math.round(255 * r), Math.round(255 * g), Math.round(255 * b)]; }
+  const rgba = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+  // a beam: a plain line, or the wave itself (crests every lw pixels), with phase ph (radians) at its start
+  function beam(ctx, x0, y0, x1, y1, col, ph, wave, amp, w) {
+    const L = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / L, uy = (y1 - y0) / L;
+    if (!wave) { ctx.strokeStyle = col; ctx.lineWidth = w || 2.5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); return; }
+    const lw = 16; ctx.strokeStyle = col; ctx.lineWidth = w || 1.6; ctx.beginPath();
+    for (let s = 0; s <= L; s += 1) { const yv = (amp || 5) * Math.sin(ph - TAU * s / lw); const px = x0 + ux * s - uy * yv, py = y0 + uy * s + ux * yv; s ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.stroke();
+  }
+  function mirror(ctx, x, y, w, h, lab, lx, ly) { ctx.fillStyle = C('--mirror'); ctx.fillRect(x - w / 2, y - h / 2, w, h); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1; ctx.strokeRect(x - w / 2, y - h / 2, w, h); if (lab) { font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, lab, lx, ly); } }
+  // the tabletop instrument (tabs 1 and 2) in the box (bx, by, bw, bh)
+  function drawBench(ctx, bx, by, bw, bh, compact) {
+    const col = rgb(S.lam), c1 = rgba(col, 0.95), sx = bx + bw * 0.42, sy = by + bh * 0.52;     // the beam splitter
+    const lx = bx + 14, m1y = by + bh * 0.1, m2x = bx + bw * 0.86 + Math.min(1, dTotal() / 2000e-6) * bw * 0.08, oy = by + bh * 0.97;
+    const ph0 = t * 6, k = TAU / 16, dphi = TAU * phaseNow();
+    // laser
+    ctx.fillStyle = C('--ink'); ctx.fillRect(lx, sy - 10, 44, 20); font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, 'laser', lx, sy - 16);
+    // beams: in from the laser; up to the fixed mirror and back; right to the movable one and back; down to the screen
+    const W = S.waves;
+    beam(ctx, lx + 44, sy, sx, sy, c1, ph0, W);
+    beam(ctx, sx, sy, sx, m1y + 4, c1, ph0 - k * (sx - lx - 44), W, 4);
+    beam(ctx, sx, sy, m2x - 4, sy, c1, ph0 - k * (sx - lx - 44), W, 4);
+    // the returning beams, drawn side by side going down to the screen: their sum shows on the screen
+    const aLen = sy - m1y - 4, bLen = m2x - 4 - sx;
+    beam(ctx, sx - 3, sy, sx - 3, oy, rgba(col, W ? 0.55 : 0.95), ph0 - k * (sx - lx - 44 + 2 * aLen), W, 4, W ? 1.2 : 2.5);
+    if (W) { beam(ctx, sx + 3, sy, sx + 3, oy, rgba(col, 0.55), ph0 - k * (sx - lx - 44 + 2 * aLen) - dphi, W, 4, 1.2);
+      // their sum, offset to the side so it can be seen
+      ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.beginPath(); const p0 = ph0 - k * (sx - lx - 44 + 2 * aLen), x0 = sx + 26;
+      for (let s = 0; s <= oy - sy; s += 1) { const y = 4 * (Math.sin(p0 - k * s) + Math.sin(p0 - k * s - dphi)); s ? ctx.lineTo(x0 + y, sy + s) : ctx.moveTo(x0 + y, sy + s); } ctx.stroke();
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, 'together', x0 + 12, oy - 6); }
+    // the beam splitter
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate(-Math.PI / 4); ctx.fillStyle = 'rgba(160,190,210,0.55)'; ctx.fillRect(-20, -3, 40, 6); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1; ctx.strokeRect(-20, -3, 40, 6); ctx.restore();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, 'beam splitter', sx + 14, sy + 24);
+    mirror(ctx, sx, m1y, 46, 6, 'fixed mirror', sx + (compact ? 0 : 74), m1y + (compact ? -10 : 4));
+    // the movable mirror on its stage, with the screw
+    mirror(ctx, m2x, sy, 6, 46, '', 0, 0);
+    ctx.fillStyle = C('--stage'); ctx.fillRect(m2x + 3, sy + 26, 22, 8); ctx.fillRect(m2x + 20, sy - 4, 16, 8);
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, tab === 1 ? 'movable mirror' : 'mirror', m2x - (compact ? 10 : 0), sy - 32);
+    // what's in the right arm (tab 2)
+    if (tab === 2) {
+      const cx0 = sx + (m2x - sx) * 0.35, cx1 = sx + (m2x - sx) * 0.72;
+      if (S.obj === 'cell') { ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5; ctx.fillStyle = 'rgba(29,79,115,' + (0.04 + 0.16 * S.P / 101.3).toFixed(3) + ')'; ctx.fillRect(cx0, sy - 14, cx1 - cx0, 28); ctx.strokeRect(cx0, sy - 14, cx1 - cx0, 28);
+        ctx.beginPath(); ctx.moveTo((cx0 + cx1) / 2, sy - 14); ctx.lineTo((cx0 + cx1) / 2, sy - 34); ctx.stroke(); font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; label(ctx, 'gas cell: ' + S.P.toFixed(1) + ' kPa', (cx0 + cx1) / 2, sy - 40); }
+      else { const hot = (S.T - 20) / 100; ctx.fillStyle = 'rgba(200,50,30,' + (0.05 + 0.3 * hot).toFixed(3) + ')'; ctx.fillRect(cx0, sy - 16, cx1 - cx0, 32);
+        ctx.strokeStyle = 'rgba(200,50,30,' + (0.3 + 0.5 * hot).toFixed(3) + ')'; ctx.lineWidth = 1.2; for (let j = 0; j < 4; j++) { const xx = cx0 + (j + 0.5) * (cx1 - cx0) / 4; ctx.beginPath(); for (let y = 0; y <= 34; y += 2) { const px = xx + 3 * Math.sin(y / 5 + t * 4 + j); y ? ctx.lineTo(px, sy + 20 - y) : ctx.moveTo(px, sy + 20 - y); } ctx.stroke(); }
+        ctx.fillStyle = C('--ink'); ctx.fillRect(cx0 + 4, sy + 22, cx1 - cx0 - 8, 6); font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; label(ctx, 'warm air: ' + S.T.toFixed(0) + ' °C', (cx0 + cx1) / 2, sy - 22); }
+    }
+    if (!compact) { font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; label(ctx, 'to the screen ↓', sx, oy + 12); }
+  }
+  // the screen: the real ring pattern, computed pixel by pixel
+  let ringCache = { key: '' };
+  function drawScreen(ctx, cx, cy, R) {
+    const key = [S.lam, dTotal(), extra(), Math.round(R)].join('|');
+    if (ringCache.key !== key) {
+      const n = Math.max(40, Math.round(R * 2 * Math.min(2, window.devicePixelRatio || 1))), cv = ringCache.cv || document.createElement('canvas'); cv.width = n; cv.height = n;
+      const c2 = cv.getContext('2d'), img = c2.createImageData(n, n), dd = img.data, col = rgb(S.lam), d = dTotal(), ex = extra();
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const x = (i + 0.5) / n * 2 - 1, y = (j + 0.5) / n * 2 - 1, r = Math.hypot(x, y), q = 4 * (j * n + i);
+        if (r > 1) { dd[q + 3] = 0; continue; }
+        const th = r * TH_MAX, I = brightness(d, th, S.lam, ex) * Math.exp(-((th / TH_BEAM) ** 2)) * 0.95 + 0.03;
+        dd[q] = 18 + col[0] * I; dd[q + 1] = 18 + col[1] * I; dd[q + 2] = 22 + col[2] * I; dd[q + 3] = 255; }
+      c2.putImageData(img, 0, 0); ringCache = { key, cv };
+    }
+    ctx.drawImage(ringCache.cv, cx - R, cy - R, 2 * R, 2 * R);
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.stroke();
+    // a small crosshair at the center, where fringes are counted
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 6, cy); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx, cy + 6); ctx.stroke();
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, 'the screen', cx, cy - R - 8);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); label(ctx, 'edge: ' + (TH_MAX * 180 / Math.PI).toFixed(1) + '° from the axis', cx, cy + R + 16);
+  }
+  // LIGO (tab 3): an L with 4 km arms, stretched and squeezed by the wave (enormously exaggerated)
+  const EXAG = 0.07 / 1e-21;     // a strain of 10^-21 drawn as a 7% change
+  function strainNow() {
+    if (S.gw === 'steady') return 1e-21 * Math.sin(TAU * 1.0 * gwT);       // 100 Hz, shown 100 times slower: once a second
+    // the 2015 merger, played 20 times slower: chirp up to 250 Hz, then a short ringdown
+    const tm = 4.0, tr = gwT / 20 - tm / 20;     // real seconds relative to the merger
+    if (tr < 0) return chirpStrain(-tr, 30, 1e-21, 250);
+    return 1e-21 * Math.exp(-tr / 0.004) * Math.cos(TAU * 250 * tr);
+  }
+  function drawLIGO(ctx, W, H, compact) {
+    const h = strainNow(), s = h * EXAG, col = [200, 40, 40], ox = W * (compact ? 0.24 : 0.2), oy = H * 0.8, Lx = W * (compact ? 0.64 : 0.62), Ly = H * 0.62;
+    const ex = ox + Lx * (1 + s / 2), ey = oy - Ly * (1 - s / 2);
+    // the wave arriving from above: rings, as a hint
+    ctx.strokeStyle = 'rgba(181,48,109,0.18)'; ctx.lineWidth = 2; for (let k = 0; k < 5; k++) { const r = 40 + ((gwT * 30 + k * 40) % 200); ctx.beginPath(); ctx.arc(ox + Lx * 0.5, oy - Ly * 0.5, r, 0, TAU); ctx.stroke(); }
+    // arms (vacuum tubes) and the light in them
+    ctx.strokeStyle = C('--tube'); ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ex, oy); ctx.moveTo(ox, oy); ctx.lineTo(ox, ey); ctx.stroke();
+    ctx.strokeStyle = rgba(col, 0.85); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ex, oy); ctx.moveTo(ox, oy); ctx.lineTo(ox, ey); ctx.stroke();
+    mirror(ctx, ex + 4, oy, 6, 26, 'end mirror', ex - 6, oy + 30); mirror(ctx, ox, ey - 4, 26, 6, 'end mirror', ox + 40, ey + 4);
+    mirror(ctx, ox + 26, oy, 4, 20, '', 0, 0); mirror(ctx, ox, oy - 26, 20, 4, '', 0, 0);
+    ctx.save(); ctx.translate(ox, oy); ctx.rotate(-Math.PI / 4); ctx.fillStyle = 'rgba(160,190,210,0.7)'; ctx.fillRect(-14, -3, 28, 6); ctx.restore();
+    ctx.fillStyle = C('--ink'); ctx.fillRect(ox - 60, oy - 7, 34, 14); font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; label(ctx, 'laser', ox - 43, oy - 12);
+    ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(ox, oy + 30, 7, 0, TAU); ctx.fill(); label(ctx, 'light detector', ox, oy + 52);
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, '4 km arm', ox + Lx / 2, oy - 14); ctx.save(); ctx.translate(ox - 16, oy - Ly / 2); ctx.rotate(-Math.PI / 2); label(ctx, '4 km arm', 0, 0); ctx.restore();
+    // the true lengths, unstretched, for comparison
+    ctx.strokeStyle = C('--rule'); ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(ox + Lx, oy - 18); ctx.lineTo(ox + Lx, oy + 18); ctx.moveTo(ox - 18, oy - Ly); ctx.lineTo(ox + 18, oy - Ly); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, 'stretching drawn about ' + niceBig(EXAG) + ' times larger than it is', 10, 18);
+    label(ctx, S.gw === 'steady' ? 'a 100 Hz wave, shown 100 times slower' : 'the 2015 signal, shown 20 times slower', 10, 34);
+  }
+  const sup = n => String(n).split('').map(ch => '⁰¹²³⁴⁵⁶⁷⁸⁹'['0123456789'.indexOf(ch)] || (ch === '-' ? '⁻' : ch)).join('');
+  function niceBig(x) { const e = Math.floor(Math.log10(x)), m = Math.round(x / 10 ** e); return (m > 1 ? m + ' \u00D7 ' : '') + '10' + sup(e); }
+  function drawGraph() {
+    const { ctx, W, H } = fit($('graph')); ctx.clearRect(0, 0, W, H);
+    if (tab !== 3 || W < 120 || H < 80) return;
+    const b = { x: 44, y: 16, w: W - 56, h: H - 40 }, span = S.gw === 'steady' ? 4 : 6, X = tt => b.x + b.w - (gwT - tt) / span * b.w, Y = v => b.y + b.h / 2 - v / 1.2e-21 * b.h / 2;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h); ctx.beginPath(); ctx.moveTo(b.x, b.y + b.h / 2); ctx.lineTo(b.x + b.w, b.y + b.h / 2); ctx.stroke();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ['+1', '0', '−1'].forEach((s, i) => ctx.fillText(s, b.x - 4, b.y + b.h / 2 + (1 - i) * -b.h / 2 * (1 / 1.2) + 3));
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); font(ctx, 11); ctx.fillText('strain the detector records (× 10⁻²¹), last ' + span + ' s of the picture', b.x + 4, b.y - 4);
+    ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2; ctx.beginPath(); trace.forEach((p, i) => { const x = X(p[0]), y = Y(p[1]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+  }
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene')); ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;
+    if (tab === 3) return drawLIGO(ctx, W, H, compact);
+    if (compact) { drawBench(ctx, 6, 30, W - 12, H * 0.46, true); const R = Math.min(W * 0.33, H * 0.17); drawScreen(ctx, W / 2, H - R - 26, R); }
+    else { drawBench(ctx, 10, 30, W * 0.56, H - 70, false); const R = Math.min(W * 0.19, H * 0.36); drawScreen(ctx, W * 0.79, H * 0.5, R); }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'not to scale' : 'tabletop, not to scale: the mirror’s motion is far too small to see', 10, 18);
+  }
+  function draw() { drawScene(); drawGraph(); }
+
+  // ================================================================
+  // 4. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const um = x => (x * 1e6).toFixed(Math.abs(x) < 10e-6 ? 3 : 1) + ' µm';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    const nm = (S.lam * 1e9).toFixed(1) + ' nm', passed = phaseNow() - count0;
+    if (tab === 1) {
+      const R = rings(dTotal(), S.lam, TH_MAX);
+      html = card('Arm difference', um(dTotal()), 'the light’s trips differ by twice this: ' + um(2 * dTotal()) + ' = ' + (2 * dTotal() / S.lam).toFixed(2) + ' wavelengths');
+      html += card('Fringes passed the center', Math.abs(passed).toFixed(1), (passed >= 0 ? 'appearing from' : 'shrinking into') + ' the center; each one is the mirror moving λ/2 = ' + (S.lam / 2 * 1e9).toFixed(1) + ' nm');
+      html += card('Bright rings on the screen', String(R.length), dTotal() < 1e-6 ? 'arms equal: one broad bright spot' : 'fewer and wider as the arms become equal');
+    } else if (tab === 2) {
+      if (S.obj === 'cell') { const n = airIndex(S.lam, S.P * 1000, 293.15);
+        html = card('Index of the air in the cell', n.toFixed(7), 'n − 1 = ' + ((n - 1) * 1e4).toFixed(3) + ' × 10⁻⁴ at ' + S.P.toFixed(1) + ' kPa, 20 °C (vacuum: exactly 1)');
+        html += card('Extra trip', ((extra()) * 1e6).toFixed(3) + ' µm', '2 × 3 cm × (n − 1): the light crosses the cell twice');
+        html += card('Fringes passed since the cell was empty', (extra() / S.lam).toFixed(1), 'about 26 at full air pressure for red light; count them and you have measured n − 1');
+      } else { const n = airIndex(S.lam, 101325, S.T + 273.15);
+        html = card('Index of the warm air', n.toFixed(7), 'n − 1 = ' + ((n - 1) * 1e4).toFixed(3) + ' × 10⁻⁴ at ' + S.T.toFixed(0) + ' °C; thinner air slows light less');
+        html += card('Trip shortened by', (-extra() * 1e6).toFixed(3) + ' µm', 'across 10 cm, twice, compared with 20 °C air');
+        html += card('Fringes passed since 20 °C', (-extra() / S.lam).toFixed(1), 'the shimmer above a hot road is this same effect');
+      }
+    } else {
+      const h = strainNow(), dL = armChange(Math.abs(h));
+      html = card('Strain now', (h / 1e-21).toFixed(2) + ' × 10⁻²¹', S.gw === 'steady' ? 'one arm stretches while the other squeezes, then the reverse' : 'GW150914: two black holes of about 36 and 29 suns, 1.3 billion light-years away');
+      html += card('Each arm changes by', (dL * 1e18).toFixed(2) + ' × 10⁻¹⁸ m', 'a thousandth of a proton’s width at 10⁻²¹; peak 2 × 10⁻¹⁸ m');
+      html += card('Phase shift in the light', (ligoPhase(Math.abs(h)) * 1e9).toFixed(1) + ' × 10⁻⁹ rad', 'the light bounces about 280 times in each arm, multiplying the effect; infrared laser, 1064 nm');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+  const TEXT = {
+    1: { lede: 'A beam of laser light is split in two, sent down two arms, reflected, and brought back together on a screen. Predict: if you move one mirror a little farther away, what happens to the pattern on the screen?',
+         notes: '<p><b>What to try.</b> Press Move it slowly: the movable mirror backs away at a quarter of a micrometer per second, and rings appear from the center and spread outward, one for every 316 nm of travel with red light. Turn the fine screw back and forth and watch them come and go. Make the arms almost equal and the rings swell until one fills the screen. Change the color: bluer light, more rings.</p>' +
+                '<p><b>Why.</b> The two halves of the light travel different distances and meet again. Where one has gone a whole number of wavelengths farther, their crests line up and the screen is bright; where it has gone a half number farther, they cancel. Light reaching the screen at an angle has a different difference (2d cosθ), so the pattern is rings. Moving the mirror by λ/2 lengthens one trip by a whole wavelength and brings back the same picture, so counting rings measures distance in wavelengths: this is how the meter was tied to light.</p>' +
+                '<p><b>The model.</b> Two equal beams; the brightness at angle θ is cos²(π · 2d cosθ / λ), checked against adding the two waves over their exact paths. The screen shows angles up to ' + (TH_MAX * 180 / Math.PI).toFixed(1) + '°; the beam is brightest in the middle. Real wavelengths: helium-neon 632.8 nm, green 532 nm, blue 450 nm.</p>' },
+    2: { lede: 'Now put something in one arm that slows the light a tiny bit: air in a cell, or air that gets warmer. Predict: can you see a change of one part in ten thousand in the speed of light?',
+         notes: '<p><b>What to try.</b> Start with the cell empty and let air in slowly: about 26 rings pass the center as the cell fills to atmospheric pressure. Then try warm air instead and heat it: the rings move the other way. The gas cell is a classic lab measurement of the refractive index of air.</p>' +
+                '<p><b>Why.</b> In air, light travels slower than in a vacuum by a factor n, the refractive index, so 3 cm of air holds a little more than 3 cm’s worth of wavelengths. The extra, 2L(n − 1), is less than a hundredth of a millimeter, but it is dozens of wavelengths, and each one moves the pattern by one ring. Warm air is thinner, so it slows the light less.</p>' +
+                '<p><b>The model.</b> The refractive index of dry air from Edlén’s formula (2.765 × 10⁻⁴ above 1 at 632.8 nm and 15 °C), proportional to the air’s density, pressure over temperature. The cell is 3 cm long; the warm air spans 10 cm; the light crosses each twice. The arm difference stays at ' + (D2 * 1e6).toFixed(0) + ' µm.</p>' },
+    3: { lede: 'LIGO is a Michelson interferometer with arms 4 km long. Predict: when a gravitational wave passes, do both arms stretch, or does one stretch while the other shrinks?',
+         notes: '<p><b>What to try.</b> Watch the steady wave stretch one arm while it squeezes the other, then the reverse. Then play the signal from September 14, 2015: two black holes spiraling together, the wave growing faster and stronger, then suddenly stopping as they merge into one.</p>' +
+                '<p><b>Why.</b> A gravitational wave stretches space in one direction while it squeezes it at right angles, so it changes the difference in the arm lengths, exactly what an interferometer measures. The change is ridiculously small: 10⁻²¹ of 4 km is a thousandth of a proton’s width. LIGO detects it by bouncing the light about 280 times in each arm, using powerful lasers and mirrors hung to isolate them from every vibration, and by comparing two detectors 3000 km apart.</p>' +
+                '<p><b>The model.</b> The 2015 signal is an approximation: the leading-order chirp of two masses spiraling in (chirp mass 30 suns), peaking at 250 Hz and 10⁻²¹, then a short ringdown. The real waveform was calculated with numerical relativity. The arms are drawn stretching about 10²⁰ times more than they do.</p>' }
+  };
+
+  // ================================================================
+  // 5. CONTROLS
+  // ================================================================
+  function visibility() {
+    const one = tab === 1, two = tab === 2, three = tab === 3;
+    $('lab_laser').hidden = three; $('lab_lam').hidden = three; $('lab_d').hidden = !one; $('lab_fine').hidden = !one;
+    $('lab_obj').hidden = !two; $('lab_P').hidden = !two || S.obj !== 'cell'; $('lab_T').hidden = !two || S.obj !== 'warm';
+    $('lab_gw').hidden = !three; $('graph').hidden = !three; $('waves').hidden = three;
+    $('go').textContent = three ? (gwRun ? 'Pause' : 'Play') : moving ? 'Stop' : (one ? 'Move it slowly' : S.obj === 'cell' ? 'Let air in slowly' : 'Heat it slowly');
+    $('waves').textContent = S.waves ? 'Show as lines' : 'Show the waves'; $('waves').setAttribute('aria-pressed', String(S.waves));
+    document.querySelectorAll('#laser button').forEach(b => b.setAttribute('aria-pressed', String(LASERS.find(l => l.id === b.dataset.v).lam === S.lam)));
+    document.querySelectorAll('#obj button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.obj)));
+    document.querySelectorAll('#gw button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.gw)));
+    $('hint').textContent = one ? 'or drag the movable mirror' : '';
+    $('scene').classList.toggle('grab', one);
+  }
+  function vals() {
+    $('lam').value = String(S.lam * 1e9); $('lam_v').textContent = (S.lam * 1e9).toFixed(1) + ' nm';
+    $('d').value = String(Math.round(S.d * 1e6)); $('d_v').textContent = (S.d * 1e6).toFixed(0) + ' µm';
+    $('fine').value = String(S.fine); $('fine_v').textContent = (S.fine >= 0 ? '+' : '') + (S.fine * 1000).toFixed(0) + ' nm';
+    $('P').value = String(S.P); $('P_v').textContent = S.P.toFixed(1) + ' kPa (' + (S.P / 101.325).toFixed(2) + ' atm)';
+    $('T').value = String(S.T); $('T_v').textContent = S.T.toFixed(0) + ' °C';
+  }
+  function upd() { visibility(); vals(); draw(); readout(); }
+  function setTab(k) {
+    tab = k; moving = false; gwRun = k === 3; gwT = 0; trace = [];
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    if (k === 2) { S.P = 0; S.T = 20; }
+    resetCount(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#laser button').forEach(b => b.addEventListener('click', () => { S.lam = LASERS.find(l => l.id === b.dataset.v).lam; resetCount(); upd(); }));
+  document.querySelectorAll('#obj button').forEach(b => b.addEventListener('click', () => { S.obj = b.dataset.v; S.P = 0; S.T = 20; moving = false; resetCount(); upd(); }));
+  document.querySelectorAll('#gw button').forEach(b => b.addEventListener('click', () => { S.gw = b.dataset.v; gwT = 0; trace = []; gwRun = true; upd(); }));
+  $('lam').addEventListener('input', () => { S.lam = +$('lam').value * 1e-9; resetCount(); upd(); });
+  $('d').addEventListener('input', () => { S.d = +$('d').value * 1e-6; resetCount(); upd(); });
+  $('fine').addEventListener('input', () => { S.fine = +$('fine').value; upd(); });
+  $('P').addEventListener('input', () => { S.P = +$('P').value; upd(); });
+  $('T').addEventListener('input', () => { S.T = +$('T').value; upd(); });
+  $('go').addEventListener('click', () => { if (tab === 3) gwRun = !gwRun; else moving = !moving; upd(); });
+  $('reset').addEventListener('click', () => { moving = false; if (tab === 1) { S.fine = 0; } if (tab === 2) { S.P = 0; S.T = 20; } if (tab === 3) { gwT = 0; trace = []; gwRun = true; } resetCount(); upd(); });
+  $('waves').addEventListener('click', () => { S.waves = !S.waves; upd(); });
+  window.addEventListener('resize', draw);
+  // dragging the movable mirror (tab 1): a pixel is 5 nm, like turning a fine screw
+  const sc = $('scene'); let drag = null;
+  sc.addEventListener('pointerdown', e => { if (tab !== 1) return; drag = { x: e.clientX, fine: S.fine }; sc.setPointerCapture(e.pointerId); e.preventDefault(); });
+  sc.addEventListener('pointermove', e => { if (!drag) return; S.fine = Math.max(-1.5, Math.min(1.5, drag.fine + (e.clientX - drag.x) * 0.005)); upd(); });
+  const endDrag = () => { drag = null; }; sc.addEventListener('pointerup', endDrag); sc.addEventListener('pointercancel', endDrag);
+  sc.addEventListener('keydown', e => { if (tab !== 1) return; const d = { ArrowLeft: -0.01, ArrowRight: 0.01 }[e.key]; if (d === undefined) return; S.fine = Math.max(-1.5, Math.min(1.5, S.fine + d)); e.preventDefault(); upd(); });
+
+  // ================================================================
+  // 6. LOOP
+  // ================================================================
+  let last = null, lastRead = 0;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+    if (dt > 0 && !document.hidden && !reduced) {
+      t += dt;
+      if (moving) {
+        if (tab === 1) { S.fine += MOVE_RATE * dt * 1e6; if (S.fine > 1.5) { S.d += 1e-6; S.fine -= 1; } vals(); }
+        if (tab === 2 && S.obj === 'cell') { S.P = Math.min(101.3, S.P + LEAK_RATE * dt / 1000); if (S.P >= 101.3) moving = false; vals(); }
+        if (tab === 2 && S.obj === 'warm') { S.T = Math.min(120, S.T + HEAT_RATE * dt); if (S.T >= 120) moving = false; vals(); }
+      }
+      if (tab === 3 && gwRun) { gwT += dt; trace.push([gwT, strainNow()]); while (trace.length && trace[0][0] < gwT - 7) trace.shift(); if (S.gw === 'merger' && gwT > 6) { gwRun = false; } }
+      draw();
+      if (ts - lastRead > 120) { readout(); visibility(); lastRead = ts; }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

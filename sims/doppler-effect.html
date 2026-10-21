@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<!--
+  The Doppler effect - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Arrival times from the
+  recorded motion match the exact solution for straight-line motion; the heard frequency matches the rate of
+  arriving crests; the textbook formulas, the drive-by, the sonic boom's timing and cone angle, relativistic
+  Doppler, and a planet's tug on its star are checked against exact or published values.
+  Credit: none; the Doppler effect is standard textbook physics.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doppler effect simulation: sirens, sonic booms and redshift | Open Physics Sims</title>
+<meta name="description" content="Hear an ambulance's pitch drop as it drives past, and see why in the crowded and stretched wave crests. Push a jet past the speed of sound to make a shock cone and a sonic boom, compare a moving listener with a moving source, then watch hydrogen's lines in a star's or galaxy's light shift toward the red.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --ghost: #7A8790; --curve: #1D4F73; --src: #1D4F73; --listener: #2E7D32; --road: #C9D1D6; --ground: #E3E8D8;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 470; touch-action: pan-y; }
+  #scene.grab { touch-action: none; cursor: grab; }
+  #graph { aspect-ratio: 900 / 200; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--body); }
+  .checks { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 4px 18px; font-size: 13px; }
+  .checks .check { white-space: nowrap; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.05; }
+    #graph { aspect-ratio: 1 / 1.0; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>The Doppler effect</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Passing siren</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Faster than sound</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Moving listener</button>
+    <button role="tab" id="tab4" aria-selected="false"><span>4</span>Light: redshift</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="Sound waves spreading from a moving source, and a listener"></canvas>
+  <div class="row2">
+    <button id="go">Pause</button>
+    <button id="reset" class="secondary">Start over</button>
+    <button id="snd" class="secondary" aria-pressed="false">Sound: off</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Pitch the listener hears against time, and the sound wave arriving"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_preset"><div>The source</div><div class="seg" id="preset" role="group" aria-label="The source"></div></div>
+    <div class="grp" id="lab_who"><div>Who moves</div>
+      <div class="seg" id="who" role="group" aria-label="Who moves"><button data-v="src">the siren</button><button data-v="lis">the listener</button><button data-v="both">both</button></div></div>
+    <label id="lab_u"><div class="row"><span>Speed</span><span class="val" id="u_v"></span></div><input type="range" id="u" min="0" max="120" step="1"></label>
+    <label id="lab_f"><div class="row"><span>Pitch it sends</span><span class="val" id="f_v"></span></div><input type="range" id="f" min="100" max="1500" step="10"></label>
+    <div class="grp" id="lab_obj"><div>What's moving</div>
+      <div class="seg" id="obj" role="group" aria-label="What is moving"><button data-v="star">a star</button><button data-v="gal">a galaxy</button></div></div>
+    <label id="lab_beta"><div class="row"><span id="beta_name">Speed</span><span class="val" id="beta_v"></span></div><input type="range" id="beta" min="-300" max="300" step="5"></label>
+    <label id="lab_dir"><div class="row"><span>Direction of motion</span><span class="val" id="dir_v"></span></div><input type="range" id="dir" min="0" max="90" step="5"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/doppler-effect.test.js)
+  // ================================================================
+  // ---- physics core: the Doppler effect ----
+  // SI units. Sound travels at v through still air, the same in every direction. A source gives out waves at
+  // frequency f0 (in its own time); a listener hears whatever crests reach it.
+  const SOUND = { v: 343 };        // m/s, air at 20 degrees C
+  const LIGHT = { c: 2.99792458e8 };
+
+  // ---- the classic formula ----
+  // source velocity us, listener velocity ul (vectors), n: unit vector from the source (when it sent the sound) to the
+  // listener (when it hears it). Speeds toward each other raise the pitch.
+  function heardRatio(us, ul, n, v) {
+    v = v || SOUND.v;
+    return (v - (ul[0] * n[0] + ul[1] * n[1])) / (v - (us[0] * n[0] + us[1] * n[1]));
+  }
+
+  // ---- a recorded motion: the source's positions and velocities at equal time steps ----
+  function makeTrack(dt, n) { return { dt, n, t: new Float64Array(n), x: new Float64Array(n), y: new Float64Array(n), vx: new Float64Array(n), vy: new Float64Array(n), len: 0, start: 0 }; }
+  // add a sample (a ring buffer: the oldest is overwritten once full)
+  function record(T, t, x, y, vx, vy) {
+    const k = (T.start + T.len) % T.n;
+    T.t[k] = t; T.x[k] = x; T.y[k] = y; T.vx[k] = vx; T.vy[k] = vy;
+    if (T.len < T.n) T.len++; else T.start = (T.start + 1) % T.n;
+  }
+  const at = (T, i) => (T.start + i) % T.n;      // i-th oldest sample
+  // the source's position and velocity at time s, between samples (cubic Hermite, using the recorded velocities)
+  function sourceAt(T, s) {
+    if (T.len === 0) return null;
+    const t0 = T.t[at(T, 0)], i = Math.max(0, Math.min(T.len - 2, Math.floor((s - t0) / T.dt)));
+    const a = at(T, i), b = at(T, i + 1), h = T.t[b] - T.t[a], u = h > 0 ? (s - T.t[a]) / h : 0;
+    const h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u, h01 = -2 * u * u * u + 3 * u * u, h11 = u * u * u - u * u;
+    const d00 = (6 * u * u - 6 * u) / h, d10 = 3 * u * u - 4 * u + 1, d01 = (-6 * u * u + 6 * u) / h, d11 = 3 * u * u - 2 * u;
+    return { x: h00 * T.x[a] + h10 * h * T.vx[a] + h01 * T.x[b] + h11 * h * T.vx[b], y: h00 * T.y[a] + h10 * h * T.vy[a] + h01 * T.y[b] + h11 * h * T.vy[b],
+             vx: d00 * T.x[a] + d10 * T.vx[a] + d01 * T.x[b] + d11 * T.vx[b], vy: d00 * T.y[a] + d10 * T.vy[a] + d01 * T.y[b] + d11 * T.vy[b] };
+  }
+  // what reaches a listener at L = { x, y, vx, vy } at time t: every moment te when the source sent sound that arrives
+  // now, v (t - te) = distance from the source then to the listener now. Subsonic sources give one; a source faster
+  // than sound gives none before its shock cone arrives and two after. For each: the heard/sent frequency ratio, the
+  // distance the sound traveled, and the source's position then.
+  function arrivals(T, t, L, v) {
+    v = v || SOUND.v; const out = [];
+    if (T.len < 2) return out;
+    const g = s => { const p = sourceAt(T, s); return v * (t - s) - Math.hypot(L.x - p.x, L.y - p.y); };
+    const tNew = Math.min(t, T.t[at(T, T.len - 1)]);
+    let hi = tNew, ghi = g(hi);
+    for (let i = T.len - 2; i >= 0; i--) {     // step back through the recording, looking for sign changes
+      const lo = T.t[at(T, i)], glo = g(lo);
+      if ((glo >= 0) !== (ghi >= 0)) {
+        let a = lo, b = hi, ga = glo; for (let k = 0; k < 60; k++) { const m = (a + b) / 2, gm = g(m); if ((gm >= 0) === (ga >= 0)) { a = m; ga = gm; } else b = m; }
+        const te = (a + b) / 2, p = sourceAt(T, te), dx = L.x - p.x, dy = L.y - p.y, d = Math.hypot(dx, dy) || 1e-9, n = [dx / d, dy / d];
+        out.push({ te, ratio: heardRatio([p.vx, p.vy], [L.vx || 0, L.vy || 0], n, v), dist: d, x: p.x, y: p.y });
+      }
+      hi = lo; ghi = glo;
+    }
+    return out;
+  }
+  // how loud each arrival is: falls off as 1/distance; and the waves are squeezed or stretched by the motion, so the
+  // pressure amplitude scales with the frequency ratio as well (for a small source, amplitude ~ ratio / distance)
+  const loudness = (arr, ref) => Math.min(4, (ref || 20) / Math.max(arr.dist, 1) * Math.abs(arr.ratio));
+
+  // ---- straight-line motion, worked out exactly (for checking, and for the faster-than-sound picture) ----
+  // source at (x0 + u s, y0) at time s; listener still at (X, Y): times te with v (t - te) = distance
+  function straightArrivals(x0, y0, u, X, Y, t, v) {
+    v = v || SOUND.v;
+    // (v (t - s))^2 = (X - x0 - u s)^2 + (Y - y0)^2, a quadratic in s
+    const A = v * v - u * u, B = -2 * v * v * t + 2 * u * (X - x0), Cc = v * v * t * t - (X - x0) ** 2 - (Y - y0) ** 2;
+    const out = [];
+    if (Math.abs(A) < 1e-12) { const s = -Cc / B; if (s <= t) out.push(s); return out; }
+    const D = B * B - 4 * A * Cc; if (D < 0) return out;
+    [(-B - Math.sqrt(D)) / (2 * A), (-B + Math.sqrt(D)) / (2 * A)].forEach(s => { if (s <= t + 1e-12 && v * (t - s) >= -1e-9) out.push(s); });
+    return out.sort((p, q) => q - p);
+  }
+  // faster than sound: the shock cone's half-angle, sin(angle) = v / u
+  const machAngle = (u, v) => Math.asin((v || SOUND.v) / u);
+  // when the boom reaches a listener a distance d from the path, as the source passes x = X at time X/u (starting at x = 0, t = 0)
+  const boomTime = (X, d, u, v) => { v = v || SOUND.v; return X / u + d * Math.sqrt(u * u - v * v) / (u * v); };
+
+  // ---- light ----
+  // relativistic Doppler: a source moving at beta = v/c, its velocity at angle th to the line toward us (measured in
+  // our frame): received/sent frequency = 1 / (gamma (1 - beta cos th)); straight toward us or away it is
+  // sqrt((1 + beta)/(1 - beta)) or its inverse
+  function lightRatio(beta, th) { const g = 1 / Math.sqrt(1 - beta * beta); return 1 / (g * (1 - beta * Math.cos(th))); }
+  // redshift z = (seen wavelength - sent) / sent, for a source moving straight away at beta, and back
+  const zFromBeta = beta => Math.sqrt((1 + beta) / (1 - beta)) - 1;
+  const betaFromZ = z => ((1 + z) ** 2 - 1) / ((1 + z) ** 2 + 1);
+  // hydrogen's visible (Balmer) lines, nm in air: H-alpha .. H-delta
+  const BALMER = [656.28, 486.13, 434.05, 410.17];
+  // a star tugged by a planet in a circular orbit (period P, planet mass m, star mass M, orbit seen edge-on):
+  // the star's speed toward and away from us swings by K = (2 pi G / P)^(1/3) m / (M + m)^(2/3)
+  const G = 6.6743e-11;
+  const wobbleK = (P, m, M) => Math.pow(2 * Math.PI * G / P, 1 / 3) * m / Math.pow(M + m, 2 / 3);
+
+  // ---- naming a pitch ----
+  // the nearest note on the piano (A4 = 440 Hz) and how far off it is, in cents (hundredths of a semitone)
+  function noteName(f) {
+    const n = 12 * Math.log2(f / 440) + 57, k = Math.round(n), names = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+    return { name: names[((k % 12) + 12) % 12] + Math.floor(k / 12), cents: Math.round(100 * (n - k)) };
+  }
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. THE SOUND SOURCES (real speeds and pitches, which the sliders then change)
+  // ================================================================
+  const PRESETS = {
+    1: [{ id: 'amb', name: 'ambulance', u: 25, f: 960, wave: 'square', cut: 3000 }, { id: 'train', name: 'train horn', u: 35, f: 311, wave: 'sawtooth', cut: 1600 }, { id: 'race', name: 'race car', u: 85, f: 280, wave: 'sawtooth', cut: 1200 }],
+    2: [{ id: 'air', name: 'airliner, Mach 0.85', u: 290, f: 140, wave: 'sawtooth', cut: 700 }, { id: 'jet', name: 'fighter jet, Mach 1.4', u: 480, f: 140, wave: 'sawtooth', cut: 700 }, { id: 'conc', name: 'Concorde, Mach 2', u: 686, f: 140, wave: 'sawtooth', cut: 700 }],
+    3: [{ id: 'siren', name: 'siren', u: 30, f: 700, wave: 'square', cut: 3000 }]
+  };
+  const VIEW = { 1: { x0: -160, x1: 160, road: 0 }, 2: { x0: -1800, x1: 1800, alt: 600 }, 3: { x0: -160, x1: 160, road: 0 } };
+
+  // ================================================================
+  // 3. STATE
+  // ================================================================
+  const S = { preset: { 1: 'amb', 2: 'jet', 3: 'siren' }, u: { 1: 25, 2: 480, 3: 30 }, f: { 1: 960, 2: 140, 3: 700 }, who: 'src',
+              obj: 'star', beta: { star: 120, gal: 0.3 }, dir: 0 };
+  let tab = 1, playing = true, simT = 0;
+  const DT = 0.005;                 // the source's motion is recorded every 5 ms
+  let track = null, src = null, lis = null, pitchLog = [], prevCount = 0, boomFlash = -10;
+  // source: { x, y, vx, vy, mode: 'drive' | 'drag', target }; listener: { x, y, vx, vy, mode: 'still' | 'drive' | 'drag' }
+  function resetScene() {
+    track = makeTrack(DT, 6000); simT = 0; pitchLog = []; prevCount = 0; boomFlash = -10;
+    const V = VIEW[tab] || VIEW[1];
+    if (tab === 1) { src = { x: V.x0 - 20, y: 0, vx: S.u[1], vy: 0, mode: 'drive' }; lis = lis && lis.tab === 1 ? Object.assign(lis, { vx: 0, vy: 0, mode: 'still' }) : { x: 0, y: 32, vx: 0, vy: 0, mode: 'still', tab: 1 }; }
+    else if (tab === 2) { src = { x: V.x0 - 300, y: V.alt, vx: S.u[2], vy: 0, mode: 'drive' }; lis = lis && lis.tab === 2 ? Object.assign(lis, { vx: 0, vy: 0, mode: 'still' }) : { x: 300, y: 0, vx: 0, vy: 0, mode: 'still', tab: 2 }; }
+    else if (tab === 3) {
+      const u = S.u[3], ms = S.who !== 'lis', ml = S.who !== 'src';
+      src = { x: ms ? -140 : 0, y: 0, vx: ms ? u : 0, vy: 0, mode: ms ? 'drive' : 'still' };
+      lis = { x: ml ? 140 : 120, y: 4, vx: ml ? -u : 0, vy: 0, mode: ml ? 'drive' : 'still', tab: 3 };
+      if (S.who === 'lis') { lis.x = 150; }
+    }
+    if (src) record(track, simT, src.x, src.y, src.vx, src.vy);
+  }
+  // advance the world by dt seconds, recording the source every DT
+  function advance(dt) {
+    const steps = Math.max(1, Math.round(dt / DT));
+    for (let i = 0; i < steps; i++) {
+      simT += DT;
+      if (src.mode === 'drive') { src.x += src.vx * DT; src.y += src.vy * DT; }
+      else if (src.mode === 'drag' && src.target) {
+        // follow the hand smoothly
+        const w = 14, ax = w * w * (src.target[0] - src.x) - 2 * w * src.vx, ay = w * w * (src.target[1] - src.y) - 2 * w * src.vy;
+        src.vx += ax * DT; src.vy += ay * DT; src.x += src.vx * DT; src.y += src.vy * DT;
+      }
+      if (lis.mode === 'drive') { lis.x += lis.vx * DT; lis.y += lis.vy * DT; }
+      else if (lis.mode === 'drag' && lis.target) { const w = 14, ax = w * w * (lis.target[0] - lis.x) - 2 * w * lis.vx, ay = w * w * (lis.target[1] - lis.y) - 2 * w * lis.vy; lis.vx += ax * DT; lis.vy += ay * DT; lis.x += lis.vx * DT; lis.y += lis.vy * DT; }
+      record(track, simT, src.x, src.y, src.vx, src.vy);
+    }
+    // once the source and its sound are well past, the next one comes along
+    const V = VIEW[tab], span = V.x1 - V.x0;
+    if (src.mode === 'drive' && (src.x > V.x1 + 0.9 * span || src.x < V.x0 - 0.9 * span) && tab !== 3) { const keep = lis; resetScene(); lis = keep; lis.vx = 0; lis.vy = 0; if (lis.mode !== 'drag') lis.mode = 'still'; }
+    if (tab === 3 && (Math.abs(src.x) > 1.2 * span || Math.abs(lis.x) > 1.2 * span)) resetScene();
+  }
+  const heardNow = () => arrivals(track, simT, lis);
+  // a dragged source or listener carries on in a straight line when let go, at its own speed
+  function release(o) { if (o.mode !== 'drag') return; o.mode = 'drive'; o.target = null; }
+
+  // ================================================================
+  // 4. SOUND (Web Audio): only after the Sound button is pressed
+  // ================================================================
+  const AU = { ctx: null, on: false, voices: [], master: null };
+  function audioStart() {
+    const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return false;
+    if (!AU.ctx) {
+      AU.ctx = new Ctx(); AU.master = AU.ctx.createGain(); AU.master.gain.value = 0.6; AU.master.connect(AU.ctx.destination);
+      for (let k = 0; k < 2; k++) { const o = AU.ctx.createOscillator(), fl = AU.ctx.createBiquadFilter(), g = AU.ctx.createGain(); fl.type = 'lowpass'; g.gain.value = 0; o.connect(fl); fl.connect(g); g.connect(AU.master); o.start(); AU.voices.push({ o, fl, g }); }
+    }
+    if (AU.ctx.state === 'suspended') AU.ctx.resume();
+    return true;
+  }
+  function audioQuiet() { if (!AU.ctx) return; const t = AU.ctx.currentTime; AU.voices.forEach(v => v.g.gain.setTargetAtTime(0, t, 0.03)); }
+  // what the listener hears now: up to two tones (two after a sonic boom), each at its own pitch and loudness
+  function audioUpdate(arr, P) {
+    if (!AU.on || !AU.ctx) return;
+    const t = AU.ctx.currentTime;
+    AU.voices.forEach((vc, k) => { const a = arr[k];
+      if (a && playing) { vc.o.type = P.wave; vc.fl.frequency.setTargetAtTime(P.cut, t, 0.05); vc.o.frequency.setTargetAtTime(Math.max(30, Math.min(6000, Math.abs(a.ratio) * P.f)), t, 0.012); vc.g.gain.setTargetAtTime(Math.min(0.22, 0.06 * loudness(a, tab === 2 ? 400 : 25)), t, 0.03); }
+      else vc.g.gain.setTargetAtTime(0, t, 0.03); });
+  }
+  function audioBoom() {
+    if (!AU.on || !AU.ctx) return;
+    const n = Math.round(AU.ctx.sampleRate * 0.7), buf = AU.ctx.createBuffer(1, n, AU.ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) { const s = i / AU.ctx.sampleRate; d[i] = (Math.random() * 2 - 1) * Math.exp(-s / 0.12) * (s < 0.004 ? s / 0.004 : 1); }
+    // an N-wave: a sharp jump, then a second one a moment later
+    const src2 = AU.ctx.createBufferSource(), fl = AU.ctx.createBiquadFilter(), g = AU.ctx.createGain(); fl.type = 'lowpass'; fl.frequency.value = 260; g.gain.value = 1.4;
+    src2.buffer = buf; src2.connect(fl); fl.connect(g); g.connect(AU.master); src2.start(); src2.start ? null : null;
+  }
+
+  // ================================================================
+  // 5. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  // scene geometry: meters to pixels
+  function geom(W, H) {
+    const V = VIEW[tab];
+    if (tab === 2) { const s = W / (V.x1 - V.x0); return { s, X: x => (x - V.x0) * s, Y: y => H - 30 - y * s }; }
+    const s = W / (V.x1 - V.x0); return { s, X: x => (x - V.x0) * s, Y: y => H * 0.58 - y * s };
+  }
+  function drawWaves(ctx, W, H, g, P) {
+    // crests: one circle per N waves, so they're far enough apart to see
+    const lam = SOUND.v / P.f, N = Math.max(1, Math.ceil(11 / (lam * g.s))), per = N / P.f;
+    const t0 = track.t[at(track, 0)], Rmax = Math.hypot(W, H) / g.s;
+    const kNew = Math.floor(simT / per), kOld = Math.ceil(Math.max(t0, simT - Rmax / SOUND.v) / per);
+    ctx.lineWidth = 1.3;
+    for (let k = kNew; k >= kOld; k--) {
+      const te = k * per, p = sourceAt(track, te); if (!p) continue;
+      const r = SOUND.v * (simT - te) * g.s, fade = Math.max(0.08, 0.75 - 0.55 * r / Math.max(W, H));
+      ctx.strokeStyle = 'rgba(29,79,115,' + fade.toFixed(3) + ')'; ctx.beginPath(); ctx.arc(g.X(p.x), g.Y(p.y), r, 0, TAU); ctx.stroke();
+    }
+    return N;
+  }
+  function person(ctx, x, y, col) {
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y - 15, 5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x, y + 3); ctx.moveTo(x - 6, y - 4); ctx.lineTo(x + 6, y - 4); ctx.moveTo(x, y + 3); ctx.lineTo(x - 5, y + 12); ctx.moveTo(x, y + 3); ctx.lineTo(x + 5, y + 12); ctx.stroke();
+  }
+  function vehicle(ctx, x, y, kind, dir) {
+    ctx.save(); ctx.translate(x, y); if (dir < 0) ctx.scale(-1, 1);
+    if (kind === 'jet' || kind === 'air' || kind === 'conc') { ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-14, -4); ctx.lineTo(-18, -10); ctx.lineTo(-20, -10); ctx.lineTo(-17, 0); ctx.lineTo(-20, 3); ctx.lineTo(-14, 3); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-6, 9); ctx.lineTo(-9, 9); ctx.lineTo(-4, 0); ctx.fill(); }
+    else if (kind === 'train') { ctx.fillStyle = C('--src'); ctx.fillRect(-26, -8, 44, 16); ctx.beginPath(); ctx.moveTo(18, -8); ctx.lineTo(26, -3); ctx.lineTo(26, 8); ctx.lineTo(18, 8); ctx.fill(); }
+    else { ctx.fillStyle = kind === 'amb' || kind === 'siren' ? '#FFFFFF' : C('--hot'); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.rect(-14, -7, 28, 14); ctx.fill(); ctx.stroke();
+      if (kind === 'amb' || kind === 'siren') { ctx.fillStyle = C('--hot'); ctx.fillRect(-3, -6, 6, 12); ctx.fillRect(-7, -2, 14, 4); } }
+    ctx.restore();
+  }
+  function drawSound(ctx, W, H, compact) {
+    const g = geom(W, H), P = cur(), V = VIEW[tab];
+    // road, or ground and sky
+    if (tab === 2) { ctx.fillStyle = C('--ground'); ctx.fillRect(0, g.Y(0), W, H - g.Y(0)); }
+    else { ctx.fillStyle = C('--road'); ctx.fillRect(0, g.Y(V.road) - 9, W, 18); ctx.strokeStyle = '#FFFFFF'; ctx.setLineDash([10, 10]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, g.Y(V.road)); ctx.lineTo(W, g.Y(V.road)); ctx.stroke(); ctx.setLineDash([]); }
+    const N = drawWaves(ctx, W, H, g, P);
+    // faster than sound: the cone where the crests pile up
+    const sp = Math.hypot(src.vx, src.vy);
+    if (sp > SOUND.v * 1.0001) { const a = machAngle(sp), ux = src.vx / sp, uy = src.vy / sp, L = 2.2 * W / g.s;
+      ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2;
+      [1, -1].forEach(sg => { const cx = Math.cos(a), sx = Math.sin(a) * sg, dx = -(ux * cx - uy * sx), dy = -(uy * cx + ux * sx); ctx.beginPath(); ctx.moveTo(g.X(src.x), g.Y(src.y)); ctx.lineTo(g.X(src.x + dx * L), g.Y(src.y + dy * L)); ctx.stroke(); }); }
+    // the source and the listener
+    vehicle(ctx, g.X(src.x), g.Y(src.y), P.id, src.vx >= 0 ? 1 : -1);
+    const arr = heardNow();
+    const flash = simT - boomFlash < 0.35;
+    if (flash) { ctx.fillStyle = 'rgba(200,50,30,' + (0.35 * (1 - (simT - boomFlash) / 0.35)).toFixed(3) + ')'; ctx.beginPath(); ctx.arc(g.X(lis.x), g.Y(lis.y) - 4, 34, 0, TAU); ctx.fill(); }
+    person(ctx, g.X(lis.x), g.Y(lis.y) - (tab === 2 ? 12 : 0), C('--listener'));
+    // where the sound now arriving left from
+    arr.forEach(a => { ctx.strokeStyle = 'rgba(200,50,30,0.55)'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(g.X(a.x), g.Y(a.y)); ctx.lineTo(g.X(lis.x), g.Y(lis.y) - (tab === 2 ? 12 : 0)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(g.X(a.x), g.Y(a.y), 5, 0, TAU); ctx.stroke(); });
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, 'one circle per ' + N + (N === 1 ? ' wave' : ' waves') + (compact ? '' : ': real time, real speeds'), 10, 18);
+    if (!compact && arr.length) label(ctx, 'red circle: where the source was when it sent the sound you hear now', 10, 34);
+    // scale bar
+    const m = tab === 2 ? 500 : 20, px = m * g.s; ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(12, H - 12); ctx.lineTo(12 + px, H - 12); ctx.moveTo(12, H - 16); ctx.lineTo(12, H - 8); ctx.moveTo(12 + px, H - 16); ctx.lineTo(12 + px, H - 8); ctx.stroke();
+    ctx.fillStyle = C('--ink'); label(ctx, m + ' m', 18 + px, H - 8);
+    if (tab !== 3 && lis.mode !== 'drag') { font(ctx, 11); ctx.fillStyle = C('--listener'); ctx.textAlign = 'center'; label(ctx, 'you (drag me)', g.X(lis.x), g.Y(lis.y) + (tab === 2 ? -40 : (lis.y > 0 ? -26 : 30))); }
+    return arr;
+  }
+
+  // ---- tab 4: light ----
+  function lightSpeed() { return S.obj === 'star' ? S.beta.star * 1e3 / LIGHT.c : S.beta.gal; }   // beta, positive = away
+  // the light source's motion: speed b (positive = away from us), at angle phi from the line of sight; we are to the right
+  const motion = () => { const b = lightSpeed(), phi = S.dir * Math.PI / 180, sg = b >= 0 ? 1 : -1; return { b, phi, mx: -sg * Math.cos(phi), my: Math.sin(phi) }; };
+  function drawLight(ctx, W, H, compact) {
+    // waves from the moving source, centered where it was when it sent each one; stars' speeds are exaggerated
+    const M = motion(), ex = S.obj === 'star' ? 600 : 1, bv = Math.min(0.85, Math.abs(M.b) * ex);
+    const cx = W * 0.4, cy = H * 0.52, R = Math.min(W, H) * 0.07, cvis = Math.min(W, H) * 0.3, per = 0.16, t = performance.now() / 1000;
+    ctx.lineWidth = 1.4;
+    for (let k = 0; k < 40; k++) {
+      const age = (t % per) + k * per, r = cvis * age; if (r > Math.max(W, H) * 1.3) break;
+      const px = cx - M.mx * bv * cvis * age, py = cy - M.my * bv * cvis * age;
+      ctx.strokeStyle = 'rgba(181,48,109,' + Math.max(0.06, 0.7 - 0.6 * r / Math.max(W, H)).toFixed(3) + ')'; ctx.beginPath(); ctx.arc(px, py, r, 0, TAU); ctx.stroke();
+    }
+    if (S.obj === 'star') { const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, R); gr.addColorStop(0, '#FFF4D6'); gr.addColorStop(1, '#F2B33D'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, R * 0.6, 0, TAU); ctx.fill(); }
+    else { ctx.save(); ctx.translate(cx, cy); ctx.rotate(-0.4); const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.4); gr.addColorStop(0, 'rgba(255,240,210,1)'); gr.addColorStop(1, 'rgba(160,180,230,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, 0, R * 1.5, R * 0.6, 0, 0, TAU); ctx.fill(); ctx.restore(); }
+    // its velocity arrow (screen y is down, so the picture's "up" motion is -my)
+    if (Math.abs(M.b) > 1e-9) { const L = 30 + 50 * bv / 0.85, x0 = cx + M.mx * R, y0 = cy + M.my * R, x1 = cx + M.mx * (R + L), y1 = cy + M.my * (R + L), a = Math.atan2(y1 - y0, x1 - x0);
+      ctx.strokeStyle = C('--vel'); ctx.fillStyle = C('--vel'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1 + 6 * Math.cos(a), y1 + 6 * Math.sin(a)); ctx.lineTo(x1 - 8 * Math.cos(a) - 6 * Math.sin(a), y1 - 8 * Math.sin(a) + 6 * Math.cos(a)); ctx.lineTo(x1 - 8 * Math.cos(a) + 6 * Math.sin(a), y1 - 8 * Math.sin(a) - 6 * Math.cos(a)); ctx.closePath(); ctx.fill(); }
+    const tx = W - (compact ? 52 : 64); ctx.fillStyle = C('--ink'); ctx.fillRect(tx, cy - 8, 34, 16); ctx.fillRect(tx - 6, cy - 11, 6, 22);
+    font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, 'telescope', tx + 14, cy + 32);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, S.obj === 'star' ? 'not to scale; the star’s motion drawn ' + ex + ' times faster' : 'not to scale; distances shrunk, speed as set', 10, 18);
+  }
+  // the spectrum the telescope records
+  const rgbOf = nm => { let r = 0, g = 0, b = 0; if (nm < 380 || nm > 750) return null;
+    if (nm < 440) { r = (440 - nm) / 60; b = 1; } else if (nm < 490) { g = (nm - 440) / 50; b = 1; } else if (nm < 510) { g = 1; b = (510 - nm) / 20; } else if (nm < 580) { r = (nm - 510) / 70; g = 1; } else if (nm < 645) { r = 1; g = (645 - nm) / 65; } else r = 1;
+    const k = nm < 420 ? 0.3 + 0.7 * (nm - 380) / 40 : nm > 700 ? 0.3 + 0.7 * (750 - nm) / 50 : 1; return [Math.round(255 * r * k), Math.round(255 * g * k), Math.round(255 * b * k)]; };
+  function drawSpectrum() {
+    const { ctx, W, H, compact } = fit($('graph')); ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 80) return;
+    const stripes = [];
+    const full = { l0: 350, l1: 1100 }, zoom = S.obj === 'star' ? { l0: 656.28 - 1.2, l1: 656.28 + 1.2 } : null;
+    const rows = zoom ? [{ y: 18, h: (H - 74) / 2, r: full, title: 'the spectrum the telescope records (wavelength in nm); ticks: hydrogen’s lines in the lab' }, { y: 18 + (H - 74) / 2 + 38, h: (H - 74) / 2, r: zoom, title: 'zoomed in on hydrogen’s red line (H-α), 2.4 nm across; tick: where it is in the lab' }] : [{ y: 18, h: H - 52, r: full, title: 'the spectrum the telescope records (wavelength in nm); ticks: hydrogen’s lines in the lab' }];
+    const seen = l => l / shiftRatio();
+    rows.forEach(row => {
+      const x0 = 40, x1 = W - 14, X = l => x0 + (l - row.r.l0) / (row.r.l1 - row.r.l0) * (x1 - x0);
+      for (let x = x0; x < x1; x++) { const l = row.r.l0 + (x - x0) / (x1 - x0) * (row.r.l1 - row.r.l0), c = rgbOf(l); ctx.fillStyle = c ? 'rgb(' + c.join(',') + ')' : (l < 380 ? '#3a2f5a' : '#4a2a2a'); ctx.fillRect(x, row.y, 1.5, row.h); }
+      // the dark lines, where the star's hydrogen absorbs: shifted; tick marks show where they are in the lab
+      BALMER.forEach(l0 => { const ls = seen(l0);
+        if (l0 >= row.r.l0 && l0 <= row.r.l1) { ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(l0), row.y - 6); ctx.lineTo(X(l0), row.y); ctx.moveTo(X(l0), row.y + row.h); ctx.lineTo(X(l0), row.y + row.h + 6); ctx.stroke(); }
+        if (ls >= row.r.l0 && ls <= row.r.l1) { ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(X(ls) - (row === rows[0] ? 1.2 : 3), row.y, row === rows[0] ? 2.4 : 6, row.h); }
+        else if (ls > row.r.l1 && row === rows[0]) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; } });
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(compact ? (row === rows[0] ? 'spectrum (nm); ticks: lab' : 'zoom on H-α, 2.4 nm wide') : row.title, x0, row.y - 7);
+      ctx.textAlign = 'center'; const step = row === rows[0] ? 100 : 0.5;
+      for (let l = Math.ceil(row.r.l0 / step) * step; l <= row.r.l1 + 1e-9; l += step) if (X(l) < x1 - 8 || row !== rows[0]) ctx.fillText(row === rows[0] ? l + '' : l.toFixed(1), X(l), row.y + row.h + 16);
+    });
+    const off = BALMER.filter(l => seen(l) > full.l1).length; if (off) { font(ctx, 11); ctx.fillStyle = C('--hot'); ctx.textAlign = 'right'; label(ctx, compact ? off + ' more →' : off + (off === 1 ? ' line' : ' lines') + ' off the edge, in the infrared →', W - 16, rows[0].y - 7); }
+  }
+  // seen frequency / sent frequency on tab 4: the velocity makes angle theta with the line toward us, cos theta = -sign(b) cos(phi)
+  function shiftRatio() { const M = motion(), th = Math.acos(Math.max(-1, Math.min(1, -(M.b >= 0 ? 1 : -1) * Math.cos(M.phi)))); return lightRatio(Math.abs(M.b), th); }
+
+  // ---- the graph for tabs 1-3: pitch heard against time, and the wave arriving now ----
+  function drawGraph(arr) {
+    if (tab === 4) return drawSpectrum();
+    const { ctx, W, H, compact } = fit($('graph')); ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 80) return;
+    const P = cur(), stack = compact, gw = stack ? W - 52 : W * 0.6 - 52, gh = stack ? H * 0.5 - 40 : H - 44;
+    const b = { x: 44, y: 18, w: gw, h: gh }, span = 8, lo = tab === 2 ? 0.25 : 0.5, hi = tab === 2 ? 4 : 2;
+    const X = t => b.x + b.w - (simT - t) / span * b.w, Y = r => b.y + b.h - (Math.log(r) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)) * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    (tab === 2 ? [0.25, 0.5, 1, 2, 4] : [0.5, 0.75, 1, 1.5, 2]).forEach(r => { const y = Y(r); ctx.strokeStyle = r === 1 ? C('--ghost') : C('--soft'); ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y); ctx.stroke(); ctx.fillText(Math.round(P.f * r) + '', b.x - 4, y + 3); });
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); font(ctx, 11); ctx.fillText('pitch you hear (Hz), last ' + span + ' s', b.x + 4, b.y - 5);
+    [0, 1].forEach(k => { ctx.strokeStyle = k ? C('--hot') : C('--curve'); ctx.lineWidth = 2; ctx.beginPath(); let pen = false;
+      pitchLog.forEach(q => { const r = q[1 + k]; if (q[0] < simT - span || r === null || r === undefined) { pen = false; return; } const y = Math.max(b.y, Math.min(b.y + b.h, Y(Math.abs(r)))); if (pen) ctx.lineTo(X(q[0]), y); else ctx.moveTo(X(q[0]), y); pen = true; }); ctx.stroke(); });
+    // the wave arriving now, against the wave sent
+    const w2 = stack ? { x: 44, y: H * 0.5 + 18, w: W - 52, h: H * 0.5 - 40 } : { x: W * 0.6 + 10, y: 18, w: W * 0.4 - 22, h: H - 44 };
+    ctx.strokeStyle = C('--rule'); ctx.strokeRect(w2.x, w2.y, w2.w, w2.h);
+    ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('sound arriving now', w2.x + 4, w2.y - 5);
+    const win = 6 / P.f, A0 = 0.42 * w2.h;
+    ctx.strokeStyle = C('--ghost'); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let i = 0; i <= 200; i++) { const tt = i / 200 * win, x = w2.x + i / 200 * w2.w, y = w2.y + w2.h / 2 - 0.35 * A0 * Math.sin(TAU * P.f * tt); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2; ctx.beginPath();
+    const amp = a => Math.min(1, 0.35 * loudness(a, tab === 2 ? 400 : 25));
+    for (let i = 0; i <= 300; i++) { const tt = i / 300 * win; let y = 0; arr.forEach(a => { y += amp(a) * Math.sin(TAU * P.f * Math.max(-6, Math.min(6, a.ratio)) * tt + a.te * 37); }); const x = w2.x + i / 300 * w2.w; const yy = w2.y + w2.h / 2 - A0 * Math.max(-1.2, Math.min(1.2, y)); i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); } ctx.stroke();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText((win * 1000).toFixed(1) + ' ms; dashed: as sent', w2.x + w2.w - 4, w2.y + w2.h + 14);
+  }
+
+  function cur() { const list = PRESETS[tab] || PRESETS[1], p = list.find(q => q.id === S.preset[tab]) || list[0]; return Object.assign({}, p, { u: S.u[tab], f: S.f[tab] }); }
+  let lastArr = [];
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene')); ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) { lastArr = tab === 4 ? [] : heardNow(); return; }
+    if (tab === 4) drawLight(ctx, W, H, compact); else lastArr = drawSound(ctx, W, H, compact);
+  }
+  function draw() { drawScene(); drawGraph(lastArr); }
+
+  // ================================================================
+  // 6. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const kmh = u => (u * 3.6).toFixed(0) + ' km/h, ' + (u * 2.237).toFixed(0) + ' mph';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab !== 4) {
+      const P = cur(), arr = lastArr, main = arr.length ? arr.reduce((a, b) => loudness(a) > loudness(b) ? a : b) : null;
+      const hz = main ? Math.abs(main.ratio) * P.f : 0, nm = main ? noteName(hz) : null, sent = noteName(P.f);
+      if (tab === 1) {
+        html = card('You hear', main ? hz.toFixed(0) + ' Hz' : 'nothing yet', main ? 'about ' + nm.name + (nm.cents ? (nm.cents > 0 ? ' +' : ' ') + nm.cents + ' cents' : '') + '; it sends ' + P.f + ' Hz (' + sent.name + ')' : 'the sound hasn’t reached you');
+        html += card(main && main.ratio > 1.0005 ? 'Higher, because' : main && main.ratio < 0.9995 ? 'Lower, because' : 'Shift', main ? (main.ratio >= 1 ? '+' : '') + ((main.ratio - 1) * 100).toFixed(1) + '%' : '—', main ? 'the sound you hear left it ' + (main.dist / SOUND.v * 1000).toFixed(0) + ' ms ago, while it was ' + (main.ratio > 1 ? 'coming toward you' : 'going away') : 'move closer, or wait');
+        html += card('Its speed', Math.hypot(src.vx, src.vy).toFixed(0) + ' m/s', kmh(Math.hypot(src.vx, src.vy)) + '; sound: ' + SOUND.v + ' m/s');
+      } else if (tab === 2) {
+        const sp = Math.hypot(src.vx, src.vy), M = sp / SOUND.v;
+        html = card('Mach', M.toFixed(2), sp.toFixed(0) + ' m/s; ' + (M > 1 ? 'cone half-angle ' + (machAngle(sp) * 180 / Math.PI).toFixed(0) + '°, from sin = 1/Mach' : 'slower than sound: no cone'));
+        html += card('You hear', arr.length === 0 ? 'nothing yet' : arr.length === 2 ? 'two sounds at once' : hz.toFixed(0) + ' Hz', arr.length === 2 ? 'after the boom: the jet going away, and (backward, rising in pitch) the sound it made coming in' : arr.length === 0 && M > 1 ? 'the jet is silent until its cone reaches you' : 'it sends ' + P.f + ' Hz');
+        const h = Math.abs(src.y - lis.y), late = M > 1 ? h * Math.sqrt(sp * sp - SOUND.v * SOUND.v) / (sp * SOUND.v) : null;
+        html += card('Boom after it passes overhead', late !== null ? late.toFixed(1) + ' s' : '—', late !== null ? 'flying ' + h.toFixed(0) + ' m above you; a faster jet is heard sooner after' : 'no boom below Mach 1');
+      } else {
+        const u = S.u[3], f0 = P.f, fs = f0 * SOUND.v / (SOUND.v - u), fl = f0 * (SOUND.v + u) / SOUND.v;
+        html = card('You hear', main ? hz.toFixed(0) + ' Hz' : 'nothing yet', main ? 'about ' + nm.name + '; the siren sends ' + f0 + ' Hz' : '');
+        html += card('Siren coming at ' + u + ' m/s', fs.toFixed(0) + ' Hz', 'f₀ v / (v − u): the crests are squeezed together in the air');
+        html += card('You going toward it at ' + u + ' m/s', fl.toFixed(0) + ' Hz', 'f₀ (v + u) / v: you run into the crests faster; ' + (u > 0 ? 'less than the other way by ' + (fs - fl).toFixed(0) + ' Hz' : ''));
+      }
+    } else {
+      const b = lightSpeed(), r = shiftRatio(), ha = 656.28 / r, z = 1 / r - 1;
+      html = card('H-α line seen at', ha.toFixed(ha > 1000 ? 0 : 2) + ' nm', 'sent at 656.28 nm; ' + (z >= 0 ? 'redshift' : 'blueshift') + ' z = ' + (Math.abs(z) < 0.01 ? z.toExponential(2) : z.toFixed(3)));
+      html += card(S.obj === 'star' ? 'Star’s speed' : 'Galaxy’s speed', S.obj === 'star' ? Math.abs(S.beta.star) + ' km/s ' + (b >= 0 ? 'away' : 'toward us') : (Math.abs(b)).toFixed(2) + ' c', S.obj === 'star' ? 'stars nearby move at tens of km/s; Barnard’s Star comes toward us at 110 km/s' : 'about ' + Math.round(Math.abs(b) * LIGHT.c / 1e3).toLocaleString('en-US') + ' km/s; the Virgo cluster recedes at 0.004 c, quasar 3C 273 at 0.15 c');
+      html += card('Sideways motion', S.dir === 0 ? '—' : 'still shifts', S.dir === 0 ? 'straight along the line of sight' : 'light, unlike sound, is reddened even by motion across the line of sight: moving clocks run slow');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'An ambulance drives past with its siren on. Predict: does the pitch you hear change gradually, or suddenly as it goes by? And when the ambulance is right beside you, are you hearing it higher, lower, or at its true pitch?',
+         notes: '<p><b>What to try.</b> Watch the circles: each is a crest of the sound, centered where the siren was when it sent it. Ahead they crowd together (short wavelength, high pitch); behind they spread out. Turn on the sound and listen as it passes, then stand farther from the road: the drop is just as large but more gradual. Drag the vehicle around, or drag yourself, and try the train and the race car.</p>' +
+                '<p><b>Why.</b> The siren sends the same number of crests per second whatever it does, but while it moves it chases its own crests ahead and leaves those behind farther apart. The air carries every crest at 343 m/s, so ahead you meet them more often (f₀ v / (v − u) straight ahead) and behind less often. Beside the road, what matters is how fast the source was approaching when it sent the sound you are hearing now; that sound left it a moment ago, so the change is gradual, and when the vehicle is right beside you you still hear it a little high.</p>' +
+                '<p><b>The model.</b> Sound at 343 m/s in still air at 20 °C. Every moment, the sim finds when the sound now reaching you was sent, from the recorded motion, and uses the source’s velocity then. Loudness falls as 1/distance. Pitches: a European ambulance siren’s high tone (960 Hz), a train horn (311 Hz), an engine note (280 Hz), all as steady tones. Real time, real speeds; the circles are every Nth crest.</p>' },
+    2: { lede: 'A fighter jet flies over at 1.4 times the speed of sound. Predict: when do you first hear it: before it reaches you, when it’s overhead, or after it has passed?',
+         notes: '<p><b>What to try.</b> Start with the airliner, slower than sound: you hear it coming, high-pitched. Then the fighter jet: the circles pile up into a cone that trails behind it, and you hear nothing until the cone reaches you, then a boom. Try Concorde at Mach 2: a narrower cone. Drag yourself closer to or farther from the path, or speed the jet up or down with the slider.</p>' +
+                '<p><b>Why.</b> Faster than sound, the jet outruns everything it sends. All the sound it made while approaching arrives together, along the edge of the cone, as a sudden pressure jump: the sonic boom. The cone’s half-angle obeys sin(angle) = v_sound / v_jet. After the boom you hear two things at once: the jet going away, and the sound it made while coming in, arriving backward.</p>' +
+                '<p><b>The model.</b> As in the first tab, in a side view, with the jet at 600 m. The boom is played as a short, low burst; a real one is an N-shaped pressure wave lasting a tenth of a second or so. The air is uniform: in real air, temperature changes bend the boom, and it can miss the ground altogether.</p>' },
+    3: { lede: 'A siren and a listener move toward each other. Predict: is it the same whether the siren moves toward you at 30 m/s, or you move toward it at 30 m/s?',
+         notes: '<p><b>What to try.</b> Choose who moves. With the listener moving, the circles stay evenly spaced around the siren, but you run into them faster. Raise the speed to 100 m/s or more and compare the two cards: the siren moving gives the bigger shift. Then let both move.</p>' +
+                '<p><b>Why.</b> Sound travels through the air, so it matters who moves through the air. A moving siren changes the spacing of the crests in the air (the wavelength); a moving listener leaves the spacing alone and just meets crests faster. The two formulas, v / (v − u) and (v + u) / v, agree for slow speeds and part company as u approaches v. A listener running away from a siren at the speed of sound would hear nothing; a siren moving at the speed of sound toward you would pile all its crests into one.</p>' +
+                '<p><b>The model.</b> As in the first tab, with a 700 Hz siren. The speed applies to whichever moves (both, when both do).</p>' },
+    4: { lede: 'Light from moving stars and galaxies shifts too. Predict: what happens to the dark lines in a galaxy’s spectrum if the galaxy is moving away from us?',
+         notes: '<p><b>What to try.</b> Move the star toward us and away and watch hydrogen’s dark lines slide in the zoomed strip: a few hundredths of a nanometer per 10 km/s. Pick a galaxy and increase its speed: the whole pattern of lines slides toward the red, then out of the visible into the infrared. Set the direction of motion to 90°: even moving straight across the line of sight, a fast source is reddened.</p>' +
+                '<p><b>Why.</b> The same crowding and spreading of crests happens with light, but light needs no air: only the relative motion matters, and at high speed the moving source’s clock also runs slow. The received frequency is f₀ / (γ (1 − β cos θ)); straight away this is √((1 − β)/(1 + β)). Astronomers measure stars’ speeds this way to a few meters per second, which is how most of the first exoplanets were found (their stars wobble), and the redshifts of galaxies revealed that the universe is expanding.</p>' +
+                '<p><b>The model.</b> Special-relativistic Doppler shift of hydrogen’s visible (Balmer) lines. For distant galaxies the redshift really comes from the expansion of space while the light travels, not from motion through space; for nearby galaxies the two pictures agree, and the slider’s speed is the equivalent speed.</p>' }
+  };
+
+  // ================================================================
+  // 7. CONTROLS
+  // ================================================================
+  function buildPresets() {
+    const list = PRESETS[tab] || []; $('preset').innerHTML = list.map(p => '<button data-v="' + p.id + '">' + p.name + '</button>').join('');
+    document.querySelectorAll('#preset button').forEach(b => b.addEventListener('click', () => { const p = list.find(q => q.id === b.dataset.v); S.preset[tab] = p.id; S.u[tab] = p.u; S.f[tab] = p.f; resetScene(); sync(); upd(); }));
+  }
+  function visibility() {
+    const snd = tab !== 4;
+    $('lab_preset').hidden = !(tab === 1 || tab === 2); $('lab_who').hidden = tab !== 3; $('lab_u').hidden = !snd; $('lab_f').hidden = !snd;
+    $('lab_obj').hidden = snd; $('lab_beta').hidden = snd; $('lab_dir').hidden = snd;
+    $('snd').hidden = !snd; $('reset').hidden = !snd;
+    $('go').textContent = playing ? 'Pause' : 'Play';
+    $('snd').textContent = AU.on ? 'Sound: on' : 'Sound: off'; $('snd').setAttribute('aria-pressed', String(AU.on));
+    document.querySelectorAll('#preset button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.preset[tab])));
+    document.querySelectorAll('#who button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.who)));
+    document.querySelectorAll('#obj button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.obj)));
+    $('hint').textContent = tab === 1 || tab === 2 ? 'drag the ' + (tab === 2 ? 'jet' : 'vehicle') + ' or yourself' : tab === 3 ? 'drag the siren or the listener' : '';
+    $('scene').classList.toggle('grab', snd);
+  }
+  function vals() {
+    if (tab !== 4) { const u = S.u[tab]; $('u').max = tab === 2 ? '900' : '150'; $('u').min = tab === 2 ? '100' : '0'; $('u').step = tab === 2 ? '10' : '1'; $('u').value = String(u);
+      $('u_v').textContent = u + ' m/s' + (tab === 2 ? ' (Mach ' + (u / SOUND.v).toFixed(2) + ')' : ' (' + (u * 3.6).toFixed(0) + ' km/h)');
+      $('f').min = tab === 2 ? '50' : '100'; $('f').max = tab === 2 ? '400' : '1500'; $('f').value = String(S.f[tab]); $('f_v').textContent = S.f[tab] + ' Hz'; }
+    else { const star = S.obj === 'star'; $('beta').min = star ? '-300' : '-0.3'; $('beta').max = star ? '300' : '0.95'; $('beta').step = star ? '5' : '0.01'; $('beta').value = String(S.beta[S.obj]);
+      $('beta_name').textContent = star ? 'Speed away from us (negative: toward)' : 'Speed away from us';
+      $('beta_v').textContent = star ? S.beta.star + ' km/s' : S.beta.gal.toFixed(2) + ' c'; $('dir').value = String(S.dir); $('dir_v').textContent = S.dir === 0 ? 'along the line of sight' : S.dir === 90 ? 'straight across it' : S.dir + '° from the line of sight'; }
+  }
+  function sync() { vals(); }
+  function upd() { visibility(); vals(); draw(); readout(); }
+  function setTab(k) {
+    tab = k; playing = true; audioQuiet();
+    [1, 2, 3, 4].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    lis = null; if (k !== 4) resetScene(); buildPresets(); sync(); upd();
+  }
+  [1, 2, 3, 4].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#who button').forEach(b => b.addEventListener('click', () => { S.who = b.dataset.v; resetScene(); upd(); }));
+  document.querySelectorAll('#obj button').forEach(b => b.addEventListener('click', () => { S.obj = b.dataset.v; S.dir = 0; upd(); }));
+  $('u').addEventListener('input', () => { S.u[tab] = +$('u').value; const sp = S.u[tab];
+    if (tab === 3) resetScene(); else if (src.mode === 'drive') { const d = Math.sign(src.vx) || 1; src.vx = d * sp; src.vy = 0; } upd(); });
+  $('f').addEventListener('input', () => { S.f[tab] = +$('f').value; upd(); });
+  $('beta').addEventListener('input', () => { S.beta[S.obj] = +$('beta').value; upd(); });
+  $('dir').addEventListener('input', () => { S.dir = +$('dir').value; upd(); });
+  $('go').addEventListener('click', () => { playing = !playing; if (!playing) audioQuiet(); upd(); });
+  $('reset').addEventListener('click', () => { resetScene(); playing = true; upd(); });
+  $('snd').addEventListener('click', () => { if (!AU.on) { AU.on = audioStart(); } else { AU.on = false; audioQuiet(); } upd(); });
+  window.addEventListener('resize', draw);
+  // dragging the source or the listener
+  const sc = $('scene'); let grab = null;
+  function toWorld(e) { const r = sc.getBoundingClientRect(), g = geom(r.width, r.height); return [(e.clientX - r.left) / g.s + VIEW[tab].x0, tab === 2 ? (r.height - 30 - (e.clientY - r.top)) / g.s : (r.height * 0.58 - (e.clientY - r.top)) / g.s]; }
+  sc.addEventListener('pointerdown', e => {
+    if (tab === 4) return; const w = toWorld(e), r = sc.getBoundingClientRect(), g = geom(r.width, r.height);
+    const dS = Math.hypot(g.X(src.x) - (e.clientX - r.left), g.Y(src.y) - (e.clientY - r.top)), dL = Math.hypot(g.X(lis.x) - (e.clientX - r.left), g.Y(lis.y) - 8 - (e.clientY - r.top));
+    grab = dS < dL ? src : lis; if (tab === 2 && grab === lis) w[1] = 0;
+    grab.mode = 'drag'; grab.target = w; sc.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  sc.addEventListener('pointermove', e => { if (!grab) return; const w = toWorld(e); if (tab === 2 && grab === lis) w[1] = 0; if (tab === 2 && grab === src) w[1] = Math.max(50, w[1]); grab.target = w; });
+  const endDrag = () => { if (grab) { if (grab === lis && tab !== 3) { lis.mode = 'still'; lis.vx = 0; lis.vy = 0; lis.target = null; } else release(grab); } grab = null; };
+  sc.addEventListener('pointerup', endDrag); sc.addEventListener('pointercancel', endDrag);
+
+  // ================================================================
+  // 8. LOOP
+  // ================================================================
+  let last = null, lastRead = 0;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+    if (dt > 0 && !document.hidden && playing && !reduced) {
+      if (tab !== 4) {
+        advance(dt);
+        const arr = heardNow();
+        if (tab === 2 && arr.length === 2 && prevCount === 0) { boomFlash = simT; audioBoom(); }
+        prevCount = arr.length;
+        pitchLog.push([simT, arr[0] ? arr[0].ratio : null, arr[1] ? arr[1].ratio : null]); while (pitchLog.length && pitchLog[0][0] < simT - 9) pitchLog.shift();
+        audioUpdate(arr, cur());
+      }
+      draw();
+      if (ts - lastRead > 150) { readout(); lastRead = ts; }
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<!--
+  Gravitational lensing - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Distances match the exact
+  results for limiting universes; Einstein radii and bending match published values; the elliptical galaxy's
+  bending matches a brute-force sum over its mass; images and brightening (one and two masses) match light
+  rays shot through the lens and counted; time delays match path lengths plus the Shapiro delay.
+  Credit: none needed; PhET has no lensing simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gravitational lensing simulation: Einstein rings, arcs and microlensing | Open Physics Sims</title>
+<meta name="description" content="Watch light bend around the Sun, a black hole, a galaxy and a galaxy cluster, with real masses and distances. Drag a background galaxy behind the lens and see it stretch into arcs, an Einstein ring or an Einstein cross; then watch a star brighten for a few weeks as another passes in front, with a spike if the lens star has a planet.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --ray: #C8321E; --ghost: #7A8790; --src: #1D4F73; --obs: #2E7D32; --einstein: #B5306D; --sunc: #F2B33D;
+    --lensstar: #E8A317; --image: #C8321E; --curve: #1D4F73; --hot: #C8321E;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 470; touch-action: pan-y; }
+  #scene.grab { touch-action: none; cursor: grab; }
+  #graph { aspect-ratio: 900 / 190; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  .row2 label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--body); }
+  .checks { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 4px 18px; font-size: 13px; }
+  .checks .check { white-space: nowrap; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 1.05; }
+    #graph { aspect-ratio: 1 / 0.6; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Gravitational lensing</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Bend the light</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Einstein rings and arcs</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Microlensing</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="The lens and the light passing it"></canvas>
+  <div class="row2">
+    <button id="go">Start</button>
+    <button id="reset" class="secondary">Reset</button>
+    <div class="seg" id="look" role="group" aria-label="How it looks"><button data-v="diagram">diagram</button><button data-v="sky">as a telescope sees it</button></div>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Brightness of the background star against time"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_lens"><div>The lens</div>
+      <div class="seg" id="lens" role="group" aria-label="The lens"><button data-v="sun">Sun</button><button data-v="bh">black hole</button><button data-v="gal">galaxy</button><button data-v="cl">cluster</button></div></div>
+    <label id="lab_off"><div class="row"><span id="off_name">Source's offset</span><span class="val" id="off_v"></span></div><input type="range" id="off" min="0" max="2" step="0.01"></label>
+    <label id="lab_size"><div class="row"><span>Background galaxy's size</span><span class="val" id="size_v"></span></div><input type="range" id="size" min="0.08" max="0.6" step="0.01"></label>
+    <label id="lab_mass"><div class="row"><span>Mass of the lens star</span><span class="val" id="mass_v"></span></div><input type="range" id="mass" min="0.1" max="1" step="0.05"></label>
+    <label id="lab_u0"><div class="row"><span>Closest approach</span><span class="val" id="u0_v"></span></div><input type="range" id="u0" min="0.05" max="1" step="0.01"></label>
+    <div class="grp" id="lab_planet"><div>The lens star</div>
+      <div class="seg" id="planet" role="group" aria-label="Planet"><button data-v="0">on its own</button><button data-v="1">with a Jupiter-mass planet</button></div></div>
+    <label id="lab_pa"><div class="row"><span>Where the planet is in its orbit</span><span class="val" id="pa_v"></span></div><input type="range" id="pa" min="-180" max="180" step="1"></label>
+    <label id="lab_ps"><div class="row"><span>Planet's orbit</span><span class="val" id="ps_v"></span></div><input type="range" id="ps" min="0.6" max="1.8" step="0.01"></label>
+    <label class="check" id="lab_fan"><input type="checkbox" id="fan"> show more rays</label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/gravitational-lensing.test.js)
+  // ================================================================
+  // ---- physics core: gravitational lensing ----
+  // SI units unless stated. Angles on the sky are in radians in the physics and converted to arcseconds for display.
+  // Everything is in the thin-lens approximation: the bending happens where the light passes the lens, and every
+  // angle is small.
+  const PH = { G: 6.6743e-11, c: 2.99792458e8, Msun: 1.98841e30, Rsun: 6.957e8, AU: 1.495978707e11, pc: 3.0857e16, ly: 9.4607e15,
+               yr: 3.15576e7, day: 86400, arcsec: Math.PI / 648000 };
+
+  // ---- distances ----
+  // Across the universe, the distances that go into lensing are "angular-diameter" distances in an expanding
+  // universe (flat, with matter and dark energy; Planck 2018: H0 = 67.7 km/s/Mpc, matter 0.31).
+  const COSMO = { H0: 67.7e3 / (1e6 * 3.0857e16), Om: 0.31 };
+  function hubbleE(z, Om) { return Math.sqrt(Om * (1 + z) ** 3 + (1 - Om)); }
+  // comoving distance to redshift z (Simpson's rule)
+  function comoving(z, cos) {
+    cos = cos || COSMO; const n = 400, h = z / n; let s = 0;
+    for (let i = 0; i <= n; i++) { const w = i === 0 || i === n ? 1 : i % 2 ? 4 : 2; s += w / hubbleE(i * h, cos.Om); }
+    return PH.c / cos.H0 * s * h / 3;
+  }
+  // the three distances lensing needs: observer to lens, observer to source, lens to source (not Ds - Dl)
+  function lensDistances(zl, zs, cos) {
+    const Ml = comoving(zl, cos), Ms = comoving(zs, cos);
+    return { Dl: Ml / (1 + zl), Ds: Ms / (1 + zs), Dls: (Ms - Ml) / (1 + zs) };
+  }
+  // how long the light has been traveling from redshift z
+  function lookback(z, cos) {
+    cos = cos || COSMO; const n = 400, h = z / n; let s = 0;
+    for (let i = 0; i <= n; i++) { const w = i === 0 || i === n ? 1 : i % 2 ? 4 : 2, zz = i * h; s += w / ((1 + zz) * hubbleE(zz, cos.Om)); }
+    return s * h / 3 / cos.H0;
+  }
+
+  // ---- how strong a lens is: its Einstein radius (an angle on the sky) ----
+  // a point mass M (a star, a black hole): the ring a source exactly behind it would make
+  const thetaEPoint = (M, Dl, Ds, Dls) => Math.sqrt(4 * PH.G * M / (PH.c * PH.c) * Dls / (Dl * Ds));
+  // a galaxy or cluster whose stars (or galaxies) move with speed spread sigma: a "singular isothermal" mass
+  const thetaEIso = (sigma, Ds, Dls) => 4 * Math.PI * (sigma / PH.c) ** 2 * Dls / Ds;
+  // the bending of light passing a point mass at distance b
+  const bendAngle = (M, b) => 4 * PH.G * M / (PH.c * PH.c * b);
+
+  // ---- lenses, in units of the Einstein radius (x, y and the deflection all in that unit) ----
+  // lens: { kind: 'point' } | { kind: 'iso', q, ang } (an elliptical isothermal galaxy, axis ratio q, rotated by ang)
+  //       | { kind: 'binary', m: [m1, m2], z: [[x1, y1], [x2, y2]] } (a star and its planet; masses add to 1)
+  function deflect(L, x, y) {
+    if (L.kind === 'point') { const r2 = x * x + y * y; return [x / r2, y / r2]; }
+    if (L.kind === 'binary') { let ax = 0, ay = 0; for (let k = 0; k < 2; k++) { const dx = x - L.z[k][0], dy = y - L.z[k][1], r2 = dx * dx + dy * dy; ax += L.m[k] * dx / r2; ay += L.m[k] * dy / r2; } return [ax, ay]; }
+    // isothermal: turn into the galaxy's own axes, where its mass per area is sqrt(q) / (2 sqrt(q^2 x^2 + y^2))
+    const c = Math.cos(L.ang || 0), s = Math.sin(L.ang || 0), u = c * x + s * y, v = -s * x + c * y, q = L.q;
+    let au, av;
+    if (q > 0.9999) { const r = Math.hypot(u, v); au = u / r; av = v / r; }
+    else { const f = Math.sqrt(1 - q * q), psi = Math.sqrt(q * q * u * u + v * v), k = Math.sqrt(q) / f;
+      au = k * Math.atan(f * u / psi); av = k * Math.atanh(f * v / psi); }
+    return [c * au - s * av, s * au + c * av];
+  }
+  // mass per area (convergence) at a point, in the same units: used for checking and for drawing
+  function kappa(L, x, y) {
+    if (L.kind === 'iso') { const c = Math.cos(L.ang || 0), s = Math.sin(L.ang || 0), u = c * x + s * y, v = -s * x + c * y; return Math.sqrt(L.q) / (2 * Math.sqrt(L.q * L.q * u * u + v * v)); }
+    return 0;   // point masses: all the mass is at the points
+  }
+  // the lens equation: a ray seen at (x, y) came from the source plane at (x, y) - deflection
+  function traceBack(L, x, y) { const a = deflect(L, x, y); return [x - a[0], y - a[1]]; }
+  // how the picture is stretched: the Jacobian of the lens equation, and the magnification 1/det
+  function jacobian(L, x, y, h) {
+    h = h || 1e-6; const a = traceBack(L, x + h, y), b = traceBack(L, x - h, y), c = traceBack(L, x, y + h), d = traceBack(L, x, y - h);
+    return [[(a[0] - b[0]) / (2 * h), (c[0] - d[0]) / (2 * h)], [(a[1] - b[1]) / (2 * h), (c[1] - d[1]) / (2 * h)]];
+  }
+  const detJ = (L, x, y) => { const J = jacobian(L, x, y); return J[0][0] * J[1][1] - J[0][1] * J[1][0]; };
+
+  // ---- images of a point source ----
+  // point lens: the source at distance u from the line of sight (Einstein radii) makes two images, on either side
+  function pointImages(u) {
+    const r = Math.sqrt(u * u + 4);
+    return [{ x: (u + r) / 2, mag: (u * u + 2) / (2 * u * r) + 0.5 }, { x: (u - r) / 2, mag: (u * u + 2) / (2 * u * r) - 0.5 }];
+  }
+  const pointMag = u => (u * u + 2) / (u * Math.sqrt(u * u + 4));    // total brightening (Paczynski)
+  // round isothermal lens: two images when the source is inside the Einstein radius, one outside
+  function isoImages(u) {
+    const im = [{ x: u + 1, mag: 1 + 1 / u }];
+    if (u < 1) im.push({ x: u - 1, mag: 1 / u - 1 });
+    return im;
+  }
+  // any lens: find the images of a point source at (bx, by) by searching a grid and polishing with Newton's method
+  function findImages(L, bx, by, R) {
+    R = R || 3; const N = 120, h = 2 * R / N, found = [];
+    const F = (x, y) => { const t = traceBack(L, x, y); return [t[0] - bx, t[1] - by]; };
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      let x = -R + (i + 0.5) * h, y = -R + (j + 0.5) * h;
+      for (let it = 0; it < 40; it++) {
+        const f = F(x, y), J = jacobian(L, x, y), det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+        if (!isFinite(det) || Math.abs(det) < 1e-14) break;
+        const dx = (J[1][1] * f[0] - J[0][1] * f[1]) / det, dy = (-J[1][0] * f[0] + J[0][0] * f[1]) / det;
+        const st = Math.hypot(dx, dy), lim = h * 2; const k = st > lim ? lim / st : 1;
+        x -= k * dx; y -= k * dy; if (st < 1e-13) break;
+      }
+      const f = F(x, y);
+      if (Math.hypot(f[0], f[1]) < 1e-10 && Math.hypot(x, y) < R * 1.2 && !found.some(p => Math.hypot(p.x - x, p.y - y) < 1e-6)) found.push({ x, y, mag: 1 / detJ(L, x, y) });
+    }
+    return found;
+  }
+
+  // ---- a star with a planet: images by solving the lens equation as a polynomial (complex numbers) ----
+  // complex numbers as [re, im]
+  const cx = { add: (a, b) => [a[0] + b[0], a[1] + b[1]], sub: (a, b) => [a[0] - b[0], a[1] - b[1]], mul: (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]],
+    div: (a, b) => { const d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; }, conj: a => [a[0], -a[1]], abs: a => Math.hypot(a[0], a[1]) };
+  // polynomials: arrays of complex coefficients, lowest power first
+  const pAdd = (p, q) => { const r = []; for (let i = 0; i < Math.max(p.length, q.length); i++) r.push(cx.add(p[i] || [0, 0], q[i] || [0, 0])); return r; };
+  const pMul = (p, q) => { const r = Array.from({ length: p.length + q.length - 1 }, () => [0, 0]); p.forEach((a, i) => q.forEach((b, j) => { r[i + j] = cx.add(r[i + j], cx.mul(a, b)); })); return r; };
+  const pScale = (p, k) => p.map(a => cx.mul(a, k));
+  // all roots of a polynomial (Aberth's method); guess: roots from a nearby polynomial, to start from
+  function roots(p, guess) {
+    while (p.length > 1 && p[p.length - 1][0] === 0 && p[p.length - 1][1] === 0) p = p.slice(0, -1);
+    const n = p.length - 1, lr = p[n][0], li = p[n][1], ld = lr * lr + li * li;
+    const ar = new Float64Array(n + 1), ai = new Float64Array(n + 1);
+    for (let i = 0; i <= n; i++) { ar[i] = (p[i][0] * lr + p[i][1] * li) / ld; ai[i] = (p[i][1] * lr - p[i][0] * li) / ld; }
+    const zr = new Float64Array(n), zi = new Float64Array(n);
+    if (guess && guess.length === n) for (let k = 0; k < n; k++) { zr[k] = guess[k][0]; zi[k] = guess[k][1]; }
+    else { let R = 0; for (let i = 0; i < n; i++) R = Math.max(R, Math.hypot(ar[i], ai[i])); R = 0.5 * (1 + R);
+      for (let k = 0; k < n; k++) { zr[k] = R * Math.cos(2 * Math.PI * k / n + 0.4); zi[k] = R * Math.sin(2 * Math.PI * k / n + 0.4); } }
+    for (let it = 0; it < 200; it++) {
+      let moved = 0;
+      for (let k = 0; k < n; k++) {
+        // value and derivative by Horner's rule
+        let vr = 0, vi = 0, dr = 0, di = 0; const x = zr[k], y = zi[k];
+        for (let i = n; i >= 0; i--) { const tr = dr * x - di * y + vr, ti = dr * y + di * x + vi; dr = tr; di = ti; const ur = vr * x - vi * y + ar[i], ui = vr * y + vi * x + ai[i]; vr = ur; vi = ui; }
+        if (vr === 0 && vi === 0) continue;
+        const dd = dr * dr + di * di; let rr = (vr * dr + vi * di) / dd, ri = (vi * dr - vr * di) / dd;   // v / v'
+        let sr = 0, si = 0; for (let j = 0; j < n; j++) if (j !== k) { const ex = x - zr[j], ey = y - zi[j], e2 = ex * ex + ey * ey; sr += ex / e2; si -= ey / e2; }
+        const br = 1 - (rr * sr - ri * si), bi = -(rr * si + ri * sr), b2 = br * br + bi * bi;
+        const wr = (rr * br + ri * bi) / b2, wi = (ri * br - rr * bi) / b2;
+        zr[k] = x - wr; zi[k] = y - wi; moved = Math.max(moved, Math.abs(wr) + Math.abs(wi));
+      }
+      if (moved < 1e-13) break;
+    }
+    return Array.from({ length: n }, (_, k) => [zr[k], zi[k]]);
+  }
+  // images of a point source zeta = [x, y] behind a two-mass lens: the 5th-degree polynomial from substituting the
+  // conjugated lens equation into itself; only the roots that really satisfy the lens equation are images
+  function binaryImages(L, zeta, memo) {
+    const z1 = L.z[0], z2 = L.z[1], m1 = [L.m[0], 0], m2 = [L.m[1], 0], zb = cx.conj(zeta);
+    const B = pMul([cx.mul([-1, 0], z1), [1, 0]], [cx.mul([-1, 0], z2), [1, 0]]);                // (z - z1)(z - z2)
+    const A = pAdd(pScale(B, zb), pAdd(pScale([cx.mul([-1, 0], z2), [1, 0]], m1), pScale([cx.mul([-1, 0], z1), [1, 0]], m2)));
+    const C1 = pAdd(A, pScale(B, cx.mul([-1, 0], cx.conj(z1)))), C2 = pAdd(A, pScale(B, cx.mul([-1, 0], cx.conj(z2))));
+    const P = pAdd(pMul([cx.mul([-1, 0], zeta), [1, 0]], pMul(C1, C2)), pAdd(pScale(pMul(B, C2), [-L.m[0], 0]), pScale(pMul(B, C1), [-L.m[1], 0])));
+    const rts = roots(P, memo && memo.last); if (memo) memo.last = rts;
+    return rts.filter(z => { const t = traceBack(L, z[0], z[1]); return Math.hypot(t[0] - zeta[0], t[1] - zeta[1]) < 1e-6; })
+      .map(z => { let g = [0, 0]; for (let k = 0; k < 2; k++) g = cx.add(g, cx.div([L.m[k], 0], cx.mul(cx.sub(cx.conj(z), cx.conj(L.z[k])), cx.sub(cx.conj(z), cx.conj(L.z[k]))))); return { x: z[0], y: z[1], mag: 1 / (1 - g[0] * g[0] - g[1] * g[1]) }; });
+  }
+  const binaryMag = (L, zeta, memo) => binaryImages(L, zeta, memo).reduce((s, im) => s + Math.abs(im.mag), 0);
+  // a source star of radius rho (Einstein radii), evenly bright: average over rings of points across its disk
+  // (midpoint rule in radius: ring k at (k - 1/2) rho / rings, with 6k points, each standing for its share of the area)
+  function diskMag(magAt, x, y, rho, rings) {
+    rings = rings || 4; const dr = rho / rings; let s = 0, w = 0;
+    for (let k = 1; k <= rings; k++) { const r = (k - 0.5) * dr, n = 6 * k, wk = 2 * Math.PI * r * dr / n;
+      for (let j = 0; j < n; j++) { const a = 2 * Math.PI * (j + 0.5 * (k % 2)) / n; s += wk * magAt(x + r * Math.cos(a), y + r * Math.sin(a)); w += wk; } }
+    return s / w;
+  }
+  // critical curves (where images are infinitely magnified) and caustics (where the source must be for that) of a
+  // star and planet: for each angle phi the critical points solve m1 (z - z2)^2 + m2 (z - z1)^2 = e^{i phi} ((z - z1)(z - z2))^2
+  function binaryCaustics(L, n) {
+    n = n || 360; const out = [], z1 = L.z[0], z2 = L.z[1];
+    const a1 = pMul([cx.mul([-1, 0], z1), [1, 0]], [cx.mul([-1, 0], z1), [1, 0]]), a2 = pMul([cx.mul([-1, 0], z2), [1, 0]], [cx.mul([-1, 0], z2), [1, 0]]);
+    for (let i = 0; i < n; i++) {
+      const e = [Math.cos(2 * Math.PI * i / n), Math.sin(2 * Math.PI * i / n)];
+      const P = pAdd(pScale(pMul(a1, a2), cx.mul([-1, 0], e)), pAdd(pScale(a2, [L.m[0], 0]), pScale(a1, [L.m[1], 0])));
+      roots(P).forEach(z => { const b = traceBack(L, z[0], z[1]); out.push({ crit: [z[0], z[1]], caus: b }); });
+    }
+    return out;
+  }
+
+  // ---- critical curve and caustic of the isothermal galaxy ----
+  // along each direction from the center, the outer critical point is where the picture's stretching blows up
+  function isoCritical(L, n) {
+    n = n || 180; const crit = [], caus = [], cut = [];
+    for (let i = 0; i < n; i++) {
+      const a = 2 * Math.PI * i / n, ux = Math.cos(a), uy = Math.sin(a);
+      let lo = 0.05, hi = 3; for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; if (detJ(L, m * ux, m * uy) < 0) lo = m; else hi = m; }
+      const r = (lo + hi) / 2; crit.push([r * ux, r * uy]); caus.push(traceBack(L, r * ux, r * uy));
+      const d = deflect(L, 1e-6 * ux, 1e-6 * uy); cut.push([-d[0], -d[1]]);   // the "cut": where images appear or vanish in pairs at the center
+    }
+    return { crit, caus, cut };
+  }
+
+  // ---- light-travel time: why the images flicker at different times ----
+  // the extra time light takes along the path through image theta (radians) for a source at beta: geometry plus the
+  // slowing near the mass. Point mass: (Dl Ds / (c Dls)) ((theta - beta)^2 / 2) - (4 G M / c^3) ln|theta|; only differences matter
+  // (times 1 + z of the lens, since the delay happens out there and is stretched by the expansion on its way to us)
+  function delayPoint(theta, beta, M, Dl, Ds, Dls, zl) { return (1 + (zl || 0)) * (Dl * Ds / (PH.c * Dls) * (theta - beta) ** 2 / 2 - 4 * PH.G * M / PH.c ** 3 * Math.log(Math.abs(theta))); }
+  // isothermal: lensing potential thetaE |theta|
+  function delayIso(theta, beta, tE, Dl, Ds, Dls, zl) { return (1 + (zl || 0)) * Dl * Ds / (PH.c * Dls) * ((theta - beta) ** 2 / 2 - tE * Math.abs(theta)); }
+
+  // ---- microlensing: a star in our galaxy passes in front of a more distant one ----
+  // the time to cross one Einstein radius, at relative speed v (perpendicular to the line of sight)
+  const crossTime = (M, Dl, Ds, v) => thetaEPoint(M, Dl, Ds, Ds - Dl) * Dl / v;
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. THE LENSES, WITH REAL NUMBERS
+  // ================================================================
+  const AS = PH.arcsec, MAS = AS / 1000, kpc = 1e3 * PH.pc, ZL = 0.3, ZS = 1.0, DIST = lensDistances(ZL, ZS);
+  const MOON = 1865;   // the full Moon's width, arcseconds
+  const LENSES = {
+    sun: { name: 'the Sun', kind: 'point', M: PH.Msun, Dl: PH.AU, far: true },
+    bh: { name: 'a giant black hole', kind: 'point', M: 6.5e9 * PH.Msun },
+    gal: { name: 'a galaxy', kind: 'iso', sigma: 250e3, q: 0.72, ang: 0.45 },
+    cl: { name: 'a galaxy cluster', kind: 'iso', sigma: 1000e3, q: 0.8, ang: -0.35 }
+  };
+  // Einstein radius (radians) and the mass inside it
+  function lensInfo(key) {
+    const Lk = LENSES[key];
+    if (Lk.far) { const tE = Math.sqrt(4 * PH.G * Lk.M / (PH.c * PH.c * Lk.Dl)); return { tE, M: Lk.M, Dl: Lk.Dl, Ds: Infinity, Dls: Infinity }; }
+    const { Dl, Ds, Dls } = DIST;
+    if (Lk.kind === 'point') return { tE: thetaEPoint(Lk.M, Dl, Ds, Dls), M: Lk.M, Dl, Ds, Dls };
+    const tE = thetaEIso(Lk.sigma, Ds, Dls), Scr = PH.c * PH.c * Ds / (4 * Math.PI * PH.G * Dl * Dls);
+    return { tE, M: Math.PI * (tE * Dl) ** 2 * Scr, Dl, Ds, Dls };
+  }
+  const fmtAngle = a => { const s = a / AS; return s >= 1 ? s.toFixed(s < 10 ? 2 : 1) + '″' : s >= 1e-3 ? (s * 1e3).toFixed(s < 0.01 ? 2 : 1) + ' milliarcseconds' : (s * 1e3).toFixed(2) + ' milliarcseconds'; };
+  const shortAngle = a => { const s = a / AS; return s >= 1 ? s.toFixed(s < 10 ? 2 : 1) + '\u2033' : (s * 1e3).toFixed(s < 0.01 ? 2 : 0) + ' mas'; };
+  const fmtMass = m => { const x = m / PH.Msun; if (x < 10) return x.toFixed(x < 1 ? 2 : 1) + ' solar masses'; const e = Math.floor(Math.log10(x)); return (x / 10 ** e).toFixed(1) + ' × 10' + sup(e) + ' solar masses'; };
+  const sup = n => String(n).split('').map(ch => '⁰¹²³⁴⁵⁶⁷⁸⁹'['0123456789'.indexOf(ch)] || ch).join('');
+  const fmtTime = t => { const d = Math.abs(t) / PH.day; return d < 2 / 24 ? (d * 1440).toFixed(0) + ' minutes' : d < 2 ? (d * 24).toFixed(1) + ' hours' : d < 700 ? d.toFixed(d < 20 ? 1 : 0) + ' days' : (d / 365.25).toFixed(1) + ' years'; };
+  // how far: the time the light has been traveling (redshift 0.3: 3.5 billion years; redshift 1: 7.9 billion)
+  const TRAVEL = { l: lookback(ZL) / PH.yr / 1e9, s: lookback(ZS) / PH.yr / 1e9 };
+  const travelStr = (short) => short ? 'light travel ' + TRAVEL.l.toFixed(1) + ' and ' + TRAVEL.s.toFixed(1) + ' billion years' : 'light from the lens set out ' + TRAVEL.l.toFixed(1) + ' billion years ago, from the source ' + TRAVEL.s.toFixed(1) + ' billion years ago';
+
+  // ================================================================
+  // 3. STATE
+  // ================================================================
+  const S = { lens: 'gal', look: 'diagram', fan: false,
+              off: { sun: 1.5, bh: 0.5, gal: 0.5, cl: 0.5 },     // tab 1: the source's offset (Einstein radii; for the Sun, in Sun radii)
+              src: [0.25, 0.12], size: 0.25,                       // tab 2: where the background galaxy really is, and its size (Einstein radii)
+              mass: 0.3, u0: 0.3, planet: false, pa: -55, ps: 1.2 };
+  let tab = 1;
+  const MU = { Dl: 6 * kpc, Ds: 8 * kpc, v: 200e3, span: 60 };   // microlensing: lens 6 kpc away, source star in the bulge at 8 kpc, 200 km/s; graph spans +-60 days
+  let mu = null;   // microlensing run: { tE (days), thE (rad), lens, rho, t, pts: [[t, A]], caus, memo, playing }
+
+  // ================================================================
+  // 4. TAB 1: THE BENDING, SEEN FROM THE SIDE (heights stretched)
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560, dpr };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  function star(ctx, x, y, r, col) { ctx.fillStyle = col; ctx.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r; ctx.lineTo(x + rr * Math.cos(a), y + rr * Math.sin(a)); } ctx.closePath(); ctx.fill(); }
+  // images along the line through lens and source, in Einstein radii, for the round lens of tab 1
+  const side = key => LENSES[key].kind === 'point' ? pointImages : isoImages;
+  // the (reduced) bending, in Einstein radii, for light passing at x Einstein radii: the lens equation is beta = x - bendU
+  const bendU = (key, x) => LENSES[key].kind === 'point' ? 1 / x : Math.sign(x);
+  function drawOne(ctx, W, H, compact) {
+    const key = S.lens, Lk = LENSES[key], info = lensInfo(key);
+    const m = compact ? 24 : 46, xo = m, xr = W - m - (compact ? 4 : 30), yc = H * 0.58;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(xo, yc); ctx.lineTo(xr + 20, yc); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = C('--muted');
+    if (key === 'sun') return drawSun(ctx, W, H, compact, xo, xr, yc, info);
+    // The picture is stretched upward. Horizontally, the lens sits where Dls/Ds says, so that straight lines in the
+    // picture obey the lens equation; a ray seen at angle th (Einstein radii) reaches height th * hE at the lens.
+    const hE = H * 0.16, L1 = (xr - xo) * (1 - info.Dls / info.Ds), L2 = xr - xo - L1, xl = xo + L1, u = S.off[key];
+    const hAt = (x, h) => yc - h * hE;          // h: height in Einstein radii (as an angle seen from us) times distance ratio
+    const ySrc = yc - u * hE * (xr - xo) / L1;
+    if (S.fan) {
+      // rays leaving the source and passing the lens plane at height b: bent toward the lens, they mostly miss us
+      for (let k = -14; k <= 14; k++) {
+        const b = k * 0.2 + 0.07; if (Lk.kind === 'point' && Math.abs(b) < 0.25) continue;
+        const after = (u * (L1 + L2) / L1 - b) / L2, before = after + bendU(key, b) * (info.Ds / info.Dls) / L1, h0 = b - before * L1;
+        ctx.strokeStyle = 'rgba(92,107,115,0.28)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xr, ySrc); ctx.lineTo(xl, hAt(0, b)); ctx.lineTo(xo, yc - h0 * hE); ctx.stroke();
+      }
+    }
+    const ims = side(key)(u);
+    ims.forEach((im, i) => {
+      ctx.strokeStyle = C('--ray'); ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(xo, yc); ctx.lineTo(xl, hAt(0, im.x)); ctx.lineTo(xr, ySrc); ctx.stroke();
+      // where we think the light comes from: straight back along the arriving ray
+      const yEnd = yc - im.x * hE * (xr - xo) / L1;
+      ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1.4; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(xl, hAt(0, im.x)); ctx.lineTo(xr, yEnd); ctx.stroke(); ctx.setLineDash([]);
+      const tag = 'image ' + (i + 1) + ' (\u00D7' + Math.abs(im.mag).toFixed(1) + ')';
+      if (yEnd > 46 && yEnd < H - 6) { star(ctx, xr, yEnd, 7, C('--ghost')); font(ctx, 11); ctx.fillStyle = C('--ghost'); ctx.textAlign = 'right'; label(ctx, tag, xr - 12, yEnd + (im.x > 0 ? -9 : 17)); }
+      else { const yy = yEnd <= 46 ? 50 : H - 10, xx = xl + (xr - xl) * (yc - yy) / (yc - yEnd); font(ctx, 11); ctx.fillStyle = C('--ghost'); ctx.textAlign = 'left'; label(ctx, tag + (yEnd <= 46 ? ' \u2191' : ' \u2193'), Math.min(xx + 6, W - 120), yy + (yEnd <= 46 ? 4 : -2)); }
+    });
+    // the lens
+    if (Lk.kind === 'point') { ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(xl, yc, 6, 0, TAU); ctx.fill(); ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(xl, yc, 10, 0, TAU); ctx.stroke(); }
+    else { const gr = ctx.createRadialGradient(xl, yc, 0, xl, yc, hE * 1.4); gr.addColorStop(0, 'rgba(232,163,23,0.6)'); gr.addColorStop(1, 'rgba(232,163,23,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(xl, yc, 14, hE * 1.4, 0, 0, TAU); ctx.fill(); }
+    // the Einstein radius at the lens
+    ctx.strokeStyle = C('--einstein'); ctx.lineWidth = 1; ctx.setLineDash([2, 3]); [-1, 1].forEach(s => { ctx.beginPath(); ctx.moveTo(xl - 16, hAt(0, s)); ctx.lineTo(xl + 16, hAt(0, s)); ctx.stroke(); }); ctx.setLineDash([]);
+    font(ctx, 10); ctx.fillStyle = C('--einstein'); ctx.textAlign = 'left'; label(ctx, 'Einstein radius', xl + 20, hAt(0, -1) + 4);
+    star(ctx, xr, ySrc, 9, C('--src'));
+    ctx.fillStyle = C('--obs'); ctx.beginPath(); ctx.arc(xo, yc, 6, 0, TAU); ctx.fill();
+    font(ctx, 12); ctx.textAlign = 'center'; ctx.fillStyle = C('--ink');
+    label(ctx, 'us', xo, yc + 22); label(ctx, Lk.name.replace(/^an? /, ''), xl, Math.min(H - 8, yc + (Lk.kind === 'iso' ? hE * 1.4 + 14 : 26)));
+    font(ctx, 12); ctx.fillStyle = C('--src'); ctx.textAlign = 'center'; label(ctx, 'source', xr, ySrc > 60 ? ySrc - 14 : ySrc + 24);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, 'not to scale: angles stretched about ' + niceBig((hE / L1) / info.tE) + ' times', 10, 18);
+    label(ctx, travelStr(compact), 10, 34);
+  }
+  // the Sun: light from a star far away arrives in parallel; drawn in Sun radii, with the bending made much larger
+  function drawSun(ctx, W, H, compact, xo, xr, yc, info) {
+    const R = H * 0.11, xl = xo + (xr - xo) * 0.42, L1 = xl - xo, beta = S.off.sun;      // beta: the star's direction, in Sun radii as seen from Earth
+    const sunR = PH.Rsun / PH.AU, im = pointImages(beta * sunR / info.tE)[0], th = im.x * info.tE / sunR;   // the visible image, in Sun radii
+    const E = 150, thD = beta + E * (th - beta);   // drawn with the shift made E times larger
+    const Y = h => yc - h * R;
+    // the star's true direction: a dashed line from Earth
+    ctx.strokeStyle = C('--src'); ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(xo, yc); ctx.lineTo(xr, yc - beta * R * (xr - xo) / L1); ctx.stroke(); ctx.setLineDash([]);
+    // the light: arrives parallel to that direction, is bent at the Sun, reaches Earth
+    ctx.strokeStyle = C('--ray'); ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(xr, Y(thD) - beta * R * (xr - xl) / L1); ctx.lineTo(xl, Y(thD)); ctx.lineTo(xo, yc); ctx.stroke();
+    // where the star appears: straight back along the arriving ray
+    const yApp = yc - thD * R * (xr - xo) / L1;
+    ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1.4; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(xl, Y(thD)); ctx.lineTo(xr, yApp); ctx.stroke(); ctx.setLineDash([]);
+    if (yApp > 6) { star(ctx, xr, yApp, 7, C('--ghost')); font(ctx, 11); ctx.fillStyle = C('--ghost'); ctx.textAlign = 'right'; label(ctx, 'where the star appears', xr - 12, yApp - 10); }
+    const yTrue = yc - beta * R * (xr - xo) / L1; if (yTrue > 6) { star(ctx, xr, yTrue, 7, C('--src')); font(ctx, 11); ctx.fillStyle = C('--src'); ctx.textAlign = 'right'; label(ctx, 'where it really is', xr - 12, yTrue + 18); }
+    // the Sun
+    const gr = ctx.createRadialGradient(xl, yc, R * 0.2, xl, yc, R); gr.addColorStop(0, '#FFE08A'); gr.addColorStop(1, '#F2B33D'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(xl, yc, R, 0, TAU); ctx.fill();
+    ctx.fillStyle = C('--obs'); ctx.beginPath(); ctx.arc(xo, yc, 6, 0, TAU); ctx.fill();
+    font(ctx, 12); ctx.textAlign = 'center'; ctx.fillStyle = C('--ink'); label(ctx, 'Earth', xo, yc + 22); label(ctx, 'Sun', xl, yc + R + 18);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, 'not to scale: the Sun’s size and the angles stretched; the bending drawn ' + E + ' times larger still', 10, 18);
+    label(ctx, '1 AU to the Sun; the star is many light-years beyond, so its light arrives in parallel', 10, 34);
+  }
+  function niceBig(x) { const e = Math.floor(Math.log10(x)), m = x / 10 ** e, r = m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10; const v = r * 10 ** e; return v >= 1e6 ? (v / 10 ** Math.floor(Math.log10(v))).toFixed(0) + ' × 10' + sup(Math.floor(Math.log10(v))) : v.toLocaleString('en-US'); }
+
+  // ================================================================
+  // 5. TAB 2: THE SKY, MADE BY TRACING EACH PIXEL'S LIGHT BACK THROUGH THE LENS
+  // ================================================================
+  const lensObj = key => LENSES[key].kind === 'point' ? { kind: 'point' } : { kind: 'iso', q: LENSES[key].q, ang: LENSES[key].ang };
+  let skyCache = { key: '' }, critCache = { key: '' };
+  // a few fixed foreground stars for the telescope view (positions 0..1)
+  const STARS = Array.from({ length: 40 }, (_, i) => { const r = Math.sin(i * 91.7) * 43758.5453; const a = r - Math.floor(r), r2 = Math.sin(i * 12.9 + 4.1) * 23421.631, b = r2 - Math.floor(r2); return [a, b, 0.4 + ((i * 37) % 10) / 14]; });
+  function geom2(W, H) { const half = 2.3, s = Math.min(W / 2, H / 2) / half; return { s, cx: W / 2, cy: H / 2, half: Math.max(W, H) / 2 / s }; }
+  // the background galaxy's brightness at source-plane point (bx, by), and its color
+  function srcLight(bx, by) {
+    const dx = bx - S.src[0], dy = by - S.src[1], r = Math.hypot(dx, dy) / S.size;
+    if (S.look === 'diagram') {
+      if (r > 1) return null;
+      const ring = Math.floor(r * 4), a = Math.atan2(dy, dx);
+      if (a > 0 && a < Math.PI / 2 && ring > 0) return [232, 163, 23];   // a marked quarter, so turned and flipped images show
+      return ring % 2 ? [151, 190, 216] : [29, 79, 115];
+    }
+    if (r > 2.6) return null;
+    const a = Math.atan2(dy, dx), arm = 0.5 + 0.5 * Math.cos(2 * a - 5 * Math.log(r + 0.05));
+    const I = Math.exp(-r / 0.32) * 1.2 + 0.55 * arm * Math.exp(-r / 0.9) * Math.min(1, r * 3);
+    return [I * 170, I * 205, I * 255];
+  }
+  function renderSky(W, H, dpr) {
+    const key = S.lens + '|' + S.look + '|' + S.src.join(',') + '|' + S.size + '|' + W + 'x' + H;
+    if (skyCache.key === key) return skyCache;
+    const g = geom2(W, H), L = lensObj(S.lens), step = Math.max(1, Math.sqrt(W * H / 160000)), nx = Math.ceil(W / step), ny = Math.ceil(H / step);
+    const cv = skyCache.cv || document.createElement('canvas'); cv.width = nx; cv.height = ny;
+    const cx2 = cv.getContext('2d'), img = cx2.createImageData(nx, ny), d = img.data;
+    const sky = S.look === 'sky', Lk = LENSES[S.lens];
+    let flux = 0;
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const x = ((i + 0.5) * step - g.cx) / g.s, y = (g.cy - (j + 0.5) * step) / g.s, k = 4 * (j * nx + i);
+      const t = traceBack(L, x, y), c = srcLight(t[0], t[1]);
+      if ((t[0] - S.src[0]) ** 2 + (t[1] - S.src[1]) ** 2 < S.size * S.size) flux += 1;
+      let r = sky ? 4 : 255, gg = sky ? 6 : 255, b = sky ? 14 : 255;
+      if (c) { if (sky) { r += c[0]; gg += c[1]; b += c[2]; } else { r = c[0]; gg = c[1]; b = c[2]; } }
+      // the lens's own starlight: an elliptical glow, more concentrated than its mass
+      if (sky && Lk.kind === 'iso') { const re = Math.sqrt(Lk.q) / (2 * kappa(L, x, y)), I = 190 * Math.exp(-re / (Lk.sigma > 5e5 ? 0.09 : 0.2)) + (Lk.sigma > 5e5 ? 26 * Math.exp(-re / 0.8) : 0); r += I; gg += I * 0.8; b += I * 0.5; }
+      d[k] = Math.min(255, r); d[k + 1] = Math.min(255, gg); d[k + 2] = Math.min(255, b); d[k + 3] = 255;
+    }
+    cx2.putImageData(img, 0, 0);
+    // the same galaxy without the lens, for the brightening
+    // brightening: area of the images of the galaxy's disk over the disk's own area (each piece keeps its surface brightness)
+    const flux0 = Math.PI * S.size * S.size; flux *= (step / g.s) ** 2;
+    skyCache = { key, cv, step, nx, ny, bright: flux / flux0 };
+    return skyCache;
+  }
+  function crit() {
+    const key = S.lens; if (critCache.key === key) return critCache;
+    const L = lensObj(key);
+    if (L.kind === 'point') { const c = []; for (let i = 0; i <= 90; i++) c.push([Math.cos(i / 90 * TAU), Math.sin(i / 90 * TAU)]); critCache = { key, crit: c, caus: [[0, 0]], cut: null }; }
+    else { const r = isoCritical(L, 180); critCache = { key, crit: r.crit, caus: r.caus, cut: r.cut }; }
+    return critCache;
+  }
+  function drawTwo(ctx, W, H, compact, dpr) {
+    const g = geom2(W, H), sk = renderSky(W, H, dpr), sky = S.look === 'sky', info = lensInfo(S.lens), L = lensObj(S.lens);
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(sk.cv, 0, 0, sk.nx * sk.step, sk.ny * sk.step);
+    for (const s of sky ? STARS : []) { ctx.fillStyle = 'rgba(255,255,255,' + (0.35 + 0.4 * s[2]).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(s[0] * W, s[1] * H, s[2] * 1.2, 0, TAU); ctx.fill(); }
+    const X = x => g.cx + x * g.s, Y = y => g.cy - y * g.s, cc = crit();
+    if (!sky) {
+      // the critical curve: a source on the caustic makes images here, infinitely stretched
+      ctx.strokeStyle = C('--einstein'); ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]); ctx.beginPath(); cc.crit.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+      font(ctx, 11); ctx.fillStyle = C('--einstein'); ctx.textAlign = 'left'; const lp = cc.crit[Math.round(cc.crit.length * 0.12)]; label(ctx, L.kind === 'point' ? 'Einstein ring' : 'critical curve', X(lp[0]) + 6, Y(lp[1]) - 6);
+      // where the galaxy really is
+      ctx.strokeStyle = C('--src'); ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(X(S.src[0]), Y(S.src[1]), S.size * g.s, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; label(ctx, 'where it really is', X(S.src[0]), Y(S.src[1]) - S.size * g.s - 6);
+      // the lens's mass
+      if (L.kind === 'point') { ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(X(0), Y(0), 5, 0, TAU); ctx.fill(); }
+      else { ctx.strokeStyle = 'rgba(232,163,23,0.8)'; ctx.lineWidth = 1; [0.25, 0.5, 1].forEach(k => { ctx.beginPath(); for (let i = 0; i <= 72; i++) { const a = i / 72 * TAU, u = k * Math.cos(a) / L.q * Math.sqrt(L.q), v = k * Math.sin(a) * Math.sqrt(L.q), c = Math.cos(L.ang), s = Math.sin(L.ang); const px = c * u - s * v, py = s * u + c * v; i ? ctx.lineTo(X(px * 0.5), Y(py * 0.5)) : ctx.moveTo(X(px * 0.5), Y(py * 0.5)); } ctx.stroke(); }); ctx.fillStyle = 'rgba(232,163,23,0.9)'; ctx.beginPath(); ctx.arc(X(0), Y(0), 3, 0, TAU); ctx.fill(); }
+      // the source plane, small: the caustic, and the galaxy's true position on it
+      const box = compact ? 92 : 130, bx = W - box - 10, by = 10, bs = box / 2 / 1.2, bc = [bx + box / 2, by + box / 2];
+      ctx.fillStyle = C('--panel'); ctx.strokeStyle = C('--rule'); ctx.fillRect(bx, by, box, box); ctx.strokeRect(bx, by, box, box);
+      ctx.strokeStyle = C('--einstein'); ctx.lineWidth = 1.3;
+      if (cc.caus.length > 1) { ctx.beginPath(); cc.caus.forEach((p, i) => i ? ctx.lineTo(bc[0] + p[0] * bs, bc[1] - p[1] * bs) : ctx.moveTo(bc[0] + p[0] * bs, bc[1] - p[1] * bs)); ctx.closePath(); ctx.stroke(); }
+      else { ctx.fillStyle = C('--einstein'); ctx.beginPath(); ctx.arc(bc[0], bc[1], 2.5, 0, TAU); ctx.fill(); }
+      if (cc.cut) { ctx.setLineDash([2, 3]); ctx.beginPath(); cc.cut.forEach((p, i) => i ? ctx.lineTo(bc[0] + p[0] * bs, bc[1] - p[1] * bs) : ctx.moveTo(bc[0] + p[0] * bs, bc[1] - p[1] * bs)); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.save(); ctx.beginPath(); ctx.rect(bx, by, box, box); ctx.clip();
+      ctx.fillStyle = 'rgba(29,79,115,0.75)'; ctx.beginPath(); ctx.arc(bc[0] + S.src[0] * bs, bc[1] - S.src[1] * bs, Math.max(2, S.size * bs), 0, TAU); ctx.fill(); ctx.restore();
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText(compact ? 'caustic' : 'behind the lens: caustic', bc[0], by + box - 6);
+    }
+    // scale bar in arcseconds
+    const target = info.tE / AS, nice = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20].find(v => v >= target * 0.6) || target, px = nice / target * g.s;
+    ctx.strokeStyle = sky ? '#cfd8de' : C('--ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(12, H - 14); ctx.lineTo(12 + px, H - 14); ctx.moveTo(12, H - 18); ctx.lineTo(12, H - 10); ctx.moveTo(12 + px, H - 18); ctx.lineTo(12 + px, H - 10); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = sky ? '#cfd8de' : C('--ink'); ctx.textAlign = 'left'; (sky ? (t, x, y) => ctx.fillText(t, x, y) : (t, x, y) => label(ctx, t, x, y))(nice + '″', 18 + px, H - 10);
+    const across = 2 * g.half * info.tE / AS; ctx.fillStyle = sky ? '#cfd8de' : C('--muted');
+    (sky ? (t, x, y) => ctx.fillText(t, x, y) : (t, x, y) => label(ctx, t, x, y))(compact ? across.toFixed(across < 1 ? 2 : 1) + '″ across' : 'picture ' + across.toFixed(across < 1 ? 2 : 1) + '″ across: ' + niceBig(MOON / across) + ' times smaller than the full Moon', 10, 18);
+  }
+
+  // ================================================================
+  // 6. TAB 3: MICROLENSING
+  // ================================================================
+  function startMicro() {
+    const M = S.mass * PH.Msun, thE = thetaEPoint(M, MU.Dl, MU.Ds, MU.Ds - MU.Dl), tE = thE * MU.Dl / MU.v / PH.day;
+    const q = 9.55e-4 / S.mass, a = S.pa * Math.PI / 180;
+    const lens = S.planet ? { kind: 'binary', m: [1 / (1 + q), q / (1 + q)], z: [[0, 0], [S.ps * Math.cos(a), S.ps * Math.sin(a)]] } : { kind: 'point' };
+    const rho = PH.Rsun / MU.Ds / thE;    // a Sun-like source star
+    mu = { thE, tE, lens, rho, t: -MU.span, pts: [], caus: S.planet ? binaryCaustics(lens, 240) : null, memo: {}, playing: mu ? mu.playing : false, au: S.ps * thE * MU.Dl / PH.AU };
+  }
+  const srcAt = t => [t / mu.tE, -S.u0];
+  function magAt(t) {
+    const p = srcAt(t);
+    if (!S.planet) return pointMag(Math.hypot(p[0], p[1]));
+    const memo = mu.memo, f = (x, y) => binaryMag(mu.lens, [x, y], memo);
+    // near the planet's caustic the star's own size matters: average over its disk
+    return diskMag(f, p[0], p[1], mu.rho, 3);
+  }
+  function stepMicro(dt) {   // dt in days of the event
+    const t1 = Math.min(MU.span, mu.t + dt);
+    const dtS = 0.04;   // samples every 0.04 days, so a planet's day-long blip is caught
+    while (mu.t < t1) { mu.t = Math.min(t1, mu.t + dtS); mu.pts.push([mu.t, magAt(mu.t)]); }
+    if (mu.t >= MU.span) mu.playing = false;
+  }
+  function drawThree(ctx, W, H, compact) {
+    const g = { s: Math.min(W / 2, H / 2) / 1.9, cx: W / 2, cy: H / 2 }, X = x => g.cx + x * g.s, Y = y => g.cy - y * g.s;
+    // the Einstein ring
+    ctx.strokeStyle = C('--einstein'); ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.arc(X(0), Y(0), g.s, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--einstein'); ctx.textAlign = 'left'; const et = compact ? 'Einstein ring' : 'Einstein ring: radius ' + fmtAngle(mu.thE); ctx.textAlign = 'left'; label(ctx, et, Math.max(6, X(-0.72) - 4 - ctx.measureText(et).width), Y(0.72) - 6);
+    // the caustics (with a planet): where the background star must be for a sharp spike
+    if (mu.caus) { ctx.fillStyle = C('--hot'); mu.caus.forEach(c => { ctx.fillRect(X(c.caus[0]) - 0.8, Y(c.caus[1]) - 0.8, 1.6, 1.6); }); }
+    // the background star's path, and the star itself
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(-MU.span / mu.tE), Y(-S.u0)); ctx.lineTo(X(MU.span / mu.tE), Y(-S.u0)); ctx.stroke();
+    const p = srcAt(mu.t);
+    ctx.strokeStyle = C('--src'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 5, 0, TAU); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; const bt = compact ? 'background star' : 'background star (where it really is)', bw = ctx.measureText(bt).width / 2; label(ctx, bt, Math.max(6 + bw, Math.min(W - 6 - bw, X(p[0]))), Y(p[1]) + 20);
+    // the lens star and its planet
+    star(ctx, X(0), Y(0), 9, C('--lensstar'));
+    if (S.planet) { const z = mu.lens.z[1]; ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(X(z[0]), Y(z[1]), 4, 0, TAU); ctx.fill(); font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; label(ctx, 'planet', X(z[0]) + 8, Y(z[1]) + 4); }
+    // the images
+    const ims = S.planet ? binaryImages(mu.lens, p, mu.memo) : pointImages(Math.hypot(p[0], p[1])).map(im => { const u = Math.hypot(p[0], p[1]) || 1e-9; return { x: im.x * p[0] / u, y: im.x * p[1] / u, mag: im.mag }; });
+    ims.forEach(im => { const r = Math.max(2.5, Math.min(14, 3.2 * Math.sqrt(Math.abs(im.mag)))); ctx.fillStyle = C('--image'); ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(X(im.x), Y(im.y), r, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; });
+    font(ctx, 11); ctx.fillStyle = C('--image'); ctx.textAlign = 'left'; const top = ims.reduce((a, b) => Math.abs(b.mag) > Math.abs(a.mag) ? b : a, ims[0]); if (top) label(ctx, 'images', Math.min(W - 48, X(top.x) + 14), Y(top.y) + (top.y > p[1] ? -10 : 18));
+    // what a telescope sees: the images are far too close together, so one blurred star, brighter
+    const A = mu.pts.length ? mu.pts[mu.pts.length - 1][1] : magAt(mu.t), box = compact ? 84 : 110, bx = W - box - 10, by = 10;
+    ctx.fillStyle = '#05080e'; ctx.fillRect(bx, by, box, box);
+    const gl = ctx.createRadialGradient(bx + box / 2, by + box / 2, 0, bx + box / 2, by + box / 2, box * 0.42), k = Math.min(1, 0.22 + 0.25 * Math.log(A) / Math.log(2));
+    gl.addColorStop(0, 'rgba(255,250,235,' + Math.min(1, 0.35 + 0.65 * k).toFixed(3) + ')'); gl.addColorStop(0.18 + 0.2 * k, 'rgba(255,240,210,' + (0.5 * k).toFixed(3) + ')'); gl.addColorStop(1, 'rgba(255,240,210,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(bx + box / 2, by + box / 2, box * 0.42, 0, TAU); ctx.fill();
+    font(ctx, 10); ctx.fillStyle = '#cfd8de'; ctx.textAlign = 'center'; ctx.fillText(compact ? 'telescope' : 'through a telescope', bx + box / 2, by + box - 6);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? fmtAngle(W / g.s * mu.thE) + ' across' : 'picture ' + fmtAngle(W / g.s * mu.thE) + ' across: ' + niceBig(MOON / (W / g.s * mu.thE / AS)) + ' times smaller than the full Moon', 10, 18);
+  }
+  function drawGraph() {
+    const { ctx, W, H } = fit($('graph')); ctx.clearRect(0, 0, W, H);
+    if (tab !== 3 || W < 120 || H < 80) return;
+    const b = { x: 40, y: 12, w: W - 52, h: H - 40 }, lmax = Math.log(30), X = t => b.x + (t + MU.span) / (2 * MU.span) * b.w, Y = A => b.y + b.h - Math.log(Math.max(1, A)) / lmax * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    [1, 2, 5, 10, 20].forEach(A => { const y = Y(A); ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y); ctx.strokeStyle = C('--soft'); ctx.stroke(); ctx.fillText('×' + A, b.x - 4, y + 3); });
+    ctx.textAlign = 'center'; [-60, -30, 0, 30, 60].forEach(t => ctx.fillText((t > 0 ? '+' : '') + t + (t === 0 ? ' days' : ''), X(t), b.y + b.h + 14));
+    ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); font(ctx, 11); ctx.fillText('brightness of the background star', b.x + 6, b.y + 13);
+    ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2; ctx.beginPath(); mu.pts.forEach((p, i) => { const x = X(p[0]), y = Math.max(b.y, Y(p[1])); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+    if (mu.pts.length) { const p = mu.pts[mu.pts.length - 1]; ctx.fillStyle = C('--curve'); ctx.beginPath(); ctx.arc(X(p[0]), Math.max(b.y, Y(p[1])), 3.5, 0, TAU); ctx.fill(); }
+  }
+
+  // ================================================================
+  // 7. DRAW, READOUTS, TEXT
+  // ================================================================
+  function drawScene() {
+    const { ctx, W, H, compact, dpr } = fit($('scene'));
+    ctx.clearRect(0, 0, W, H);
+    if (W < 80 || H < 60) return;
+    if (tab === 1) drawOne(ctx, W, H, compact); else if (tab === 2) drawTwo(ctx, W, H, compact, dpr); else drawThree(ctx, W, H, compact);
+  }
+  function draw() { drawScene(); drawGraph(); }
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const key = S.lens, Lk = LENSES[key], info = lensInfo(key);
+      if (key === 'sun') {
+        const sunR = PH.Rsun / PH.AU, beta = S.off.sun * sunR, ims = pointImages(beta / info.tE), shift = (ims[0].x * info.tE - beta);
+        html = card('Bent by', fmtAngle(bendAngle(PH.Msun, ims[0].x * info.tE * PH.AU)), 'for light passing ' + (ims[0].x * info.tE / sunR).toFixed(2) + ' Sun radii from the center; 1.75″ at the edge (4GM/c²b)');
+        html += card('The star looks shifted', 'outward by ' + fmtAngle(shift), 'measured during the 1919 eclipse, when stars near the Sun could be seen');
+        html += card('Second image', 'hidden', 'its light would have to pass through the Sun');
+      } else {
+        const u = S.off[key], ims = side(key)(u), tE = info.tE;
+        const dts = ims.length > 1 ? (Lk.kind === 'point' ? delayPoint(ims[1].x * tE, u * tE, Lk.M, info.Dl, info.Ds, info.Dls, ZL) - delayPoint(ims[0].x * tE, u * tE, Lk.M, info.Dl, info.Ds, info.Dls, ZL) : delayIso(ims[1].x * tE, u * tE, tE, info.Dl, info.Ds, info.Dls, ZL) - delayIso(ims[0].x * tE, u * tE, tE, info.Dl, info.Ds, info.Dls, ZL)) : 0;
+        html = card('Einstein radius', fmtAngle(tE), 'mass inside it: ' + fmtMass(info.M) + (Lk.kind === 'iso' ? ' (stars, gas and dark matter)' : ''));
+        html += card('Images', ims.length === 2 ? 'two, ' + fmtAngle(Math.abs(ims[0].x - ims[1].x) * tE) + ' apart' : 'one', ims.length === 2 ? 'brightened ×' + Math.abs(ims[0].mag).toFixed(1) + ' and ×' + Math.abs(ims[1].mag).toFixed(1) : 'the source is too far off to the side for a second image');
+        html += card('Arrival times', ims.length === 2 ? fmtTime(dts) + ' apart' : '—', ims.length === 2 ? 'the paths differ in length and in how close they pass the mass; if the source flickers, the images flicker in turn' : 'move the source closer to the line of sight');
+      }
+    } else if (tab === 2) {
+      const info = lensInfo(S.lens), L = lensObj(S.lens), n = L.kind === 'point' ? (Math.hypot(...S.src) < 1e-3 ? 0 : 2) : findImages(L, S.src[0], S.src[1], 2.6).length, sk = skyCache;
+      html = card('Einstein radius', fmtAngle(info.tE), 'mass inside it: ' + fmtMass(info.M) + '; ' + travelStr(false));
+      html += card('Images of its center', Math.hypot(...S.src) < 0.01 ? 'a ring' : n === 4 ? 'four (an Einstein cross)' : n === 2 ? 'two' : n === 1 ? 'one' : String(n), 'four when the source sits inside the diamond-shaped caustic behind an elongated lens');
+      html += card('Brightened', '×' + (sk.bright || 1).toFixed(1), 'the lens makes the galaxy look bigger and so brighter; the surface brightness of each piece is unchanged');
+    } else {
+      const A = mu.pts.length ? mu.pts[mu.pts.length - 1][1] : 1;
+      html = card('Brightness', '×' + A.toFixed(2), 'peak ×' + pointMag(S.u0).toFixed(2) + ' from the star alone, for a closest approach of ' + S.u0.toFixed(2) + ' Einstein radii');
+      html += card('Timescale', mu.tE.toFixed(0) + ' days', 'to cross one Einstein radius (' + fmtAngle(mu.thE) + ') at 200 km/s, for a ' + S.mass.toFixed(2) + ' solar-mass star 20,000 light-years away');
+      html += card('Day', (mu.t > 0 ? '+' : '') + mu.t.toFixed(0), S.planet ? 'planet ' + mu.au.toFixed(1) + ' AU from its star; its blip lasts about a day, if the path crosses its caustic' : 'the images are ' + fmtAngle(2 * mu.thE) + ' apart at most; no telescope can separate them');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'Light passing a mass is bent toward it. Predict: if a galaxy sits almost exactly in front of a more distant one, how many copies of the distant galaxy could we see, and where?',
+         notes: '<p><b>What to try.</b> Start with the Sun: starlight grazing its edge is bent by 1.75″, so a star near the Sun appears pushed outward. Then pick the galaxy and slide the source toward the line of sight: two paths reach us, one on each side, and we see two images. Slide it outside the Einstein radius and the second image fades away. Turn on more rays to see that most light misses us.</p>' +
+                '<p><b>Why.</b> Mass curves space, and light follows the curves: a ray passing at distance b from a mass M is bent by 4GM/(c²b), twice what a Newtonian guess gives. Rays passing above and below the lens can both be bent toward us, so we see the source in two places. The angle at which a source directly behind the lens would appear on all sides at once is the Einstein radius; it measures the lens’s mass.</p>' +
+                '<p><b>The model.</b> Thin lens: all the bending happens where the light passes the lens. Black hole: 6.5 billion solar masses (like M87’s), a point mass. Galaxy and cluster: isothermal (mass falling off as 1/r), with speed spreads of 250 and 1000 km/s, drawn round from the side. Lens at redshift 0.3, source at redshift 1, with distances from the expanding universe (Planck 2018). Heights are stretched so the tiny angles show.</p>' },
+    2: { lede: 'A distant galaxy sits behind a closer, massive lens. Predict: as you move it to exactly behind the lens, what will its image turn into?',
+         notes: '<p><b>What to try.</b> Drag the background galaxy across the lens and watch it stretch into arcs; put it exactly behind and it becomes a ring. With the galaxy lens, find the spots that give four images, an Einstein cross: they lie inside the small diamond in the corner panel. Notice the marked quarter: some images are flipped. Switch to the telescope view to see what Hubble would.</p>' +
+                '<p><b>Why.</b> Each point of the picture is made by tracing its light back past the lens to where it left the background galaxy. Near the lens that light is bent the most, so points spread around a ring all trace back to the same small region behind the lens: the galaxy is stretched into arcs, and its total light grows. Where the stretching becomes infinite (the critical curve) arcs are longest; the source positions that put images there form the caustic.</p>' +
+                '<p><b>The model.</b> The same lenses as the first tab, now with the galaxies elongated (elliptical isothermal, axis ratios 0.72 and 0.8). The picture is computed point by point from the exact lens equation. The black hole alone is unrealistic (it would sit inside a galaxy), but it shows the point-mass ring. Sizes are real: the scale bar is in arcseconds.</p>' },
+    3: { lede: 'A dim star in our galaxy drifts in front of a more distant star. The two images it makes are far too close for any telescope to separate. Predict: what would a telescope see change?',
+         notes: '<p><b>What to try.</b> Press Start and watch the background star brighten and fade over a few weeks. Bring the path closer to the lens star for a taller peak; make the lens star heavier for a longer event. Then give the lens star a planet: with the planet where it starts, the path crosses the planet’s caustic (the red dots) and a short spike appears. Move the planet in its orbit and the spike disappears, as it does in most real events.</p>' +
+                '<p><b>Why.</b> The lens star makes two images of the background star, a fraction of a milliarcsecond apart, so we see one star that grows brighter as the images grow (×(u² + 2)/(u√(u² + 4)) at u Einstein radii). A planet near one of the images disturbs it briefly. Surveys such as OGLE and KMTNet watch hundreds of millions of bulge stars for these events, and have found well over a hundred planets this way, including ones as small as Earth.</p>' +
+                '<p><b>The model.</b> Lens 6 kpc (20,000 light-years) away, source star like the Sun in the bulge at 8 kpc, moving across at 200 km/s; planet of one Jupiter mass. Images and brightening from the exact lens equation for one or two masses (the two-mass case as a fifth-degree polynomial), averaged over the source star’s disk. Time is sped up about 700,000 times.</p>' }
+  };
+
+  // ================================================================
+  // 8. CONTROLS
+  // ================================================================
+  function visibility() {
+    const one = tab === 1, two = tab === 2, three = tab === 3;
+    $('lab_lens').hidden = three; $('lab_off').hidden = !one; $('lab_fan').hidden = !one || S.lens === 'sun';
+    $('lab_size').hidden = !two; $('look').hidden = !two;
+    $('lab_mass').hidden = !three; $('lab_u0').hidden = !three; $('lab_planet').hidden = !three; $('lab_pa').hidden = !three || !S.planet; $('lab_ps').hidden = !three || !S.planet;
+    $('graph').hidden = !three; $('go').hidden = !three; $('reset').hidden = !three;
+    document.querySelector('#lens button[data-v="sun"]').hidden = two;
+    $('go').textContent = mu && mu.playing ? 'Pause' : (mu && mu.t >= MU.span ? 'Again' : (mu && mu.t > -MU.span ? 'Play' : 'Start'));
+    $('hint').textContent = two ? 'drag the background galaxy' : '';
+    document.querySelectorAll('#lens button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.lens)));
+    document.querySelectorAll('#look button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.look)));
+    document.querySelectorAll('#planet button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === S.planet)));
+    $('fan').checked = S.fan;
+    $('scene').classList.toggle('grab', two);
+    $('off_name').textContent = S.lens === 'sun' ? 'Star\u2019s angle from the Sun' : 'Source\u2019s offset';
+  }
+  function vals() {
+    const info = lensInfo(S.lens);
+    if (S.lens === 'sun') { $('off').min = '1.02'; $('off').max = '5'; } else { $('off').min = '0.02'; $('off').max = '2'; }
+    $('off').value = String(S.off[S.lens]);
+    $('off_v').textContent = S.lens === 'sun' ? S.off.sun.toFixed(2) + ' Sun radii' : S.off[S.lens].toFixed(2) + ' Einstein radii (' + shortAngle(S.off[S.lens] * info.tE) + ')';
+    $('size_v').textContent = 'radius ' + shortAngle(S.size * info.tE);
+    $('mass_v').textContent = S.mass.toFixed(2) + ' solar masses'; $('u0_v').textContent = S.u0.toFixed(2) + ' Einstein radii';
+    $('pa_v').textContent = S.pa + '°'; $('ps_v').textContent = S.ps.toFixed(2) + ' Einstein radii' + (mu ? ' = ' + mu.au.toFixed(1) + ' AU' : '');
+  }
+  function sync() { $('size').value = String(S.size); $('mass').value = String(S.mass); $('u0').value = String(S.u0); $('pa').value = String(S.pa); $('ps').value = String(S.ps); vals(); }
+  function upd() { visibility(); vals(); draw(); readout(); }
+  function setTab(k) {
+    tab = k; if (k === 2 && S.lens === 'sun') S.lens = 'gal';
+    [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    if (k === 3) { if (mu) mu.playing = false; startMicro(); }
+    sync(); upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#lens button').forEach(b => b.addEventListener('click', () => { S.lens = b.dataset.v; upd(); }));
+  document.querySelectorAll('#look button').forEach(b => b.addEventListener('click', () => { S.look = b.dataset.v; upd(); }));
+  document.querySelectorAll('#planet button').forEach(b => b.addEventListener('click', () => { S.planet = b.dataset.v === '1'; startMicro(); upd(); }));
+  $('off').addEventListener('input', () => { S.off[S.lens] = +$('off').value; upd(); });
+  $('fan').addEventListener('change', () => { S.fan = $('fan').checked; upd(); });
+  $('size').addEventListener('input', () => { S.size = +$('size').value; upd(); });
+  ['mass', 'u0', 'pa', 'ps'].forEach(id => $(id).addEventListener('input', () => { S[id] = +$(id).value; startMicro(); upd(); }));
+  $('go').addEventListener('click', () => { if (mu.t >= MU.span) { startMicro(); } mu.playing = !mu.playing; upd(); });
+  $('reset').addEventListener('click', () => { mu.playing = false; startMicro(); upd(); });
+  window.addEventListener('resize', draw);
+  // dragging the background galaxy (tab 2)
+  const sc = $('scene'); let dragging = false;
+  function toSrc(e) { const r = sc.getBoundingClientRect(), g = geom2(r.width, r.height); return [Math.max(-2, Math.min(2, (e.clientX - r.left - g.cx) / g.s)), Math.max(-1.8, Math.min(1.8, (g.cy - (e.clientY - r.top)) / g.s))]; }
+  sc.addEventListener('pointerdown', e => { if (tab !== 2) return; dragging = true; S.src = toSrc(e); sc.setPointerCapture(e.pointerId); e.preventDefault(); upd(); });
+  sc.addEventListener('pointermove', e => { if (!dragging) return; S.src = toSrc(e); upd(); });
+  const endDrag = () => { dragging = false; }; sc.addEventListener('pointerup', endDrag); sc.addEventListener('pointercancel', endDrag);
+  sc.addEventListener('keydown', e => { if (tab !== 2) return; const d = { ArrowLeft: [-0.05, 0], ArrowRight: [0.05, 0], ArrowUp: [0, 0.05], ArrowDown: [0, -0.05] }[e.key]; if (!d) return; S.src = [S.src[0] + d[0], S.src[1] + d[1]]; e.preventDefault(); upd(); });
+
+  // ================================================================
+  // 9. LOOP (only the microlensing tab moves)
+  // ================================================================
+  let last = null, lastRead = 0;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+    if (tab === 3 && mu && mu.playing && dt > 0 && !document.hidden) {
+      stepMicro(reduced ? 2 * MU.span : dt * 8);        // 8 days per second
+      draw(); if (ts - lastRead > 120 || !mu.playing) { readout(); visibility(); lastRead = ts; }
+    }
+    requestAnimationFrame(frame);
+  }
+  startMicro(); setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

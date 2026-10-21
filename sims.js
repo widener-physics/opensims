@@ -19,6 +19,39 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'michelson-interferometer',
+    title: 'The Michelson interferometer',
+    pageTitle: 'Michelson interferometer simulation: fringes, refractive index and LIGO',
+    topic: 'optics',
+    tags: ['Michelson interferometer', 'interference', 'fringes', 'wavelength', 'refractive index', 'LIGO', 'gravitational waves', 'laser'],
+    blurb: "Slide a mirror a fraction of a micrometer and watch rings stream out of the center, one for every half wavelength. Let air into a cell in one arm and count the rings as the light slows, then see LIGO's 4 km version catch the 2015 gravitational wave from two merging black holes.",
+    level: 'intro',
+    added: '2026-10-21',
+    status: 'ready'
+  },
+  {
+    slug: 'doppler-effect',
+    title: 'The Doppler effect',
+    pageTitle: 'Doppler effect simulation: sirens, sonic booms and redshift',
+    topic: 'oscillations',
+    tags: ['Doppler effect', 'sound', 'pitch', 'frequency', 'sonic boom', 'Mach cone', 'shock wave', 'redshift', 'blueshift', 'spectral lines'],
+    blurb: "Hear an ambulance's pitch drop as it drives past, and see why in the crowded and stretched wave crests. Push a jet past the speed of sound to make a shock cone and a sonic boom, compare a moving listener with a moving source, then watch hydrogen's lines in a star's or galaxy's light shift toward the red.",
+    level: 'intro',
+    added: '2026-10-21',
+    status: 'ready'
+  },
+  {
+    slug: 'gravitational-lensing',
+    title: 'Gravitational lensing',
+    pageTitle: 'Gravitational lensing simulation: Einstein rings, arcs and microlensing',
+    topic: 'astronomy',
+    tags: ['gravitational lensing', 'Einstein ring', 'Einstein cross', 'general relativity', 'bending of light', 'dark matter', 'microlensing', 'exoplanets', 'caustic'],
+    blurb: "Watch light bend around the Sun, a black hole, a galaxy and a galaxy cluster, with real masses and distances. Drag a background galaxy behind the lens and see it stretch into arcs, an Einstein ring or an Einstein cross; then watch a star brighten for a few weeks as another passes in front, with a spike if the lens star has a planet.",
+    level: 'intro',
+    added: '2026-10-21',
+    status: 'ready'
+  },
+  {
     slug: 'gyroscope',
     title: 'Gyroscope precession',
     pageTitle: 'Gyroscope simulation: precession and nutation',
