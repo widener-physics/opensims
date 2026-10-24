@@ -24,7 +24,7 @@ window.SIMS = [
     pageTitle: 'Entropy simulation: microstates, S = k ln Ω, and why heat flows hot to cold',
     topic: 'thermo',
     tags: ['entropy', 'microstates', 'second law of thermodynamics', 'Boltzmann', 'S = k ln W', 'free expansion', 'Einstein solid', 'irreversibility', 'time reversal'],
-    blurb: "Pull the partition out of a box of colliding molecules and see why they never gather back by themselves. Count the arrangements, watch two solids share energy until their temperatures match, then reverse every molecule's velocity and see a nudge of a billionth undo the return.",
+    blurb: "Pull the partition out of a box of colliding molecules and see why they never gather back by themselves. Watch two solids trade packets of energy one at a time until their temperatures match, then reverse every molecule's velocity and see a nudge of a billionth undo the return.",
     level: 'intro',
     added: '2026-10-21',
     status: 'ready'

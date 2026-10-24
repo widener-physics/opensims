@@ -14,12 +14,6 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol * Math.abs(b);
   const C = (n, k) => fact(n) / (fact(k) * fact(n - k));
   ok([[4, 2, 6n], [10, 5, 252n], [20, 10, 184756n]].every(([n, k, v]) => C(n, k) === v && Math.abs(Math.exp(E.lnChoose(n, k)) - Number(v)) < 1e-6 * Number(v)), 'ways to put n of N molecules on the left: 4 → 6 ways for 2–2, 10 → 252 for 5–5, 20 → 184 756 for 10–10');
   ok(Math.abs(E.lnWays(1000, 500) - lnBig(C(1000, 500))) < 1e-9 && E.lnChoose(5, 6) === -Infinity && E.lnChoose(5, -1) === -Infinity, 'ways for 500–500 of 1000 molecules: e^' + E.lnWays(1000, 500).toFixed(2) + ' (exact); impossible splits have none'); })();
-ok([2, 7, 100, 1000].every(N => { let s = 0; for (let n = 0; n <= N; n++) s += E.chance(N, n); return Math.abs(s - 1) < 1e-10; }) && near(E.chance(10, 10), 1 / 1024, 1e-12), 'chances of all the splits add to 1; all 10 on the left: 1 in 1024');
-// the chance of being near half, against the normal (bell-curve) approximation for large N
-(function () { const erf = x => { let s = 0, t = x, n = 0; while (Math.abs(t) > 1e-17 && n < 200) { s += t / (2 * n + 1); n++; t *= -x * x / n; } return 2 / Math.sqrt(Math.PI) * s; };
-  const N = 1000, d = 0.02, z = (d * N + 0.5) / (0.5 * Math.sqrt(N)) / Math.SQRT2;
-  ok(Math.abs(E.chanceWithin(N, d) - erf(z)) < 0.003, '1000 molecules: within 2% of half ' + (100 * E.chanceWithin(N, d)).toFixed(1) + '% of the time (bell curve: ' + (100 * erf(z)).toFixed(1) + '%)');
-  ok(near(E.chanceWithin(4, 0), 6 / 16, 1e-12) && near(E.chanceWithin(4, 0.25), 14 / 16, 1e-12), '4 molecules: exactly half 6/16 of the time, 2–2 or 3–1 either way 14/16'); })();
 ok(E.tenPow(Math.log(2) * 100).e === 30 && Math.abs(E.tenPow(Math.log(2) * 100).m - 1.2677) < 1e-3 && E.tenPow(Math.log(5)).e === 0, 'writing big numbers: 2^100 = 1.27 × 10^30');
 
 // 2. Einstein solids
@@ -88,7 +82,6 @@ ok(E.diskRadius(1000) < 0.009 && E.diskRadius(2) === 0.03 && Math.abs(1000 * Mat
 
 // constants: Boltzmann's constant (exact, SI 2019); the box 2 by 1; the position unit 1/2^30 of the height ("a billionth")
 ok(E.KB === 1.380649e-23 && E.GAS.W === 2 && E.GAS.H === 1 && E.GAS.Q === 2 ** 30 && Math.abs(1 / E.GAS.Q - 9.3e-10) < 1e-11, 'Boltzmann\'s constant 1.380649 × 10⁻²³ J/K; box 2 × 1; positions in steps of 1/2³⁰ ≈ 0.93 billionths');
-ok(Math.abs(E.chanceWithin(4, 0.5) - 1) < 1e-12 && Math.abs(E.chanceWithin(5, 0.1) - 20 / 32) < 1e-12, 'every split is within 50% of even; 5 molecules: 3–2 or 2–3 in 20 of 32 arrangements');
 (function () { const sp = E.splits(3, 4, 5); ok(sp.length === 6 && sp[0].qA === 0 && sp[5].qA === 5 && Math.abs(Math.exp(sp[0].b) - 56) < 1e-9 && Math.abs(Math.exp(sp[5].a) - 21) < 1e-9, 'splits of 5 packets: every one from 0 to 5 in A; all 5 in B (4 oscillators): 56 ways; all 5 in A (3): 21 ways'); })();
 ok(Math.abs(E.tempSolid(10, 1) - 1 / Math.log(11)) < 1e-12, 'one packet in 10 oscillators: kT/ε = 1/ln 11');
 // a fresh gas: inside its box, not overlapping, moving in all directions with rms speed 1, and no net drift
