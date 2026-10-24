@@ -19,6 +19,28 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'entropy',
+    title: 'Entropy and microstates',
+    pageTitle: 'Entropy simulation: microstates, S = k ln Ω, and why heat flows hot to cold',
+    topic: 'thermo',
+    tags: ['entropy', 'microstates', 'second law of thermodynamics', 'Boltzmann', 'S = k ln W', 'free expansion', 'Einstein solid', 'irreversibility', 'time reversal'],
+    blurb: "Pull the partition out of a box of colliding molecules and see why they never gather back by themselves. Count the arrangements, watch two solids share energy until their temperatures match, then reverse every molecule's velocity and see a nudge of a billionth undo the return.",
+    level: 'intro',
+    added: '2026-10-21',
+    status: 'ready'
+  },
+  {
+    slug: 'fourier',
+    title: 'Fourier: building waves',
+    pageTitle: 'Fourier series simulation: build, draw and hear waves made of harmonics',
+    topic: 'oscillations',
+    tags: ['Fourier series', 'harmonics', 'square wave', 'Gibbs phenomenon', 'spectrum', 'timbre', 'uncertainty principle', 'bandwidth', 'sound'],
+    blurb: "Add sine waves one harmonic at a time and watch them build a square, triangle or sawtooth wave, overshoot at every jump included, and hear the tone change. Draw any shape and see which harmonics it takes, then shorten a beep until its pitch dissolves into a spread of frequencies.",
+    level: 'intro',
+    added: '2026-10-21',
+    status: 'ready'
+  },
+  {
     slug: 'michelson-interferometer',
     title: 'The Michelson interferometer',
     pageTitle: 'Michelson interferometer simulation: fringes, refractive index and LIGO',

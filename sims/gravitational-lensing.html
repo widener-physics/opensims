@@ -503,26 +503,33 @@
   }
   // the Sun: light from a star far away arrives in parallel; drawn in Sun radii, with the bending made much larger
   function drawSun(ctx, W, H, compact, xo, xr, yc, info) {
-    const R = H * 0.11, xl = xo + (xr - xo) * 0.42, L1 = xl - xo, beta = S.off.sun;      // beta: the star's direction, in Sun radii as seen from Earth
+    yc = H * 0.62;
+    const xl = xo + (xr - xo) * 0.55, L1 = xl - xo, k = (xr - xo) / L1, beta = S.off.sun;      // beta: the star's direction, in Sun radii as seen from Earth
     const sunR = PH.Rsun / PH.AU, im = pointImages(beta * sunR / info.tE)[0], th = im.x * info.tE / sunR;   // the visible image, in Sun radii
-    const E = 150, thD = beta + E * (th - beta);   // drawn with the shift made E times larger
+    // the Sun's drawn size: as large as it can be while the star (at the right edge) stays below the captions;
+    // the shift is drawn E times larger, more when the Sun is drawn smaller, so it doesn't vanish for distant stars
+    const R0 = H * 0.12; let R = R0, E = 150, thD;
+    for (let i = 0; i < 4; i++) { thD = beta + E * (th - beta); R = Math.min(R0, (yc - 60) / (thD * k)); E = Math.max(150, Math.round(150 * R0 / R / 50) * 50); }
+    thD = beta + E * (th - beta); R = Math.min(R0, (yc - 60) / (thD * k));
     const Y = h => yc - h * R;
+    const yTrue = yc - beta * R * k, yApp = yc - thD * R * k, yBend = Y(thD);
     // the star's true direction: a dashed line from Earth
-    ctx.strokeStyle = C('--src'); ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(xo, yc); ctx.lineTo(xr, yc - beta * R * (xr - xo) / L1); ctx.stroke(); ctx.setLineDash([]);
-    // the light: arrives parallel to that direction, is bent at the Sun, reaches Earth
-    ctx.strokeStyle = C('--ray'); ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(xr, Y(thD) - beta * R * (xr - xl) / L1); ctx.lineTo(xl, Y(thD)); ctx.lineTo(xo, yc); ctx.stroke();
-    // where the star appears: straight back along the arriving ray
-    const yApp = yc - thD * R * (xr - xo) / L1;
-    ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1.4; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(xl, Y(thD)); ctx.lineTo(xr, yApp); ctx.stroke(); ctx.setLineDash([]);
-    if (yApp > 6) { star(ctx, xr, yApp, 7, C('--ghost')); font(ctx, 11); ctx.fillStyle = C('--ghost'); ctx.textAlign = 'right'; label(ctx, 'where the star appears', xr - 12, yApp - 10); }
-    const yTrue = yc - beta * R * (xr - xo) / L1; if (yTrue > 6) { star(ctx, xr, yTrue, 7, C('--src')); font(ctx, 11); ctx.fillStyle = C('--src'); ctx.textAlign = 'right'; label(ctx, 'where it really is', xr - 12, yTrue + 18); }
+    ctx.strokeStyle = C('--src'); ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(xo, yc); ctx.lineTo(xr, yTrue); ctx.stroke(); ctx.setLineDash([]);
+    // where the star appears: straight back along the light that reaches Earth
+    ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1.4; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(xl, yBend); ctx.lineTo(xr, yApp); ctx.stroke(); ctx.setLineDash([]);
+    // the light: leaves the star, is bent toward the Sun as it passes, reaches Earth
+    ctx.strokeStyle = C('--ray'); ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(xr, yTrue); ctx.lineTo(xl, yBend); ctx.lineTo(xo, yc); ctx.stroke();
+    star(ctx, xr, yApp, 7, C('--ghost')); star(ctx, xr, yTrue, 7, C('--src'));
+    font(ctx, 11); ctx.textAlign = 'right';
+    ctx.fillStyle = C('--ghost'); label(ctx, compact ? 'where it appears' : 'where the star appears', xr - 12, yApp - 10);
+    ctx.fillStyle = C('--src'); const rt = 'where it really is', sl = Math.max((yc - yTrue) / (xr - xo), (yBend - yTrue) / (xr - xl)); label(ctx, rt, xr - 4, yTrue + 16 + sl * ctx.measureText(rt).width);   // below both lines that leave the star
     // the Sun
     const gr = ctx.createRadialGradient(xl, yc, R * 0.2, xl, yc, R); gr.addColorStop(0, '#FFE08A'); gr.addColorStop(1, '#F2B33D'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(xl, yc, R, 0, TAU); ctx.fill();
     ctx.fillStyle = C('--obs'); ctx.beginPath(); ctx.arc(xo, yc, 6, 0, TAU); ctx.fill();
     font(ctx, 12); ctx.textAlign = 'center'; ctx.fillStyle = C('--ink'); label(ctx, 'Earth', xo, yc + 22); label(ctx, 'Sun', xl, yc + R + 18);
     font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
-    label(ctx, 'not to scale: the Sun’s size and the angles stretched; the bending drawn ' + E + ' times larger still', 10, 18);
-    label(ctx, '1 AU to the Sun; the star is many light-years beyond, so its light arrives in parallel', 10, 34);
+    label(ctx, compact ? 'not to scale; bending drawn ' + E + '× larger' : 'not to scale: the Sun’s size and the angles stretched; the bending drawn ' + E + ' times larger still', 10, 18);
+    label(ctx, compact ? 'the star is really light-years away' : '1 AU to the Sun; the star is really many light-years beyond', 10, 34);
   }
   function niceBig(x) { const e = Math.floor(Math.log10(x)), m = x / 10 ** e, r = m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10; const v = r * 10 ** e; return v >= 1e6 ? (v / 10 ** Math.floor(Math.log10(v))).toFixed(0) + ' × 10' + sup(Math.floor(Math.log10(v))) : v.toLocaleString('en-US'); }
 

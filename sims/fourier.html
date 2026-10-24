@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<!--
+  Fourier: building waves from sine waves - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The shapes' coefficients
+  match numerical integration; the overshoot at a jump tends to Gibbs's constant; the analysis of a drawing
+  recovers known coefficients and satisfies Parseval's theorem; a burst's spectrum matches a direct numerical
+  Fourier transform, and its width matches the formulas for bell-curve and sharp-edged bursts.
+  Credit: PhET's "Fourier: Making Waves" (University of Colorado Boulder) covers some of the same ground;
+  this sim was written independently.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fourier series simulation: build, draw and hear waves made of harmonics | Open Physics Sims</title>
+<meta name="description" content="Add sine waves one harmonic at a time and watch them build a square, triangle or sawtooth wave, overshoot at every jump included, and hear the tone change. Draw any shape and see which harmonics it takes, then shorten a beep until its pitch dissolves into a spread of frequencies.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --ghost: #7A8790; --curve: #1D4F73; --drawn: #C9D1D6; --target: #B5306D;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 380; touch-action: pan-y; }
+  #scene.draw { touch-action: none; cursor: crosshair; }
+  #graph { aspect-ratio: 900 / 200; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 11px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  #preset button { padding: 6px 9px; }
+  #lab_target { margin-top: 6px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--body); }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  /* one slider per harmonic: number and frequency, slider, amplitude */
+  .harm { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0 28px; }
+  .harm .head { grid-column: 1 / -1; margin-bottom: 2px; }
+  .controls .harm label { display: grid; grid-template-columns: 82px 1fr 42px; gap: 8px; align-items: center; }
+  .harm .n { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .harm .n i { font-style: normal; color: var(--muted); font-size: 12.5px; }
+  .harm .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .harm input[type=range] { height: 24px; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.8; }
+    #graph { aspect-ratio: 1 / 0.55; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Fourier: building waves</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Build a wave</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Draw a wave</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Short pulse</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="The wave"></canvas>
+  <div class="row2">
+    <button id="snd" class="secondary" aria-pressed="false">Sound: off</button>
+    <button id="play">Play the pulse</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="The harmonics in the wave"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_preset"><div>Start from</div>
+      <div class="seg" id="preset" role="group" aria-label="Start from"><button data-v="sine">sine</button><button data-v="square">square</button><button data-v="triangle">triangle</button><button data-v="sawtooth">sawtooth</button><button data-v="clear">flat</button></div></div>
+    <label class="check" id="lab_target"><input type="checkbox" id="target" checked> show the shape it’s aiming for</label>
+    <div class="harm" id="harm"><div class="head">Each harmonic’s amplitude</div></div>
+    <div class="grp" id="lab_ex"><div>Start from</div>
+      <div class="seg" id="ex" role="group" aria-label="Start from"><button data-v="sine">sine</button><button data-v="hump">hump</button><button data-v="step">step</button><button data-v="spike">spike</button></div></div>
+    <label id="lab_N"><div class="row"><span>Harmonics used</span><span class="val" id="N_v"></span></div><input type="range" id="N" min="1" max="20" step="1"></label>
+    <div class="grp" id="lab_edge"><div>Switched on and off</div>
+      <div class="seg" id="edge" role="group" aria-label="Switched on and off"><button data-v="smooth">smoothly</button><button data-v="sharp">sharply</button></div></div>
+    <label id="lab_tau"><div class="row"><span>How long it lasts</span><span class="val" id="tau_v"></span></div><input type="range" id="tau" min="0" max="100" step="1"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/fourier.test.js)
+  // ================================================================
+  // ---- physics core: Fourier series and spectra ----
+  // A repeating wave with period 1 (x counts periods) is a sum of a steady level a0 and sine and cosine waves at
+  // whole-number multiples n of the repeat rate:  y(x) = a0 + sum over n of [ a_n cos(2 pi n x) + b_n sin(2 pi n x) ].
+  const TWO_PI = 2 * Math.PI;
+  // the standard shapes, height 1, and their known coefficients (all sine terms; they are odd functions of x)
+  const SHAPES = {
+    sine:     { name: 'sine',     f: x => Math.sin(TWO_PI * x), b: n => n === 1 ? 1 : 0, jump: 0 },
+    square:   { name: 'square',   f: x => { const u = x - Math.floor(x); return u === 0 || u === 0.5 ? 0 : u < 0.5 ? 1 : -1; }, b: n => n % 2 ? 4 / (Math.PI * n) : 0, jump: 2 },
+    triangle: { name: 'triangle', f: x => { const u = x - Math.floor(x); return u < 0.25 ? 4 * u : u < 0.75 ? 2 - 4 * u : 4 * u - 4; }, b: n => n % 2 ? 8 / (Math.PI * Math.PI * n * n) * ((n - 1) / 2 % 2 ? -1 : 1) : 0, jump: 0 },
+    sawtooth: { name: 'sawtooth', f: x => { const u = x - Math.floor(x + 0.5); return u === -0.5 ? 0 : 2 * u; }, b: n => 2 * (n % 2 ? 1 : -1) / (Math.PI * n), jump: 2 }
+  };
+  // the first N coefficients of a shape, as arrays indexed by n (index 0 is the steady level)
+  function shapeCoeffs(key, N) { const a = new Array(N + 1).fill(0), b = new Array(N + 1).fill(0); for (let n = 1; n <= N; n++) b[n] = SHAPES[key].b(n); return { a, b }; }
+  // the sum, using terms 1..N (all of them if N is left out)
+  function series(c, x, N) {
+    const M = N === undefined ? Math.max(c.a.length, c.b.length) - 1 : Math.min(N, Math.max(c.a.length, c.b.length) - 1);
+    let y = c.a[0] || 0;
+    for (let n = 1; n <= M; n++) { const th = TWO_PI * n * x; y += (c.a[n] || 0) * Math.cos(th) + (c.b[n] || 0) * Math.sin(th); }
+    return y;
+  }
+  // how far the sum overshoots near a jump, as a fraction of the jump (for square and sawtooth; Gibbs: about 0.0895)
+  function overshoot(key, N, samples) {
+    const c = shapeCoeffs(key, N), K = samples || 8000; let top = -Infinity;
+    for (let i = 0; i < K; i++) top = Math.max(top, series(c, i / K));
+    return (top - 1) / SHAPES[key].jump;
+  }
+  // the highest point the sum reaches (for the triangle: how far its corners are rounded off)
+  function peak(c, N, samples) { const K = samples || 4000; let top = -Infinity; for (let i = 0; i < K; i++) top = Math.max(top, series(c, i / K, N)); return top; }
+
+  // ---- a shape drawn by hand: M equally spaced samples over one period ----
+  // a0 = average; a_n = (2/M) sum y_k cos(2 pi n k / M); b_n = (2/M) sum y_k sin(2 pi n k / M)  (for n below M/2)
+  function analyze(y, N) {
+    const M = y.length, a = new Array(N + 1).fill(0), b = new Array(N + 1).fill(0);
+    for (let k = 0; k < M; k++) a[0] += y[k] / M;
+    for (let n = 1; n <= N; n++) { let sa = 0, sb = 0; for (let k = 0; k < M; k++) { const th = TWO_PI * n * k / M; sa += y[k] * Math.cos(th); sb += y[k] * Math.sin(th); } a[n] = 2 * sa / M; b[n] = 2 * sb / M; }
+    return { a, b };
+  }
+  const amplitude = (c, n) => Math.hypot(c.a[n] || 0, c.b[n] || 0);
+  // root-mean-square difference between the samples and the sum of the first N terms
+  function rmsMiss(y, c, N) { const M = y.length; let s = 0; for (let k = 0; k < M; k++) { const d = y[k] - series(c, k / M, N); s += d * d; } return Math.sqrt(s / M); }
+
+  // ---- a short burst of a tone: how long it lasts against how spread out its frequencies are ----
+  // the tone, frequency f0 (Hz), switched on and off by an envelope lasting tau seconds: smooth (a bell curve whose
+  // full width at half height is tau) or sharp (on for exactly tau)
+  const envelope = (t, tau, kind) => kind === 'sharp' ? (Math.abs(t) <= tau / 2 ? 1 : 0) : Math.exp(-4 * Math.LN2 * t * t / (tau * tau));
+  const burst = (t, tau, kind, f0) => envelope(t, tau, kind) * Math.sin(TWO_PI * f0 * t);
+  // its spectrum: the size of each frequency in it, |X(f)| with X(f) = integral of x(t) e^(-2 pi i f t) dt.
+  // The envelope's transform E(f) is real; the sine splits it into copies at +f0 and -f0: |X| = |E(f - f0) - E(f + f0)| / 2
+  function envSpec(f, tau, kind) {
+    if (kind === 'sharp') return Math.abs(f) < 1e-12 ? tau : Math.sin(Math.PI * f * tau) / (Math.PI * f);
+    return tau * Math.sqrt(Math.PI / (4 * Math.LN2)) * Math.exp(-Math.PI * Math.PI * tau * tau * f * f / (4 * Math.LN2));
+  }
+  const spectrum = (f, tau, kind, f0) => Math.abs(envSpec(f - f0, tau, kind) - envSpec(f + f0, tau, kind)) / 2;
+  // the spread: the width of the spectrum's main peak at half its height (found by searching outward from the top)
+  function spread(tau, kind, f0) {
+    const S = f => spectrum(f, tau, kind, f0);
+    // the top of the main peak: near f0, searched within a fraction of the expected width
+    let fp = f0, top = S(f0); const w = 1 / tau;
+    for (let i = -200; i <= 200; i++) { const f = f0 + i * w / 400; if (f > 0 && S(f) > top) { top = S(f); fp = f; } }
+    const half = top / 2, edge = (dir) => {
+      let lo = fp, hi = fp; const step = w / 50;
+      while (S(hi) > half) { lo = hi; hi += dir * step; if (hi <= 0) return 0; }
+      for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (S(m) > half) lo = m; else hi = m; }
+      return (lo + hi) / 2;
+    };
+    const f1 = edge(-1), f2 = edge(1);
+    return { f1, f2, df: f2 - f1, peak: fp, top };
+  }
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. SETTINGS AND STATE
+  // ================================================================
+  const F0 = 220;                  // tabs 1 and 2: the wave repeats 220 times a second (A3)
+  const TONE = 440;                // tab 3: concert A
+  const NH = 10, NDRAW = 20, M = 256;
+  const KEYS = ['sine', 'square', 'triangle', 'sawtooth'];
+  const S = { b: new Array(NH + 1).fill(0), preset: 'sine', target: true,
+              y: new Array(M).fill(0), ex: 'hump', N: 5, edge: 'smooth', tv: 50 };
+  S.b[1] = 1;
+  let tab = 1, coef = null;
+  const tauOf = v => 0.002 * Math.pow(25, v / 100);      // 2 ms to 50 ms
+  // the examples to draw over
+  const EX = {
+    sine: x => Math.sin(TAU * x),
+    hump: x => 1.6 * Math.exp(-(((x - 0.5) / 0.1) ** 2)) - 0.8,
+    step: x => x < 0.5 ? 0.7 : -0.7,
+    spike: x => Math.abs(x - 0.5) < 0.012 ? 1 : -0.8
+  };
+  function setExample(k) { S.ex = k; for (let i = 0; i < M; i++) S.y[i] = EX[k](i / M); coef = analyze(S.y, NDRAW); }
+  setExample('hump');
+  // which standard shape (if any) the sliders now make, and with harmonics up to which number
+  function matched() {
+    let K = 0; for (let n = 1; n <= NH; n++) if (Math.abs(S.b[n]) > 0.004) K = n;
+    if (!K) return null;
+    for (const key of KEYS) { let good = true; for (let n = 1; n <= NH && good; n++) { const want = n <= K ? SHAPES[key].b(n) : 0; if (Math.abs(S.b[n] - want) > 0.006) good = false; } if (good) return { key, K }; }
+    return null;
+  }
+
+  // ================================================================
+  // 3. SOUND (Web Audio): only after the Sound button, or Play, is pressed
+  // ================================================================
+  const AU = { ctx: null, osc: null, g: null, on: false };
+  function audioInit() {
+    const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return false;
+    if (!AU.ctx) { AU.ctx = new Ctx(); AU.g = AU.ctx.createGain(); AU.g.gain.value = 0; AU.g.connect(AU.ctx.destination);
+      AU.osc = AU.ctx.createOscillator(); AU.osc.frequency.value = F0; AU.osc.connect(AU.g); AU.osc.start(); }
+    if (AU.ctx.state === 'suspended') AU.ctx.resume();
+    return true;
+  }
+  function audioQuiet() { if (AU.ctx) AU.g.gain.setTargetAtTime(0, AU.ctx.currentTime, 0.03); }
+  // the tone: exactly these amplitudes, at a fixed overall loudness (no rescaling, so flipping a harmonic over doesn't change the volume)
+  function audioUpdate() {
+    if (!AU.on || !AU.ctx || tab === 3) { audioQuiet(); return; }
+    const K = tab === 1 ? NH : S.N, re = new Float32Array(K + 1), im = new Float32Array(K + 1); let any = false;
+    for (let n = 1; n <= K; n++) { re[n] = tab === 1 ? 0 : coef.a[n] / 2; im[n] = (tab === 1 ? S.b[n] : coef.b[n]) / 2; if (re[n] || im[n]) any = true; }
+    if (!any) { audioQuiet(); return; }
+    AU.osc.setPeriodicWave(AU.ctx.createPeriodicWave(re, im, { disableNormalization: true }));
+    AU.g.gain.setTargetAtTime(0.12, AU.ctx.currentTime, 0.03);
+  }
+  // tab 3: play the burst once, peak height 0.35
+  function playBurst() {
+    if (!audioInit()) return;
+    const sr = AU.ctx.sampleRate, len = 0.14, n = Math.round(sr * len), buf = AU.ctx.createBuffer(1, n, sr), d = buf.getChannelData(0), tau = tauOf(S.tv);
+    for (let i = 0; i < n; i++) d[i] = 0.35 * burst(i / sr - len / 2, tau, S.edge, TONE);
+    const s = AU.ctx.createBufferSource(); s.buffer = buf; s.connect(AU.ctx.destination); s.start();
+  }
+
+  // ================================================================
+  // 4. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  const fmt = (v, d) => (v < 0 && Math.abs(v) >= 0.5 * 10 ** -d ? '−' : '') + Math.abs(v).toFixed(d);
+  // a plot box with a zero line and grid lines at the heights listed
+  function frame(ctx, b, Y, ticks) {
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    ticks.forEach(v => { const y = Y(v); ctx.strokeStyle = v === 0 ? C('--ghost') : C('--soft'); ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y); ctx.stroke(); ctx.fillText(fmt(v, 0), b.x - 5, y + 3); });
+  }
+  function curve(ctx, b, X, fn, x0, x1, col, w, dash) {
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineJoin = 'round'; if (dash) ctx.setLineDash(dash); ctx.beginPath();
+    const n = Math.max(200, Math.round(b.w * 2));
+    for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, p = fn(x); if (p === null) continue; i ? ctx.lineTo(X(x), p) : ctx.moveTo(X(x), p); }
+    ctx.stroke(); ctx.restore();
+  }
+
+  // ---- tab 1: the sum, two cycles ----
+  function drawBuild(ctx, W, H, compact) {
+    const b = { x: compact ? 30 : 38, y: 28, w: 0, h: H - 28 - 28 }; b.w = W - b.x - 12;
+    const R = 1.8, Y = v => b.y + b.h / 2 - v / R * b.h / 2, X = x => b.x + x / 2 * b.w;
+    frame(ctx, b, Y, [-1, 0, 1]);
+    // time along the bottom, in ms
+    const per = 1000 / F0; font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let t = 0; t <= 2 * per + 1e-9; t += compact ? 2 : 1) { const x = X(t / per); ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(x, b.y + b.h); ctx.lineTo(x, b.y + b.h + 4); ctx.stroke(); ctx.fillText(t + '', x, b.y + b.h + 15); }
+    ctx.textAlign = 'right'; ctx.fillText('ms', b.x + b.w, b.y + b.h + 26 > H ? b.y + b.h + 15 : b.y + b.h + 26);
+    const m = matched(), tk = m ? m.key : (KEYS.includes(S.preset) ? S.preset : null), c = { a: [0], b: S.b };
+    if (S.target && tk && !(m && m.key === 'sine')) curve(ctx, b, X, x => Y(SHAPES[tk].f(x)), 0, 2, C('--target'), 1.6, [5, 4]);
+    curve(ctx, b, X, x => Y(series(c, x)), 0, 2, C('--curve'), 2.6);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'the sum, two cycles' : 'the sum of the harmonics below: two cycles, repeating ' + F0 + ' times a second', b.x, 17);
+    if (S.target && tk && !(m && m.key === 'sine')) { ctx.fillStyle = C('--target'); ctx.textAlign = 'right'; label(ctx, (compact ? '' : 'dashed: ') + 'a true ' + SHAPES[tk].name + ' wave', W - 12, 17); }
+  }
+  // ---- bars: one per harmonic ----
+  function drawBars(ctx, W, H, compact, vals, K, R, signed, used, title, freqs) {
+    const b = { x: compact ? 30 : 38, y: 26, w: 0, h: H - 26 - (freqs && !compact ? 34 : 22) }; b.w = W - b.x - 12;
+    const Y = v => signed ? b.y + b.h / 2 - v / R * b.h / 2 : b.y + b.h - v / R * b.h;
+    frame(ctx, b, Y, signed ? [-1, 0, 1] : [0, 1]);
+    const slot = b.w / K, bw = Math.min(26, slot * 0.6);
+    font(ctx, 10); ctx.textAlign = 'center';
+    for (let n = 1; n <= K; n++) {
+      const x = b.x + (n - 0.5) * slot, v = Math.max(-R, Math.min(R, vals[n] || 0));
+      ctx.fillStyle = n <= used ? C('--body') : C('--drawn'); ctx.fillRect(x - bw / 2, Math.min(Y(0), Y(v)), bw, Math.abs(Y(v) - Y(0)));
+      const show = K <= 10 || n === 1 || n % (compact ? 5 : 2) === 0 || (compact && n === K);
+      ctx.fillStyle = C('--muted'); if (show) ctx.fillText(n + '', x, b.y + b.h + 13);
+      if (freqs && !compact) ctx.fillText(n * F0 + ' Hz', x, b.y + b.h + 26);
+    }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, title, b.x, 16);
+  }
+  // ---- tab 2: the drawing and the curve rebuilt from its harmonics ----
+  const drawBox = (W, H) => { const compact = W < 560, b = { x: compact ? 30 : 38, y: 28, w: 0, h: H - 28 - 26 }; b.w = W - b.x - 12; return b; };
+  const DR = 1.3;
+  function drawDraw(ctx, W, H, compact) {
+    const b = drawBox(W, H), Y = v => b.y + b.h / 2 - v / DR * b.h / 2, X = x => b.x + x * b.w;
+    frame(ctx, b, Y, [-1, 0, 1]);
+    // the drawing: a broad pale line
+    ctx.strokeStyle = C('--drawn'); ctx.lineWidth = 7; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
+    for (let k = 0; k < M; k++) { const x = X(k / M), y = Y(S.y[k]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.lineTo(X(1), Y(S.y[M - 1])); ctx.stroke(); ctx.lineCap = 'butt';
+    curve(ctx, b, X, x => Y(series(coef, x, S.N)), 0, 1, C('--curve'), 2.4);
+    // where the next cycle starts
+    ctx.strokeStyle = C('--ghost'); ctx.setLineDash([2, 3]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(1), b.y); ctx.lineTo(X(1), b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'draw one cycle here' : 'draw here: one cycle of a wave that repeats forever (gray); blue: rebuilt from ' + S.N + (S.N === 1 ? ' harmonic' : ' harmonics'), b.x, 17);
+    font(ctx, 10); ctx.textAlign = 'center'; ctx.fillText('one cycle', b.x + b.w / 2, b.y + b.h + 15);
+  }
+  // ---- tab 3: the burst, and its spectrum ----
+  const TW = 0.06, FMAX = 2000;
+  const ZW = 0.003;     // the zoomed panel: the middle 6 ms
+  function pulsePanel(ctx, b, tw, tau, step, unit) {
+    const Y = v => b.y + b.h / 2 - v / 1.2 * b.h / 2, X = t => b.x + (t + tw) / (2 * tw) * b.w;
+    frame(ctx, b, Y, [-1, 0, 1]);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let t = -tw * 1000; t <= tw * 1000 + 1e-9; t += step) { const x = X(t / 1000); ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(x, b.y + b.h); ctx.lineTo(x, b.y + b.h + 4); ctx.stroke(); ctx.fillText(Math.round(t) + '', x, b.y + b.h + 15); }
+    if (unit) { ctx.textAlign = 'right'; ctx.fillText('ms', b.x + b.w, b.y + b.h + 27); }
+    [1, -1].forEach(sg => curve(ctx, b, X, t => Y(sg * envelope(t, tau, S.edge)), -tw, tw, C('--ghost'), 1.2, [4, 4]));
+    // the tone itself: sampled finely enough for every cycle
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip(); ctx.strokeStyle = C('--curve'); ctx.lineWidth = tw < 0.01 ? 2 : 1.4; ctx.beginPath();
+    const n = Math.max(400, Math.round(2 * tw * TONE * 24)); for (let i = 0; i <= n; i++) { const t = -tw + 2 * tw * i / n, y = Y(burst(t, tau, S.edge, TONE)); i ? ctx.lineTo(X(t), y) : ctx.moveTo(X(t), y); }
+    ctx.stroke(); ctx.restore();
+  }
+  function drawPulse(ctx, W, H, compact) {
+    const tau = tauOf(S.tv);
+    // side by side on wide screens, one above the other on phones
+    let A, Z;
+    if (compact) { const h1 = (H - 28 - 30 - 46) * 0.56; A = { x: 30, y: 28, w: W - 42, h: h1 }; Z = { x: 30, y: 28 + h1 + 46, w: W - 42, h: H - 28 - 30 - 46 - h1 }; }
+    else { const w1 = (W - 38 - 12 - 46) * 0.66; A = { x: 38, y: 28, w: w1, h: H - 28 - 30 }; Z = { x: 38 + w1 + 46, y: 28, w: W - 38 - 12 - 46 - w1, h: H - 28 - 30 }; }
+    pulsePanel(ctx, A, TW, tau, compact ? 30 : 20, true);
+    pulsePanel(ctx, Z, ZW, tau, 1, true);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'the sound wave: ' + TONE + ' Hz, ' + (tau * 1000).toFixed(1) + ' ms' : 'the sound wave: a ' + TONE + ' Hz tone lasting ' + (tau * 1000).toFixed(1) + ' ms (dashed: its envelope)', A.x, 17);
+    label(ctx, 'zoomed in: the middle 6 ms', Z.x, Z.y - 11);
+  }
+  function drawSpectrum(ctx, W, H, compact) {
+    const tau = tauOf(S.tv), sp = spread(tau, S.edge, TONE), b = { x: compact ? 30 : 38, y: 26, w: 0, h: H - 26 - 30 }; b.w = W - b.x - 12;
+    const top = sp.top, X = f => b.x + f / FMAX * b.w, Y = v => b.y + b.h - v * 0.86 * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let f = 0; f <= FMAX; f += compact ? 500 : 250) { const x = X(f); ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(x, b.y + b.h); ctx.lineTo(x, b.y + b.h + 4); ctx.stroke(); ctx.fillText(f + '', x, b.y + b.h + 15); }
+    ctx.textAlign = 'right'; ctx.fillText('Hz', b.x + b.w, b.y + b.h + 27);
+    // the tone's own frequency
+    ctx.strokeStyle = C('--hot'); ctx.setLineDash([3, 4]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(X(TONE), b.y); ctx.lineTo(X(TONE), b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+    // the spectrum, filled
+    const n = Math.round(b.w * 3), pts = []; for (let i = 0; i <= n; i++) { const f = FMAX * i / n; pts.push([X(f), Y(spectrum(f, tau, S.edge, TONE) / top)]); }
+    ctx.fillStyle = 'rgba(29,79,115,0.14)'; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(X(FMAX), Y(0)); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+    // the spread: across the peak at half height
+    const yh = Y(0.5), x1 = X(sp.f1), x2 = X(sp.f2);
+    ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x1, yh); ctx.lineTo(x2, yh); ctx.moveTo(x1, yh - 5); ctx.lineTo(x1, yh + 5); ctx.moveTo(x2, yh - 5); ctx.lineTo(x2, yh + 5); ctx.stroke();
+    font(ctx, 11); ctx.fillStyle = C('--hot'); const st = 'spread ' + sp.df.toFixed(0) + ' Hz', tw = ctx.measureText(st).width;
+    ctx.textAlign = 'left'; label(ctx, st, Math.min(b.x + b.w - tw - 4, x2 + 8), yh + 4);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'frequencies in it' : 'the frequencies in it (spectrum, always drawn the same height); red: ' + TONE + ' Hz', b.x, 16);
+  }
+
+  function draw() {
+    const s = fit($('scene')), g = fit($('graph'));
+    s.ctx.clearRect(0, 0, s.W, s.H); g.ctx.clearRect(0, 0, g.W, g.H);
+    if (s.W >= 120 && s.H >= 80) { if (tab === 1) drawBuild(s.ctx, s.W, s.H, s.compact); else if (tab === 2) drawDraw(s.ctx, s.W, s.H, s.compact); else drawPulse(s.ctx, s.W, s.H, s.compact); }
+    if (g.W >= 120 && g.H >= 70) {
+      if (tab === 1) drawBars(g.ctx, g.W, g.H, g.compact, S.b, NH, 1.3, true, NH, g.compact ? 'each harmonic’s amplitude' : 'each harmonic’s amplitude (below the line: the sine wave flipped over)', true);
+      else if (tab === 2) { const amp = [0]; for (let n = 1; n <= NDRAW; n++) amp.push(amplitude(coef, n)); drawBars(g.ctx, g.W, g.H, g.compact, amp, NDRAW, 1.3, false, S.N, g.compact ? 'how much of each harmonic' : 'how much of each harmonic is in your drawing (pale: not used yet)', false); }
+      else drawSpectrum(g.ctx, g.W, g.H, g.compact);
+    }
+  }
+
+  // ================================================================
+  // 5. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  function listN(ns) { return ns.length > 5 ? ns.slice(0, 5).join(', ') + ', …' : ns.join(', '); }
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const ns = []; for (let n = 1; n <= NH; n++) if (Math.abs(S.b[n]) > 0.004) ns.push(n);
+      html = card('Harmonics in it', ns.length ? listN(ns) : 'none', ns.length ? 'at ' + listN(ns.map(n => n * F0)) + ' Hz: whole-number multiples of ' + F0 + ' Hz' : 'every amplitude is zero: a flat line');
+      const m = matched();
+      if (!m) html += card('Shape', ns.length ? 'your own mix' : '—', ns.length ? 'not the start of a standard shape; the buttons above set one' : 'pick a shape above, or raise a slider');
+      else if (m.key === 'sine') html += card('Shape', 'a pure sine wave', 'just the first harmonic: the only wave with a single frequency');
+      else if (SHAPES[m.key].jump) { const o = overshoot(m.key, m.K); html += card('Overshoot at each jump', (100 * o).toFixed(1) + '% of the jump', m.key + ' wave with harmonics up to ' + m.K + '; adding more squeezes the wiggles toward the jump'); }
+      else html += card('Its corners reach', peak({ a: [0], b: S.b }).toFixed(3), 'triangle wave with harmonics up to ' + m.K + '; the true wave reaches 1');
+      html += card('Pitch', ns.length ? F0 + ' Hz (A3)' : '—', 'every mix repeats ' + F0 + ' times a second, so the pitch stays the same; the harmonics change the tone');
+    } else if (tab === 2) {
+      const miss = rmsMiss(S.y, coef, S.N), order = []; for (let n = 1; n <= NDRAW; n++) order.push(n); order.sort((p, q) => amplitude(coef, q) - amplitude(coef, p));
+      html = card('Rebuilt with', S.N + (S.N === 1 ? ' harmonic' : ' harmonics'), 'misses your drawing by ' + (100 * miss / 2).toFixed(miss < 0.02 ? 2 : 1) + '% of the full height, on average (root mean square)');
+      html += card('Biggest harmonics', order.slice(0, 3).join(', '), 'amplitudes ' + order.slice(0, 3).map(n => amplitude(coef, n).toFixed(2)).join(', ') + '; ' + (amplitude(coef, 20) > 0.25 * amplitude(coef, order[0]) ? 'still large at the 20th' : 'falling off at high numbers'));
+      html += card('Average level', fmt(coef.a[0], 2), 'the steady part (harmonic 0); it doesn’t change the sound');
+    } else {
+      const tau = tauOf(S.tv), sp = spread(tau, S.edge, TONE);
+      html = card('Lasts', (tau * 1000).toFixed(1) + ' ms', 'about ' + (tau * TONE).toFixed(tau * TONE < 10 ? 1 : 0) + ' cycles of the ' + TONE + ' Hz tone' + (S.edge === 'smooth' ? ' (width at half height)' : ''));
+      html += card('Frequencies in it', sp.f1.toFixed(0) + ' to ' + sp.f2.toFixed(0) + ' Hz', 'a spread of ' + sp.df.toFixed(0) + ' Hz, across the peak at half its height');
+      html += card('Duration × spread', (tau * sp.df).toFixed(2), 'stays about the same at every length: halve the duration and the spread doubles');
+    }
+    $('readout').innerHTML = html;
+  }
+
+  const TEXT = {
+    1: { lede: 'Every repeating wave can be built by adding sine waves at whole-number multiples of one frequency. Predict: can smooth sine waves add up to a square wave, with its sudden jumps?',
+         notes: '<p><b>What to try.</b> Start with the sine wave, then raise the third harmonic a little, then the fifth: the sum flattens on top. Press square to set the first five odd harmonics at once, then lower the higher ones one at a time and watch the corners soften. Look closely at the jumps: the sum overshoots. Try the triangle wave: with the same harmonics its sum is almost perfect. Turn the sound on as you add harmonics: the pitch stays the same while the tone grows brighter. Then flip a harmonic over (make its amplitude negative): the shape changes a lot, but the sound hardly at all.</p>' +
+                '<p><b>Why.</b> Any wave that repeats f times a second is a sum of sine waves at f, 2f, 3f, and so on (Fourier’s theorem). A square wave needs only the odd harmonics, with amplitudes 4/(πn); a triangle wave also needs only odd ones, but they fall as 1/n², so a few are enough. Smooth shapes need few harmonics; sharp corners and jumps need many. At a jump the sum always overshoots, by about 9% of the jump however many harmonics you add: more harmonics squeeze the overshoot closer to the jump but never shrink it (the Gibbs phenomenon). Your ear mostly hears how much of each harmonic there is, not how they line up, which is why flipping one changes the tone so little.</p>' +
+                '<p><b>The model.</b> Ten harmonics of 220 Hz (the A below middle C), each a sine wave starting at zero; a negative amplitude is the same sine wave flipped over. The standard shapes have height 1. The sound is made in your browser from exactly these amplitudes, at a fixed loudness setting, so flipping a harmonic doesn’t change the volume.</p>' },
+    2: { lede: 'Draw any repeating shape and see which harmonics it is made of. Predict: does a smooth hump or a sudden step need more harmonics to rebuild?',
+         notes: '<p><b>What to try.</b> Draw over the gray curve with the mouse or a finger: whatever you draw is one cycle of a wave that repeats forever. Slide the number of harmonics and watch the blue curve close in on your drawing. Compare the hump, the step and the spike: the hump’s harmonics die away quickly, the step’s fall slowly, and the spike’s hardly fall at all. Make the two ends of your drawing meet at different heights and see what the rebuilt curve does at the edges. Turn on the sound to hear your drawing.</p>' +
+                '<p><b>Why.</b> Each harmonic’s amplitude measures how much your drawing resembles a sine or cosine wave at that frequency: multiply them together and average over a cycle. Smooth drawings are made almost entirely of low harmonics; sharp features need high ones, and a very narrow spike needs nearly all of them equally (the same trade-off as on the next tab). The end of one cycle joins the start of the next, so if your ends don’t meet, that is a jump, and the rebuilt curve wiggles and overshoots there.</p>' +
+                '<p><b>The model.</b> Your drawing is stored as 256 equally spaced heights over one cycle. Each harmonic’s cosine and sine parts, a and b, are found by summing over those points (a discrete Fourier transform); its amplitude, plotted in the bars, is √(a² + b²). The average level is listed separately. The sound repeats your cycle 220 times a second, as on the first tab.</p>' },
+    3: { lede: 'A 440 Hz tone that lasts only a moment. Predict: does a very short beep contain only 440 Hz?',
+         notes: '<p><b>What to try.</b> Play the pulse at about 50 ms: a clear beep. Make it shorter and play it again, watching the spectrum: it spreads out, and at a few milliseconds the pitch is gone and you hear a click. Then switch it on and off sharply: ripples appear on both sides of the spectrum, and you can hear a click at each end.</p>' +
+                '<p><b>Why.</b> Only a sine wave that goes on forever has a single frequency. Switch it on and off and it is no longer a single sine wave: it is a mixture of many, near 440 Hz, which add up to the burst and cancel everywhere else. The shorter the burst, the wider the range of frequencies it takes, so the duration times the spread stays about the same. This is why sending short pulses quickly takes a wide band of radio frequencies, and in quantum mechanics, where frequency stands for energy, the same trade-off is the uncertainty principle.</p>' +
+                '<p><b>The model.</b> A 440 Hz tone (concert A) shaped by a bell curve (its duration is the width at half height) or switched on and off sharply. The spectrum is the size of its Fourier transform, calculated exactly, and scaled so its peak is always the same height. The spread is the width of the main peak at half its height. For long bursts, duration × spread is 4 ln 2/π = 0.88 for the bell curve and 1.21 for sharp edges.</p>' }
+  };
+
+  // ================================================================
+  // 6. CONTROLS
+  // ================================================================
+  // the harmonic sliders
+  $('harm').insertAdjacentHTML('beforeend', Array.from({ length: NH }, (_, i) => { const n = i + 1;
+    return '<label><span class="n">' + n + ' <i>' + n * F0 + ' Hz</i></span><input type="range" id="h' + n + '" min="-1.3" max="1.3" step="0.01" aria-label="Harmonic ' + n + ' amplitude"><span class="val" id="h' + n + '_v"></span></label>'; }).join(''));
+  function visibility() {
+    $('lab_preset').hidden = tab !== 1; $('lab_target').hidden = tab !== 1; $('harm').hidden = tab !== 1;
+    $('lab_ex').hidden = tab !== 2; $('lab_N').hidden = tab !== 2;
+    $('lab_edge').hidden = tab !== 3; $('lab_tau').hidden = tab !== 3;
+    $('snd').hidden = tab === 3; $('play').hidden = tab !== 3;
+    $('snd').textContent = AU.on ? 'Sound: on' : 'Sound: off'; $('snd').setAttribute('aria-pressed', String(AU.on));
+    $('hint').textContent = tab === 2 ? 'draw on the wave above' : tab === 3 ? 'turn your volume down a little first' : '';
+    const m = matched(), pv = m && m.key === S.preset ? S.preset : (!m && S.preset === 'clear' && !S.b.some(v => Math.abs(v) > 0.004) ? 'clear' : null);
+    document.querySelectorAll('#preset button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === pv)));
+    document.querySelectorAll('#ex button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.ex)));
+    document.querySelectorAll('#edge button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.edge)));
+    $('scene').classList.toggle('draw', tab === 2);
+    $('scene').setAttribute('aria-label', tab === 1 ? 'The sum of the harmonics' : tab === 2 ? 'Drawing area: one cycle of a wave, and the curve rebuilt from its harmonics' : 'A short burst of a 440 Hz tone');
+    $('graph').setAttribute('aria-label', tab === 3 ? 'The frequencies in the burst' : 'The amplitude of each harmonic');
+  }
+  function vals() {
+    for (let n = 1; n <= NH; n++) { $('h' + n).value = String(S.b[n]); $('h' + n + '_v').textContent = fmt(S.b[n], 2); }
+    $('target').checked = S.target;
+    $('N').value = String(S.N); $('N_v').textContent = S.N + ' of ' + NDRAW;
+    $('tau').value = String(S.tv); $('tau_v').textContent = (tauOf(S.tv) * 1000).toFixed(1) + ' ms';
+  }
+  function upd() { visibility(); vals(); draw(); readout(); audioUpdate(); }
+  function setTab(k) {
+    tab = k; [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes; upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#preset button').forEach(b => b.addEventListener('click', () => { const k = b.dataset.v; S.preset = k;
+    for (let n = 1; n <= NH; n++) S.b[n] = k === 'clear' ? 0 : SHAPES[k].b(n); upd(); }));
+  for (let n = 1; n <= NH; n++) $('h' + n).addEventListener('input', () => { S.b[n] = +$('h' + n).value; upd(); });
+  $('target').addEventListener('change', () => { S.target = $('target').checked; upd(); });
+  document.querySelectorAll('#ex button').forEach(b => b.addEventListener('click', () => { setExample(b.dataset.v); upd(); }));
+  $('N').addEventListener('input', () => { S.N = +$('N').value; upd(); });
+  document.querySelectorAll('#edge button').forEach(b => b.addEventListener('click', () => { S.edge = b.dataset.v; upd(); }));
+  $('tau').addEventListener('input', () => { S.tv = +$('tau').value; upd(); });
+  $('snd').addEventListener('click', () => { if (!AU.on) AU.on = audioInit(); else { AU.on = false; audioQuiet(); } upd(); });
+  $('play').addEventListener('click', playBurst);
+  window.addEventListener('resize', draw);
+  // drawing on tab 2: every sample the pointer passes over is set, joining up fast strokes
+  const sc = $('scene'); let pen = null;
+  function at(e) { const r = sc.getBoundingClientRect(), b = drawBox(r.width, r.height);
+    const k = Math.max(0, Math.min(M - 1, Math.round((e.clientX - r.left - b.x) / b.w * M))), v = Math.max(-1, Math.min(1, -((e.clientY - r.top) - (b.y + b.h / 2)) / (b.h / 2) * DR));
+    return [k, v]; }
+  function paint(p) {
+    if (pen) { const [k0, v0] = pen, [k1, v1] = p, s = k1 >= k0 ? 1 : -1; for (let k = k0; k !== k1 + s; k += s) S.y[k] = k1 === k0 ? v1 : v0 + (v1 - v0) * (k - k0) / (k1 - k0); }
+    else S.y[p[0]] = p[1];
+    pen = p; S.ex = null; coef = analyze(S.y, NDRAW);
+  }
+  let queued = false;
+  sc.addEventListener('pointerdown', e => { if (tab !== 2) return; pen = null; paint(at(e)); sc.setPointerCapture(e.pointerId); e.preventDefault(); upd(); });
+  sc.addEventListener('pointermove', e => { if (tab !== 2 || !pen) return; paint(at(e)); if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; upd(); }); } });
+  const endPen = () => { if (pen) { pen = null; upd(); } };
+  sc.addEventListener('pointerup', endPen); sc.addEventListener('pointercancel', endPen);
+
+  setTab(1);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<!--
+  Entropy and microstates - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Counting matches exact
+  whole-number arithmetic; the Einstein solids match brute-force enumeration and Vandermonde's identity, and the
+  random energy hops visit arrangements with the exact odds; the colliding gas obeys the laws of elastic
+  collisions and energy conservation, settles into the Maxwell speed distribution, fluctuates as the hard-disk
+  equation of state predicts, and retraces its motion exactly when reversed.
+  Credit: the bit-reversible stepping follows D. Levesque and L. Verlet, J. Stat. Phys. 72, 519 (1993); the
+  two Einstein solids follow D. V. Schroeder, An Introduction to Thermal Physics (2000), chapter 2.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entropy simulation: microstates, S = k ln Ω, and why heat flows hot to cold | Open Physics Sims</title>
+<meta name="description" content="Pull the partition out of a box of colliding molecules and see why they never gather back by themselves. Count the arrangements, watch two solids share energy until their temperatures match, then reverse every molecule's velocity and see a nudge of a billionth undo the return.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --vel: #2E7D32;
+    --ghost: #7A8790; --curve: #1D4F73; --gas: #1D4F73; --wall: #172128; --solidA: #C8321E; --solidB: #1D4F73; --band: rgba(29,79,115,0.10);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 430; }
+  #graph { aspect-ratio: 900 / 210; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .check { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .controls label.check { display: flex; }
+  .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--body); flex: none; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.66; }
+    #scene.count { aspect-ratio: 1 / 1.15; }
+    #graph { aspect-ratio: 1 / 1.0; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Entropy and microstates</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Gas spreads out</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Counting</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Sharing energy</button>
+    <button role="tab" id="tab4" aria-selected="false"><span>4</span>Run it backward</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="A box of gas molecules"></canvas>
+  <div class="row2">
+    <button id="go">Remove the partition</button>
+    <button id="rev" class="secondary">Reverse every velocity</button>
+    <button id="shuf">Shuffle</button>
+    <button id="shuf1k" class="secondary">Shuffle 1000 times</button>
+    <button id="reset" class="secondary">Start over</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Graphs"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_n"><div class="row"><span>Molecules</span><span class="val" id="n_v"></span></div><input type="range" id="n" min="0" max="26" step="1"></label>
+    <label class="check" id="lab_nudge"><input type="checkbox" id="nudge"> before reversing, nudge one molecule (red) by a billionth of the box</label>
+    <label id="lab_na"><div class="row"><span>Solid A: oscillators</span><span class="val" id="na_v"></span></div><input type="range" id="na" min="10" max="300" step="10"></label>
+    <label id="lab_nb"><div class="row"><span>Solid B: oscillators</span><span class="val" id="nb_v"></span></div><input type="range" id="nb" min="10" max="300" step="10"></label>
+    <label id="lab_q"><div class="row"><span>Energy (packets) in all</span><span class="val" id="q_v"></span></div><input type="range" id="q" min="10" max="400" step="10"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/entropy.test.js)
+  // ================================================================
+  // ---- physics core: entropy and microstates ----
+  const KB = 1.380649e-23;                       // Boltzmann's constant, J/K
+  // ---- counting ----
+  // ln n!: added up exactly below 256, Stirling's series above (error below 1e-12)
+  const LNF = [0]; for (let i = 1; i < 256; i++) LNF[i] = LNF[i - 1] + Math.log(i);
+  function lnFact(n) {
+    if (n < 256) return LNF[n];
+    return n * Math.log(n) - n + 0.5 * Math.log(2 * Math.PI * n) + 1 / (12 * n) - 1 / (360 * n * n * n);
+  }
+  const lnChoose = (n, k) => k < 0 || k > n ? -Infinity : lnFact(n) - lnFact(k) - lnFact(n - k);
+  // N molecules, each in the left or right half: the number of arrangements with n on the left, and its chance
+  const lnWays = (N, n) => lnChoose(N, n);
+  const chance = (N, n) => Math.exp(lnChoose(N, n) - N * Math.LN2);
+  // the chance that the fraction on the left is within d of one half
+  function chanceWithin(N, d) { let p = 0; for (let n = 0; n <= N; n++) if (Math.abs(n / N - 0.5) <= d + 1e-12) p += chance(N, n); return p; }
+  // a number given by its natural log, written as mantissa and power of ten
+  function tenPow(lnx) { const l = lnx / Math.LN10, e = Math.floor(l); return { m: Math.pow(10, l - e), e }; }
+
+  // ---- two Einstein solids sharing energy ----
+  // a solid of N oscillators holding q packets (quanta) of energy: ways = (q + N - 1)! / (q! (N - 1)!)
+  const lnOmegaSolid = (N, q) => lnChoose(q + N - 1, q);
+  // for every split qA + qB = q: ln of the ways for A, for B, and together
+  function splits(NA, NB, q) { const out = []; for (let qA = 0; qA <= q; qA++) { const a = lnOmegaSolid(NA, qA), b = lnOmegaSolid(NB, q - qA); out.push({ qA, a, b, t: a + b }); } return out; }
+  // temperature, in units of (packet energy)/k: 1/T = dS/dU, from the large-number formula S/k = (q+N) ln(q+N) - q ln q - N ln N
+  const tempSolid = (N, q) => q <= 0 ? 0 : 1 / Math.log(1 + N / q);
+  // one random step: a randomly chosen oscillator, if it has any energy, gives one packet to another randomly chosen one.
+  // The chance of any step equals the chance of its reverse, so in the long run every arrangement is equally likely.
+  function hop(st, rand) { const n = st.length, i = Math.floor(rand() * n); if (st[i] > 0) { const j = Math.floor(rand() * n); st[i]--; st[j]++; return [i, j]; } return null; }
+
+  // ---- a gas of colliding disks in a box 2 wide and 1 tall, with a partition down the middle ----
+  // Positions are kept as whole numbers of a tiny unit (1/2^30 of the box's height) and stepped with the Verlet rule
+  //   x(next) = 2 x(now) - x(before) + round(a dt^2)
+  // in whole numbers, so that reversing the motion (swapping "now" and "before") retraces it exactly, bit for bit
+  // (Levesque and Verlet 1993). Disks push apart like stiff springs while they overlap; so do the walls.
+  const GAS = { Q: 1073741824, dt: 2e-4, W: 2, H: 1 };
+  GAS.k = 0.5 * Math.PI * Math.PI / Math.pow(12 * GAS.dt, 2);     // stiffness: a collision lasts about 12 steps
+  const diskRadius = N => Math.min(0.03, Math.sqrt(0.22 / (Math.PI * N)));
+  function mulberry(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  // N disks placed at random in the left half (or within a corner box), moving in random directions;
+  // speeds from the 2D thermal (Maxwell) distribution with rms speed vrms, or all equal if `same`
+  function makeGas(N, opt) {
+    opt = opt || {}; const rand = mulberry(opt.seed || 1), r = opt.r || diskRadius(N), Q = GAS.Q, dt = GAS.dt;
+    const box = opt.box || [0, 0, 1, 1], vrms = opt.vrms || 1;
+    const x = new Float64Array(N), y = new Float64Array(N), px = new Float64Array(N), py = new Float64Array(N); let placed = 0, tries = 0;
+    while (placed < N && tries < 2e6) { tries++;
+      const cx = box[0] + r + rand() * (box[2] - box[0] - 2 * r), cy = box[1] + r + rand() * (box[3] - box[1] - 2 * r); let ok = true;
+      for (let j = 0; j < placed && ok; j++) if ((x[j] / Q - cx) ** 2 + (y[j] / Q - cy) ** 2 < 4.4 * r * r) ok = false;
+      if (ok) { x[placed] = Math.round(cx * Q); y[placed] = Math.round(cy * Q); placed++; } }
+    for (let i = 0; i < N; i++) { const a = rand() * 2 * Math.PI, s = opt.same ? vrms : vrms * Math.sqrt(-Math.log(1 - rand()));
+      px[i] = x[i] - Math.round(s * Math.cos(a) * dt * Q); py[i] = y[i] - Math.round(s * Math.sin(a) * dt * Q); }
+    return { N, r, x, y, px, py, wall: opt.wall !== false, steps: 0, dir: 1, fx: new Float64Array(N), fy: new Float64Array(N), placed };
+  }
+  // forces (per unit mass) on every disk, from the positions now
+  function forces(g) {
+    const Q = GAS.Q, k = GAS.k, r = g.r, N = g.N, d2 = 4 * r * r, fx = g.fx, fy = g.fy;
+    fx.fill(0); fy.fill(0);
+    const cs = 2 * r, nx = Math.max(1, Math.floor(GAS.W / cs)), ny = Math.max(1, Math.floor(GAS.H / cs));
+    if (!g.head || g.head.length !== nx * ny) { g.head = new Int32Array(nx * ny); g.next = new Int32Array(N); g.cell = new Int32Array(N); }
+    const head = g.head, next = g.next, cell = g.cell; head.fill(-1);
+    for (let i = 0; i < N; i++) { const X = g.x[i] / Q, Y = g.y[i] / Q;
+      // walls: the outer ones, and the partition while it is in
+      if (X < r) fx[i] += k * (r - X); if (X > GAS.W - r) fx[i] -= k * (X - GAS.W + r);
+      if (Y < r) fy[i] += k * (r - Y); if (Y > GAS.H - r) fy[i] -= k * (Y - GAS.H + r);
+      if (g.wall) { const m = GAS.W / 2; if (X < m && X > m - r) fx[i] -= k * (X - m + r); else if (X >= m && X < m + r) fx[i] += k * (m + r - X); }
+      const cx = Math.min(nx - 1, Math.max(0, Math.floor(X / GAS.W * nx))), cy = Math.min(ny - 1, Math.max(0, Math.floor(Y / GAS.H * ny))), c = cy * nx + cx;
+      cell[i] = c; next[i] = head[c]; head[c] = i; }
+    for (let i = 0; i < N; i++) {
+      const c = cell[i], cx = c % nx, cy = (c - cx) / nx, X = g.x[i] / Q, Y = g.y[i] / Q;
+      for (let oy = -1; oy <= 1; oy++) { const yy = cy + oy; if (yy < 0 || yy >= ny) continue;
+        for (let ox = -1; ox <= 1; ox++) { const xx = cx + ox; if (xx < 0 || xx >= nx) continue;
+          for (let j = head[yy * nx + xx]; j >= 0; j = next[j]) { if (j <= i) continue;
+            const dx = X - g.x[j] / Q, dy = Y - g.y[j] / Q, s2 = dx * dx + dy * dy;
+            if (s2 < d2 && s2 > 0) { const s = Math.sqrt(s2), f = k * (2 * r - s) / s; fx[i] += f * dx; fy[i] += f * dy; fx[j] -= f * dx; fy[j] -= f * dy; } } } } }
+  }
+  function stepGas(g, n) {
+    const c = GAS.dt * GAS.dt * GAS.Q;
+    for (let s = 0; s < (n || 1); s++) {
+      forces(g);
+      for (let i = 0; i < g.N; i++) { const nx = 2 * g.x[i] - g.px[i] + Math.round(g.fx[i] * c), ny = 2 * g.y[i] - g.py[i] + Math.round(g.fy[i] * c); g.px[i] = g.x[i]; g.py[i] = g.y[i]; g.x[i] = nx; g.y[i] = ny; }
+      g.steps += g.dir;
+    }
+  }
+  // turn every velocity around: swap "now" and "before"
+  function reverseGas(g) { for (let i = 0; i < g.N; i++) { const a = g.x[i], b = g.y[i]; g.x[i] = g.px[i]; g.y[i] = g.py[i]; g.px[i] = a; g.py[i] = b; } g.dir = -g.dir; }
+  // velocity of disk i (box heights per second), from its last step
+  const velocity = (g, i) => [(g.x[i] - g.px[i]) / (GAS.Q * GAS.dt), (g.y[i] - g.py[i]) / (GAS.Q * GAS.dt)];
+  function countLeft(g) { let n = 0; const m = GAS.W / 2 * GAS.Q; for (let i = 0; i < g.N; i++) if (g.x[i] < m) n++; return n; }
+  // energy per unit mass: kinetic (from the step's velocity) plus the springiness of overlaps
+  // (velocities are those of the last step, so they lag the positions by half a step; the drift this causes is small)
+  function energy(g) {
+    let e = 0; const Q = GAS.Q, k = GAS.k, r = g.r, m = GAS.W / 2;
+    for (let i = 0; i < g.N; i++) { const v = velocity(g, i); e += 0.5 * (v[0] * v[0] + v[1] * v[1]);
+      const X = (g.x[i] + g.px[i]) / 2 / Q, Y = (g.y[i] + g.py[i]) / 2 / Q, w = s => s > 0 ? 0.5 * k * s * s : 0;
+      e += w(r - X) + w(X - GAS.W + r) + w(r - Y) + w(Y - GAS.H + r);
+      if (g.wall) e += X < m ? w(X - m + r) : w(m + r - X);
+      for (let j = i + 1; j < g.N; j++) { const dx = X - (g.x[j] + g.px[j]) / 2 / Q, dy = Y - (g.y[j] + g.py[j]) / 2 / Q, d = Math.hypot(dx, dy); if (d < 2 * r) e += w(2 * r - d); } }
+    return e;
+  }
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. STATE
+  // ================================================================
+  const NS = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400, 500, 600, 800, 1000];
+  const S = { ni: { 1: 16, 2: 2, 4: 19 }, nudge: false, NA: 100, NB: 150, q: 120 };
+  let tab = 1;
+  const nOf = k => NS[S.ni[k]];
+  const STEPS_PER_S = Math.round(1 / GAS.dt);
+  // the gas (tabs 1 and 4): its own box for each tab
+  const GS = { 1: null, 4: null };
+  function newGas(k) {
+    const g = makeGas(nOf(k), { seed: (Date.now() ^ (k * 7919)) >>> 0 });
+    GS[k] = { g, released: false, playing: false, t: 0, hist: [], tRev: null, nudged: -1, back: false, lastRec: -1 };
+  }
+  // counting (tab 2): the last arrangement shuffled, and the tally of shuffles
+  const CT = { arr: null, tally: null, shuffles: 0, pos: null };
+  function resetCount() { const N = nOf(2); CT.arr = null; CT.shuffles = 0; CT.tally = new Array(N + 1).fill(0); CT.pos = null; }
+  function shuffle(times) {
+    const N = nOf(2);
+    for (let s = 0; s < times; s++) { const a = new Uint8Array(N); let n = 0; for (let i = 0; i < N; i++) { a[i] = Math.random() < 0.5 ? 1 : 0; n += a[i]; } CT.tally[n]++; CT.shuffles++; CT.arr = a; }
+    CT.pos = Array.from({ length: N }, () => [Math.random(), Math.random()]);
+  }
+  // the two solids (tab 3)
+  const SO = { st: null, playing: false, hist: [], hops: 0 };
+  function resetSolids() { SO.st = new Int32Array(S.NA + S.NB); for (let i = 0; i < S.q; i++) SO.st[i % S.NA]++; SO.hist = []; SO.hops = 0; SO.playing = false; }
+  const qA = () => { let s = 0; for (let i = 0; i < S.NA; i++) s += SO.st[i]; return s; };
+
+  // ================================================================
+  // 3. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  // big numbers: 1.27 × 10³⁰
+  const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹', sup = n => (n < 0 ? '⁻' : '') + String(Math.abs(n)).split('').map(d => SUP[+d]).join('');
+  function big(lnx) { if (lnx < Math.log(1e6)) return Math.round(Math.exp(lnx)).toLocaleString('en-US'); const p = tenPow(lnx); let m = p.m.toFixed(2), e = p.e; if (m === '10.00') { m = '1.00'; e++; } return m + ' × 10' + sup(e); }
+  const nice = (v, d) => v.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d });
+
+  // ---- the box of gas ----
+  function drawGas(ctx, W, H, compact, k) {
+    const G = GS[k], g = G.g, top = 26, s = Math.min((W - 24) / 2, (H - top - 22)), bx = (W - 2 * s) / 2, by = top;
+    ctx.fillStyle = '#FBFCFD'; ctx.fillRect(bx, by, 2 * s, s); ctx.strokeStyle = C('--wall'); ctx.lineWidth = 2; ctx.strokeRect(bx, by, 2 * s, s);
+    // the middle: the partition while it is in, a faint line after
+    if (g.wall) { ctx.fillStyle = C('--wall'); ctx.fillRect(bx + s - 2, by, 4, s); }
+    else { ctx.strokeStyle = C('--rule'); ctx.setLineDash([4, 5]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx + s, by); ctx.lineTo(bx + s, by + s); ctx.stroke(); ctx.setLineDash([]); }
+    const rp = Math.max(1.2, g.r * s), Q = GAS.Q;
+    ctx.fillStyle = C('--gas'); ctx.beginPath();
+    for (let i = 0; i < g.N; i++) { if (i === G.nudged) continue; const x = bx + g.x[i] / Q * s, y = by + s - g.y[i] / Q * s; ctx.moveTo(x + rp, y); ctx.arc(x, y, rp, 0, TAU); }
+    ctx.fill();
+    if (G.nudged >= 0) { const i = G.nudged; ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.arc(bx + g.x[i] / Q * s, by + s - g.y[i] / Q * s, Math.max(2.5, rp), 0, TAU); ctx.fill(); }
+    const nl = countLeft(g); font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center';
+    label(ctx, nl + ' on the left', bx + s / 2, by + s + 16); label(ctx, (g.N - nl) + ' on the right', bx + 1.5 * s, by + s + 16);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    const msg = !G.released ? (compact ? g.N + ' molecules, partition in' : g.N + ' molecules bouncing around the left half; the partition keeps them there')
+      : k === 4 && G.back ? (G.nudged >= 0 ? (compact ? 'the nudge spoiled the return' : 'reached the moment of release, but the nudge spoiled the return') : 'back to the moment the partition came out') : k === 4 && G.tRev !== null ? (compact ? 'running backward' : 'every velocity reversed: running backward') : (compact ? 'time ' + G.t.toFixed(1) : 'time since the partition came out: ' + G.t.toFixed(1));
+    label(ctx, msg, bx, 17);
+  }
+  // ---- graphs against time: share on the left, and S/k ----
+  function drawHistory(ctx, W, H, compact, k) {
+    const G = GS[k], N = G.g.N, h = G.hist, smax = lnWays(N, Math.floor(N / 2)) || 1;
+    const span = 20, tEnd = Math.max(span, h.length ? h[h.length - 1][0] : 0), t0 = tEnd - span;
+    const P = compact ? [{ x: 40, y: 22, w: W - 52, h: H / 2 - 48 }, { x: 40, y: H / 2 + 20, w: W - 52, h: H / 2 - 48 }] : [{ x: 44, y: 22, w: W / 2 - 64, h: H - 52 }, { x: W / 2 + 40, y: 22, w: W / 2 - 52, h: H - 52 }];
+    const sd = 0.5 / Math.sqrt(N);
+    P.forEach((b, pi) => {
+      const X = t => b.x + (t - t0) / span * b.w, Y = pi === 0 ? f => b.y + b.h - f * b.h : v => b.y + b.h - v / smax * b.h;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      if (pi === 0) { ctx.fillStyle = C('--band'); ctx.fillRect(b.x, Y(0.5 + sd), b.w, Y(0.5 - sd) - Y(0.5 + sd)); ctx.fillStyle = C('--muted');
+        [0, 0.5, 1].forEach(f => { ctx.strokeStyle = f === 0.5 ? C('--ghost') : C('--soft'); ctx.setLineDash(f === 0.5 ? [3, 3] : []); ctx.beginPath(); ctx.moveTo(b.x, Y(f)); ctx.lineTo(b.x + b.w, Y(f)); ctx.stroke(); ctx.setLineDash([]); ctx.fillText(100 * f + '%', b.x - 4, Y(f) + 3); }); }
+      else { ctx.strokeStyle = C('--ghost'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(b.x, Y(smax)); ctx.lineTo(b.x + b.w, Y(smax)); ctx.stroke(); ctx.setLineDash([]); ctx.fillText(smax < 10 ? smax.toFixed(1) : Math.round(smax) + '', b.x - 4, Y(smax) + 3); ctx.fillText('0', b.x - 4, Y(0) + 3); }
+      ctx.textAlign = 'center'; for (let t = Math.ceil(t0 / 5) * 5; t <= tEnd + 1e-9; t += 5) ctx.fillText(t + '', X(t), b.y + b.h + 13);
+      if (G.tRev !== null && G.tRev >= t0) { ctx.strokeStyle = C('--hot'); ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(X(G.tRev), b.y); ctx.lineTo(X(G.tRev), b.y + b.h); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip(); ctx.strokeStyle = C('--curve'); ctx.lineWidth = 1.8; ctx.beginPath(); let pen = false;
+      h.forEach(p => { if (p[0] < t0 - 0.1) return; const y = pi === 0 ? Y(p[1] / N) : Y(lnWays(N, p[1])); pen ? ctx.lineTo(X(p[0]), y) : ctx.moveTo(X(p[0]), y); pen = true; }); ctx.stroke(); ctx.restore();
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+      ctx.fillText(pi === 0 ? (compact ? 'share on the left' : 'share on the left (shaded: ±1/(2√N))') : (compact ? 'entropy S/k = ln Ω' : 'entropy S/k = ln Ω (dashed: the most it can be)'), b.x + 2, b.y - 7);
+    });
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(G.tRev !== null ? 'time (red: reversed)' : 'time', W - 12, H - 4);
+  }
+  // ---- counting: every arrangement for a few molecules, or one shuffled arrangement ----
+  const MOL = ['#C8321E', '#1D4F73', '#2E7D32', '#D9651B', '#5B3F8C', '#B5306D'];
+  function drawCount(ctx, W, H, compact) {
+    const N = nOf(2);
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    if (N <= (compact ? 5 : 6)) {
+      label(ctx, compact ? 'all ' + (1 << N) + ' arrangements' : 'all ' + (1 << N) + ' arrangements of ' + N + ' molecules, grouped by how many are on the left', 12, 17);
+      const cols = N + 1, cw = (W - 24) / cols, top = 44, bot = 40, rows = Math.max(...Array.from({ length: cols }, (_, n) => Math.round(Math.exp(lnChoose(N, n)))));
+      const sub = rows > 10 ? 2 : 1, perCol = Math.ceil(rows / sub), bh = Math.min(40, (H - top - bot) / perCol - 4), bw = Math.min(bh * 2, (cw - 8) / sub - 4);
+      // list the arrangements in each group
+      const groups = Array.from({ length: cols }, () => []); for (let m = 0; m < (1 << N); m++) { let n = 0; for (let i = 0; i < N; i++) if (m >> i & 1) n++; groups[n].push(m); }
+      const last = CT.arr ? CT.arr.reduce((a, b, i) => a | (b << i), 0) : -1;
+      groups.forEach((gr, n) => {
+        const cx = 12 + (n + 0.5) * cw;
+        font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; ctx.fillText(n + ' left', cx, top - 8);
+        gr.forEach((m, j) => { const sc = Math.floor(j / perCol), r = j % perCol, x = cx - (sub * (bw + 4) - 4) / 2 + sc * (bw + 4), y = top + r * (bh + 4);
+          ctx.strokeStyle = m === last ? C('--hot') : C('--rule'); ctx.lineWidth = m === last ? 2.5 : 1; ctx.strokeRect(x, y, bw, bh);
+          ctx.strokeStyle = C('--ghost'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + bw / 2, y + 2); ctx.lineTo(x + bw / 2, y + bh - 2); ctx.stroke();
+          // each molecule in its own color, at its own spot in its half
+          for (let i = 0; i < N; i++) { const left = m >> i & 1, px = x + (left ? 0 : bw / 2) + bw / 2 * ((i % 3) + 1) / 4, py = y + bh * (Math.floor(i / 3) + 1) / 3; ctx.fillStyle = MOL[i]; ctx.beginPath(); ctx.arc(px, py, Math.max(1.5, Math.min(5, bh / 8)), 0, TAU); ctx.fill(); } });
+        const yb = top + Math.min(perCol, gr.length) * (bh + 4) + 14;
+        font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.fillText('Ω = ' + gr.length, cx, Math.min(H - 20, yb)); ctx.fillText('S/k = ' + Math.log(gr.length).toFixed(2), cx, Math.min(H - 6, yb + 14));
+      });
+    } else {
+      const s = Math.min((W - 24) / 2, H - 50), bx = (W - 2 * s) / 2, by = 28 + Math.max(0, (H - 50 - s) / 2);
+      ctx.fillStyle = '#FBFCFD'; ctx.fillRect(bx, by, 2 * s, s); ctx.strokeStyle = C('--wall'); ctx.lineWidth = 2; ctx.strokeRect(bx, by, 2 * s, s);
+      ctx.strokeStyle = C('--ghost'); ctx.setLineDash([4, 5]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx + s, by); ctx.lineTo(bx + s, by + s); ctx.stroke(); ctx.setLineDash([]);
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+      if (!CT.arr) { label(ctx, N + ' molecules; press Shuffle to put each one left or right at random', bx, 17); return; }
+      const nl = CT.arr.reduce((a, b) => a + b, 0), rp = Math.max(1.3, Math.min(6, s * 0.35 / Math.sqrt(N)));
+      label(ctx, compact ? 'one arrangement of ' + big(N * Math.LN2) : 'one arrangement of the ' + big(N * Math.LN2) + ' possible: each molecule left or right at random', bx, 17);
+      ctx.fillStyle = C('--gas'); ctx.beginPath();
+      for (let i = 0; i < N; i++) { const p = CT.pos[i], x = bx + (CT.arr[i] ? 0 : s) + rp + p[0] * (s - 2 * rp), y = by + rp + p[1] * (s - 2 * rp); ctx.moveTo(x + rp, y); ctx.arc(x, y, rp, 0, TAU); } ctx.fill();
+      font(ctx, 12); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, nl + ' on the left', bx + s / 2, by + s + 16); label(ctx, (N - nl) + ' on the right', bx + 1.5 * s, by + s + 16);
+    }
+  }
+  // the share of all arrangements with each number on the left (grouped into at most 41 bins), and S/k
+  function drawWays(ctx, W, H, compact) {
+    const N = nOf(2), B = Math.min(N + 1, 41), binOf = n => Math.min(B - 1, Math.floor(n * B / (N + 1))), p = new Array(B).fill(0), tl = new Array(B).fill(0);
+    for (let n = 0; n <= N; n++) { p[binOf(n)] += chance(N, n); tl[binOf(n)] += CT.tally[n]; }
+    const P = compact ? [{ x: 40, y: 22, w: W - 52, h: H / 2 - 48 }, { x: 40, y: H / 2 + 20, w: W - 52, h: H / 2 - 48 }] : [{ x: 44, y: 22, w: W / 2 - 64, h: H - 52 }, { x: W / 2 + 40, y: 22, w: W / 2 - 52, h: H - 52 }];
+    const last = CT.arr ? CT.arr.reduce((a, b) => a + b, 0) : null;
+    // left: bars
+    { const b = P[0], top = Math.max(...p), Y = v => b.y + b.h - v / top * b.h * 0.92, bw = b.w / B;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+      for (let i = 0; i < B; i++) { ctx.fillStyle = C('--body'); ctx.fillRect(b.x + i * bw + bw * 0.12, Y(p[i]), bw * 0.76, b.y + b.h - Y(p[i])); }
+      if (CT.shuffles) { ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < B; i++) { if (!tl[i]) continue; const y = Y(tl[i] / CT.shuffles); ctx.moveTo(b.x + i * bw + bw * 0.1, y); ctx.lineTo(b.x + (i + 1) * bw - bw * 0.1, y); } ctx.stroke(); }
+      if (last !== null) { const x = b.x + (binOf(last) + 0.5) * bw; ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.moveTo(x, b.y + b.h + 2); ctx.lineTo(x - 5, b.y + b.h + 9); ctx.lineTo(x + 5, b.y + b.h + 9); ctx.fill(); }
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; [0, 0.5, 1].forEach(f => ctx.fillText(Math.round(f * N) + '', b.x + f * b.w, b.y + b.h + 20));
+      ctx.textAlign = 'right'; ctx.fillText((100 * top).toFixed(top < 0.01 ? 2 : 1) + '%', b.x - 4, Y(top) + 3); ctx.fillText('0', b.x - 4, b.y + b.h + 3);
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'share of arrangements, by number on the left' : 'share of all arrangements' + (B < N + 1 ? ' (grouped)' : '') + (CT.shuffles ? '; red: your shuffles' : ''), b.x + 2, b.y - 7); }
+    // right: S/k = ln Ω
+    { const b = P[1], top = N * Math.LN2, X = n => b.x + n / N * b.w, Y = v => b.y + b.h - v / top * b.h;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2; ctx.beginPath(); const M = Math.min(N, 400);
+      for (let i = 0; i <= M; i++) { const n = Math.round(i / M * N), y = Y(lnWays(N, n)); i ? ctx.lineTo(X(n), y) : ctx.moveTo(X(n), y); } ctx.stroke();
+      if (last !== null) { ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.arc(X(last), Y(lnWays(N, last)), 4.5, 0, TAU); ctx.fill(); }
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; [0, 0.5, 1].forEach(f => ctx.fillText(Math.round(f * N) + '', b.x + f * b.w, b.y + b.h + 13));
+      ctx.textAlign = 'right'; ctx.fillText(top < 10 ? top.toFixed(1) : Math.round(top) + '', b.x - 4, Y(top) + 3); ctx.fillText('0', b.x - 4, b.y + b.h + 3);
+      ctx.fillText('number on the left', b.x + b.w, b.y + b.h + 26 < H ? b.y + b.h + 26 : b.y + b.h + 13);
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('entropy S/k = ln Ω' + (compact ? '' : ' (top: N ln 2)'), b.x + 2, b.y - 7); }
+  }
+  // ---- two solids: every oscillator a square, darker with more energy ----
+  const SHADE = ['#FFFFFF', '#FDE6D9', '#F9C3A6', '#F09A72', '#E06B44', '#C8321E', '#8F1F12'];
+  function drawSolids(ctx, W, H, compact) {
+    const gap = 26, top = 46, bot = 12, avail = W - 24 - gap, tot = S.NA + S.NB;
+    // both grids share one square size; widths in proportion to the number of oscillators
+    let cell = 30; for (; cell > 3; cell -= 0.5) { const fits = N => { const wA = avail * N / tot, cols = Math.floor(wA / cell), rows = Math.ceil(N / Math.max(1, cols)); return cols >= 1 && rows * cell <= H - top - bot; }; if (fits(S.NA) && fits(S.NB)) break; }
+    const qa = qA(), qb = S.q - qa;
+    [[0, S.NA, 12, 'A', qa, '--solidA'], [S.NA, S.NB, 12 + avail * S.NA / tot + gap, 'B', qb, '--solidB']].forEach(([off, N, x0, name, qq, col]) => {
+      const w = avail * N / tot, cols = Math.max(1, Math.floor(w / cell)), rows = Math.ceil(N / cols), gx = x0 + (w - cols * cell) / 2, gy = top;
+      for (let i = 0; i < N; i++) { const e = SO.st[off + i], x = gx + (i % cols) * cell, y = gy + Math.floor(i / cols) * cell;
+        ctx.fillStyle = SHADE[Math.min(SHADE.length - 1, e)]; ctx.fillRect(x + 0.5, y + 0.5, cell - 1, cell - 1); }
+      ctx.strokeStyle = C(col); ctx.lineWidth = 2; ctx.strokeRect(gx - 3, gy - 3, cols * cell + 6, rows * cell + 6);
+      font(ctx, 12, 600); ctx.fillStyle = C(col); ctx.textAlign = 'left'; label(ctx, 'Solid ' + name, gx - 3, gy - 22);
+      font(ctx, 11); ctx.fillStyle = C('--muted'); label(ctx, compact ? qq + ' packets' : N + ' oscillators, ' + qq + ' packets, kT = ' + tempSolid(N, qq).toFixed(2) + ' ε', gx - 3, gy - 8);
+    });
+    if (!compact) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; label(ctx, 'darker: more packets of energy', W - 12, 14); }
+  }
+  function drawSolidGraphs(ctx, W, H, compact) {
+    const sp = splits(S.NA, S.NB, S.q), qa = qA(), best = sp.reduce((a, b) => b.t > a.t ? b : a), smax = best.t;
+    const P = compact ? [{ x: 40, y: 22, w: W - 52, h: H / 2 - 48 }, { x: 40, y: H / 2 + 20, w: W - 52, h: H / 2 - 48 }] : [{ x: 44, y: 22, w: W / 2 - 64, h: H - 52 }, { x: W / 2 + 40, y: 22, w: W / 2 - 52, h: H - 52 }];
+    { const b = P[0], X = q => b.x + q / S.q * b.w, Y = v => b.y + b.h - v / smax * b.h * 0.95;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+      [['a', '--solidA'], ['b', '--solidB'], ['t', '--ink']].forEach(([key, col]) => { ctx.strokeStyle = C(col); ctx.lineWidth = key === 't' ? 2.2 : 1.6; ctx.beginPath(); sp.forEach((s, i) => i ? ctx.lineTo(X(s.qA), Y(s[key])) : ctx.moveTo(X(s.qA), Y(s[key]))); ctx.stroke(); });
+      ctx.strokeStyle = C('--ghost'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(best.qA), b.y); ctx.lineTo(X(best.qA), b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+      const cur = sp[qa]; ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(X(qa), Y(cur.t), 5, 0, TAU); ctx.fill();
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; [0, 0.5, 1].forEach(f => ctx.fillText(Math.round(f * S.q) + '', X(f * S.q), b.y + b.h + 13));
+      ctx.textAlign = 'right'; ctx.fillText(Math.round(smax) + '', b.x - 4, Y(smax) + 3); ctx.fillText('0', b.x - 4, b.y + b.h + 3); ctx.fillText('packets in A', b.x + b.w, b.y + b.h + 26 < H ? b.y + b.h + 26 : b.y + b.h + 13);
+      font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText('S/k: ', b.x + 2, b.y - 7); let x = b.x + 2 + ctx.measureText('S/k: ').width;
+      [['A', '--solidA'], ['B', '--solidB'], ['together', '--ink']].forEach(([t, col], i) => { ctx.fillStyle = C(col); const s = t + (i < 2 ? ', ' : ''); ctx.fillText(s, x, b.y - 7); x += ctx.measureText(s).width; }); }
+    { const b = P[1], h = SO.hist, span = 600, n = h.length, Y = q => b.y + b.h - q / S.q * b.h, X = i => b.x + (i - Math.max(0, n - span)) / span * b.w;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = C('--ghost'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(b.x, Y(best.qA)); ctx.lineTo(b.x + b.w, Y(best.qA)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = C('--solidA'); ctx.lineWidth = 1.8; ctx.beginPath(); for (let i = Math.max(0, n - span); i < n; i++) i > Math.max(0, n - span) ? ctx.lineTo(X(i), Y(h[i])) : ctx.moveTo(X(i), Y(h[i])); ctx.stroke();
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(S.q + '', b.x - 4, Y(S.q) + 3); ctx.fillText('0', b.x - 4, Y(0) + 3); ctx.fillText('time (last 10 s)', b.x + b.w, b.y + b.h + 13);
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText('packets in A' + (compact ? '' : ' (dashed: most likely)'), b.x + 2, b.y - 7); }
+  }
+
+  function draw() {
+    const s = fit($('scene')), g = fit($('graph'));
+    s.ctx.clearRect(0, 0, s.W, s.H); g.ctx.clearRect(0, 0, g.W, g.H);
+    const okS = s.W >= 120 && s.H >= 80, okG = g.W >= 160 && g.H >= 100;
+    if (tab === 1 || tab === 4) { if (okS) drawGas(s.ctx, s.W, s.H, s.compact, tab); if (okG) drawHistory(g.ctx, g.W, g.H, g.compact, tab); }
+    else if (tab === 2) { if (okS) drawCount(s.ctx, s.W, s.H, s.compact); if (okG) drawWays(g.ctx, g.W, g.H, g.compact); }
+    else { if (okS) drawSolids(s.ctx, s.W, s.H, s.compact); if (okG) drawSolidGraphs(g.ctx, g.W, g.H, g.compact); }
+  }
+
+  // ================================================================
+  // 4. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const jk = lnO => { const v = KB * lnO; if (v === 0) return '0'; const e = Math.floor(Math.log10(v)); return (v / 10 ** e).toFixed(2) + ' × 10' + sup(e) + ' J/K'; };
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab === 1 || tab === 4) {
+      const G = GS[tab], N = G.g.N, nl = countLeft(G.g), s = lnWays(N, nl);
+      html = card('On the left', nl + ' of ' + N, (100 * nl / N).toFixed(0) + '%; ' + big(lnWays(N, nl)) + (lnWays(N, nl) === 0 ? ' arrangement has' : ' arrangements have') + ' this split');
+      html += card('Entropy, S/k = ln Ω', s.toFixed(s < 100 ? 2 : 1), 'S = ' + jk(s) + '; when spread evenly, ' + lnWays(N, Math.floor(N / 2)).toFixed(1) + ' (that’s about N ln 2 = ' + (N * Math.LN2).toFixed(1) + ')');
+      if (tab === 1) html += card('All on the left again', '1 in ' + big(N * Math.LN2), N <= 12 ? 'the chance at any moment; with so few, you will see it happen' : 'the chance at any moment that all ' + N + ' are back on the left');
+      else html += card('Time since release', G.t.toFixed(2), G.back ? (G.nudged >= 0 ? 'back to the moment of release, but the nudge spoiled the return' : 'back at the start: entropy fell, which the laws of motion allow') : G.tRev !== null ? 'counting down: the motion is retracing itself' : G.released ? 'reverse the velocities whenever you like' : 'take out the partition to start');
+    } else if (tab === 2) {
+      const N = nOf(2), h = Math.floor(N / 2), lw = lnWays(N, h);
+      html = card('Arrangements in all', '2' + sup(N) + (N > 6 ? ' = ' + big(N * Math.LN2) : ' = ' + (2 ** N)), 'each of the ' + N + ' molecules on the left or the right');
+      html += card('Even split' + (N % 2 ? ' (' + h + '–' + (N - h) + ')' : ''), 'Ω = ' + big(lw), (100 * chance(N, h)).toFixed(chance(N, h) < 0.01 ? 2 : 1) + '% of all; S/k = ln Ω = ' + lw.toFixed(2) + '; all on one side: Ω = 1, S/k = 0');
+      const w = chanceWithin(N, 0.05); html += card('Within 5% of even', (100 * w).toFixed(w > 0.999 ? 3 : 1) + '% of the time', 'all on the left: 1 in ' + big(N * Math.LN2) + (CT.shuffles ? '; your ' + CT.shuffles.toLocaleString('en-US') + (CT.shuffles === 1 ? ' shuffle: ' : ' shuffles: ') + (100 * CT.tally.reduce((a, c, n) => a + (Math.abs(n / N - 0.5) <= 0.05 + 1e-12 ? c : 0), 0) / CT.shuffles).toFixed(1) + '%' : ''));
+    } else {
+      const qa = qA(), qb = S.q - qa, sp = splits(S.NA, S.NB, S.q), best = sp.reduce((a, b) => b.t > a.t ? b : a), tA = tempSolid(S.NA, qa), tB = tempSolid(S.NB, qb);
+      html = card('Energy in A', qa + ' of ' + S.q + ' packets', 'most likely: ' + best.qA + ', the share that makes the two temperatures equal');
+      html += card('Temperatures (kT/ε)', 'A ' + tA.toFixed(2) + ', B ' + tB.toFixed(2), Math.abs(qa - best.qA) <= 2 * spreadQ(sp) ? 'about equal: no more steady flow, just wandering' : 'energy flows from ' + (tA > tB ? 'A to B' : 'B to A') + ', the hotter to the colder');
+      const t = sp[qa].t; html += card('Entropy, S/k = ln Ω_A + ln Ω_B', t.toFixed(1), 'most it can be: ' + smaxStr(best.t) + '; S = ' + jk(t));
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+  const smaxStr = v => v.toFixed(1);
+  // how far the energy in A typically wanders from its most likely value (the spread of its odds)
+  function spreadQ(sp) { const m = Math.max(...sp.map(s => s.t)); let w = 0, a = 0, a2 = 0; sp.forEach(s => { const p = Math.exp(s.t - m); w += p; a += p * s.qA; a2 += p * s.qA * s.qA; }); return Math.sqrt(Math.max(0, a2 / w - (a / w) ** 2)); }
+
+  const TEXT = {
+    1: { lede: 'A gas is held in the left half of a box. Predict: when the partition comes out, will the gas ever all gather on the left again by itself?',
+         notes: '<p><b>What to try.</b> Take out the partition and watch the share on the left fall to half, then wander around it. Start over with only 4 or 5 molecules: now they often all end up on one side, and the entropy graph dips to zero each time. Then try 100 or 1000: the wandering shrinks, and the gas never comes back.</p>' +
+                '<p><b>Why.</b> Each way of placing the molecules, left or right, is a microstate, and the molecules’ collisions visit them all without preference. There is only one way to have all of them on the left, but for 100 molecules about 10²⁹ ways to have them split 50–50. So the gas goes to the even split not because anything pushes it there, but because almost every microstate looks like that. The entropy S = k ln Ω counts the ways (Ω) on a log scale; it rises by N k ln 2 as the gas spreads, and the second law, that entropy doesn’t fall, is a statement about overwhelming odds.</p>' +
+                '<p><b>The model.</b> Disks in two dimensions, bouncing elastically off each other and the walls, with speeds from the thermal distribution. Only left or right is counted, so the entropy here is the spreading-out part; the speeds’ share does not change, because the energy does not. Real air molecules move far faster: they would cross a 1 m box in a few milliseconds. The disks are drawn to scale and take up a little room, which makes the share wander slightly less than 1/(2√N).</p>' },
+    2: { lede: 'Put each molecule on the left or the right of a box at random. Predict: with 4 molecules, how often are they split evenly? With 1000?',
+         notes: '<p><b>What to try.</b> Start with 4 molecules and look at all 16 arrangements: 6 of them are 2–2, and only 1 has all four on the left. Shuffle a few times, then 1000 times, and watch the red tally settle onto the blue bars. Then raise the number of molecules: the peak of the bars grows narrower, and with 1000 molecules almost every shuffle lands within 5% of even.</p>' +
+                '<p><b>Why.</b> If every arrangement (microstate) is equally likely, the chance of a split (macrostate) is just its share of the arrangements. The count Ω for n on the left is N! / (n! (N − n)!), largest at the even split. The width of the peak, as a share of N, shrinks as 1/√N, so for a mole of gas (10²³ molecules) the share on each side is 50% to about 12 decimal places. Entropy, S = k ln Ω, is largest at the even split: equal to about N k ln 2 there, and zero when all are on one side.</p>' +
+                '<p><b>The model.</b> Counting only: each molecule left or right, independently, 50–50. For more than 40 molecules, the bars are grouped. Exact counts are used (with logarithms, so even 2¹⁰⁰⁰ fits).</p>' },
+    3: { lede: 'Two solids touch: A starts with all the energy, B with none. Predict: does the energy end up shared equally per atom, all of it in B, or something else?',
+         notes: '<p><b>What to try.</b> Press Play and watch the energy, in packets, spread from A into B until the dot on the entropy graph reaches the top of the black curve. Notice that it stays near there, wandering a little. Make B much bigger than A, or give them more energy, and see where the energy settles; the temperatures, not the energies, end up equal.</p>' +
+                '<p><b>Why.</b> In a simple model of a solid (Einstein’s), each atom is an oscillator holding a whole number of energy packets. The number of ways to share q packets among N oscillators is (q + N − 1)! / (q! (N − 1)!). For two solids together, the ways multiply, Ω = Ω_A Ω_B, and nearly all of them have the energy split so that each solid’s entropy rises as fast as the other’s falls. That balance point is equal temperature, because temperature is defined by 1/T = dS/dU. Heat flows from hot to cold simply because there are vastly more ways to be at equal temperature.</p>' +
+                '<p><b>The model.</b> Einstein solids, with one packet of energy ε per step of each oscillator. At each step, an oscillator chosen at random passes one packet, if it has one, to another chosen at random; over time this visits every arrangement equally often. Temperatures are from the large-number formula kT/ε = 1 / ln(1 + N/q).</p>' },
+    4: { lede: 'Let the gas spread out, then reverse every molecule’s velocity. Predict: will it gather back into the left half, the way a film run backward would?',
+         notes: '<p><b>What to try.</b> Take out the partition, let the gas spread for a few seconds, then reverse: every molecule retraces its path and they all crowd back into the left half, exactly on time. Start over, turn on the nudge, and do the same: one molecule is moved by a billionth of the box before the reversal, and the gas only partly gathers back before spreading out again. Try waiting longer before reversing: the nudged run fails sooner.</p>' +
+                '<p><b>Why.</b> Newton’s laws work the same forward and backward, so the gathering is allowed: entropy can fall. But it takes a perfectly arranged set of velocities, and the slightest error ruins it, because each collision magnifies an error in angle by a factor of roughly the distance between collisions over the size of a molecule. A billionth becomes the whole box within a few dozen collisions. This is why we never see a spread-out gas gather itself up: the arrangements that would do it exist, but they are a vanishingly small share of all of them.</p>' +
+                '<p><b>The model.</b> As on the first tab. Positions are stored as whole numbers of a tiny unit and stepped with a rule that is exactly reversible in the computer’s arithmetic, so the backward run is perfect to the last digit without the nudge (Levesque and Verlet, 1993).</p>' }
+  };
+
+  // ================================================================
+  // 5. CONTROLS
+  // ================================================================
+  function visibility() {
+    const gas = tab === 1 || tab === 4, G = gas ? GS[tab] : null;
+    $('lab_n').hidden = tab === 3; $('lab_nudge').hidden = tab !== 4;
+    $('lab_na').hidden = tab !== 3; $('lab_nb').hidden = tab !== 3; $('lab_q').hidden = tab !== 3;
+    $('go').hidden = tab === 2; $('rev').hidden = tab !== 4; $('shuf').hidden = tab !== 2; $('shuf1k').hidden = tab !== 2;
+    $('go').textContent = gas ? (!G.released ? 'Remove the partition' : G.playing ? 'Pause' : 'Play') : (SO.playing ? 'Pause' : 'Play');
+    $('go').disabled = tab === 4 && G.back;
+    if (tab === 4) $('rev').disabled = !G.released || G.tRev !== null;
+    $('hint').textContent = tab === 4 && G.released && G.tRev === null ? (G.t < 1 ? 'let it spread first' : '') : '';
+  }
+  function vals() {
+    if (tab !== 3) { $('n').value = String(S.ni[tab]); $('n_v').textContent = nOf(tab); }
+    $('nudge').checked = S.nudge;
+    $('na').value = String(S.NA); $('na_v').textContent = S.NA; $('nb').value = String(S.NB); $('nb_v').textContent = S.NB; $('q').value = String(S.q); $('q_v').textContent = S.q;
+  }
+  function upd() { visibility(); vals(); draw(); readout(); }
+  function setTab(k) {
+    tab = k; [1, 2, 3, 4].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    $('scene').classList.toggle('count', k === 2);
+    $('scene').setAttribute('aria-label', k === 2 ? 'Arrangements of molecules in a box' : k === 3 ? 'Two solids sharing packets of energy' : 'A box of gas molecules');
+    upd();
+  }
+  [1, 2, 3, 4].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  $('n').addEventListener('input', () => { S.ni[tab] = +$('n').value; if (tab === 2) resetCount(); else newGas(tab); upd(); });
+  $('nudge').addEventListener('change', () => { S.nudge = $('nudge').checked; upd(); });
+  ['na', 'nb', 'q'].forEach(id => $(id).addEventListener('input', () => { S[{ na: 'NA', nb: 'NB', q: 'q' }[id]] = +$(id).value; resetSolids(); upd(); }));
+  $('go').addEventListener('click', () => {
+    if (tab === 3) { SO.playing = !SO.playing; upd(); return; }
+    const G = GS[tab]; if (!G.released) { G.released = true; G.g.wall = false; G.playing = true; G.hist = [[0, countLeft(G.g)]]; G.g.steps = 0; G.t = 0; G.elapsed = 0; G.lastRec = 0; } else G.playing = !G.playing; upd();
+  });
+  $('rev').addEventListener('click', () => { const G = GS[4]; if (!G.released || G.tRev !== null) return;
+    if (S.nudge) { const i = Math.floor(Math.random() * G.g.N); G.g.x[i] += 1; G.g.px[i] += 1; G.nudged = i; }
+    reverseGas(G.g); G.tRev = G.t; G.playing = true; G.elapsed = G.t; upd(); });
+  $('reset').addEventListener('click', () => { if (tab === 2) resetCount(); else if (tab === 3) resetSolids(); else newGas(tab); upd(); });
+  $('shuf').addEventListener('click', () => { shuffle(1); upd(); });
+  $('shuf1k').addEventListener('click', () => { shuffle(1000); upd(); });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 6. LOOP
+  // ================================================================
+  let last = null, msPerStep = 0.05, lastRead = 0;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function advanceGas(G, dt) {
+    // as much of real time as the computer can manage in about 9 ms
+    let want = Math.round(dt * STEPS_PER_S); want = Math.max(1, Math.min(want, Math.floor(9 / msPerStep)));
+    const t0 = performance.now(); let done = 0;
+    for (; done < want; done++) {
+      if (G.tRev !== null && G.g.steps <= 0) { G.back = true; G.playing = false; G.hist.push([G.elapsed + done * GAS.dt, countLeft(G.g)]); break; }
+      stepGas(G.g, 1);
+    }
+    if (done) msPerStep = 0.8 * msPerStep + 0.2 * (performance.now() - t0) / done;
+    // time since release: forward until reversed, then counting down (the graph keeps running on)
+    G.t = G.g.steps * GAS.dt; G.elapsed = (G.elapsed || 0) + done * GAS.dt;
+    const te = G.tRev === null ? G.t : G.elapsed;
+    if (G.released && te - G.lastRec > 0.05) { G.hist.push([te, countLeft(G.g)]); G.lastRec = te; if (G.hist.length > 4000) G.hist.shift(); }
+  }
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+    if (dt > 0 && !document.hidden) {
+      let moved = false;
+      if (tab === 1 || tab === 4) { const G = GS[tab]; if (G.released && G.playing && !reduced) { advanceGas(G, dt); moved = true; if (G.back) upd(); }
+        else if (!G.released && !reduced) { advanceGas(G, dt); moved = true; } }
+      else if (tab === 3 && SO.playing && !reduced) { const n = 4 * (S.NA + S.NB); for (let i = 0; i < n; i++) hop(SO.st, Math.random); SO.hops += n; SO.hist.push(qA()); if (SO.hist.length > 4000) SO.hist.shift(); moved = true; }
+      if (moved) { draw(); if (ts - lastRead > 150) { readout(); lastRead = ts; } }
+    }
+    requestAnimationFrame(frame);
+  }
+  newGas(1); newGas(4); resetCount(); resetSolids();
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
