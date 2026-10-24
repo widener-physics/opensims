@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://opensims.wu-physics.net/sitemap.xml

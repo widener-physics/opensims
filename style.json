@@ -9,7 +9,7 @@
     },
     "file_rules": {
       "single_file": true,
-      "external_requests": "none: no scripts, fonts, stylesheets, images, analytics, or CDN links",
+      "external_requests": "none: no scripts, fonts, stylesheets, images, analytics, or CDN links (the site's analytics tag is added by npm run meta, not by authors)",
       "works_offline_from_file_url": true,
       "file_name": "kebab-case slug matching the sims.js entry, e.g. sims/rolling-race.html",
       "max_recommended_size_kb": 80

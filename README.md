@@ -12,10 +12,11 @@ TEMPLATE.html     a complete starter simulation to copy from
 PROMPT.md         how to draft a simulation with an AI model, with the prompt to use
 STYLE_GUIDE.md    what a simulation should look and behave like, and why
 style.json        the same rules in machine-readable form, for AI-assisted authoring
-tests/            physics tests, run against the sims as they ship, and a check that each page's title and description match sims.js
-package.json      names the scripts: npm test, npm run meta, npm run build (no dependencies)
-tools/            page-meta.js (writes each sim's <title> and description from sims.js); share-image.html (source of share.png)
-deploy/           the deploy steps: the home page's list, sitemap and link previews, and optional analytics (see Deploying)
+tests/            physics tests, run against the sims as they ship, and a check that the pages match sims.js
+package.json      names the scripts: npm test, npm run meta (no dependencies)
+tools/            page-meta.js (npm run meta: keeps the pages in step with sims.js); analytics.html (the site's analytics
+                  snippet); share-image.html (source of share.png)
+sitemap.xml       written by npm run meta, with robots.txt
 share.png         the picture shown when a link to the site is shared
 LICENSE           GPL v3
 README.md
@@ -57,58 +58,35 @@ for a new simulation.
 3. Run `npm run meta`. It writes the page's `<title>` and `<meta name="description">` from this entry: the
    description is the blurb, and the title is `pageTitle` (or the title plus "simulation") followed by the site's
    name. Search engines show these, so give `pageTitle` the words a teacher would type: "Brachistochrone
-   simulation: the fastest slide" rather than just "The fastest slide". The tests fail if a page has drifted from
-   its entry.
+   simulation: the fastest slide" rather than just "The fastest slide". It also adds the page to the home page's
+   list and the sitemap, with its link-preview tags and the analytics snippet (see Publishing). The tests fail if a
+   page has drifted from its entry.
 4. Optionally add `thumb: 'thumbs/rolling-race.png'` for a real screenshot (16:9). Without it the card gets a schematic drawn from the topic.
 5. Run through the checklist at the end of `STYLE_GUIDE.md`, then open a pull request.
 
 To add a topic, add a key to `TOPICS` in `sims.js` with a display name and a color.
 
-## Deploying on Cloudflare Pages
+## Publishing
 
-The whole site is static. In the Cloudflare dashboard: Workers & Pages → Create → Pages → connect the GitHub repository. Framework preset: *None*. Build command: `npm run build` (it runs the two steps in `deploy/`; there are no dependencies to install). Build output directory: `/`. Every push to `main` redeploys. Add a custom domain from the project's *Custom domains* tab.
+The site is static and has no build step: Cloudflare Pages serves the files in this repository exactly as they
+are, and every push to `main` redeploys. The Pages project's build settings: framework preset *None*, build
+command left blank, build output directory `/`.
 
-### Search engines and link previews
+What search engines and link previews need is written into the files by `npm run meta` (tools/page-meta.js), from
+`sims.js`: each page's title, description, canonical address and link-preview tags (with `share.png`), the list
+of simulations in the home page's HTML (for search engines that don't run scripts), `sitemap.xml` and
+`robots.txt`. Run it after changing `sims.js`; the tests fail if a page has fallen out of step. The site's address
+is set at the top of `tools/page-meta.js`. A page in `sims/` that isn't listed in `sims.js` yet is a draft: it
+gets a "noindex" tag instead, stays off the sitemap, and doesn't appear in the directory.
 
-The build always writes the list of simulations into the home page's HTML (the same markup its script draws), so
-search engines that don't run scripts still see every simulation and follow the links.
+### Analytics
 
-Set one more variable, for **Production and Preview**, and it also adds what needs the site's address:
-
-| Variable | Value |
-|---|---|
-| `SITE_URL` | the address the site is served from, e.g. `https://opensims.wu-physics.net` |
-
-With it, every page gets a canonical address (so search engines treat that address as the real one, not the
-`pages.dev` copy) and link-preview tags with `share.png`, and the build writes `sitemap.xml` and `robots.txt`.
-Submit `https://<your site>/sitemap.xml` in Google Search Console and Bing Webmaster Tools. Like the analytics,
-these tags go in a marked block that the *Download file* button cuts out. If you fork the project under another
-name, remake `share.png` from `tools/share-image.html`.
-
-### Analytics (optional)
-
-The repository contains no analytics and never will: a fork, a clone or a downloaded file is clean. If you want
-to count visits to *your* deployment, give Cloudflare your analytics service's snippet and the deploy step adds it
-to the copy it serves. Without it, the deploy step does nothing, so forks need no changes.
-
-In the Pages project: *Settings → Variables and Secrets*, for **Production** only (so preview builds aren't counted):
-
-| Variable | Value |
-|---|---|
-| `ANALYTICS_SNIPPET` | the whole HTML snippet your service gives you for the page's `<head>` (Plausible, Umami, GoatCounter, …) |
-| `ANALYTICS_HOSTS` | the host name the site is served from, e.g. `opensims.wu-physics.net` (comma-separate several) |
-
-Then redeploy. The snippet goes into `index.html` and every page in `sims/` (not `TEMPLATE.html`), switched off
-by a three-line check unless the page is being viewed on one of `ANALYTICS_HOSTS`. The directory's *Download
-file* button cuts the block back out, so a downloaded simulation is byte-for-byte the file in this repository; and
-a page saved some other way (*Save as*) still sends nothing to anyone once it is opened from a USB stick or hosted
-on someone else's course site. A bad setting (no host, or a site ID instead of the snippet) stops the deploy with a message rather than
-deploying something half-working.
-
-To see the result without deploying: `ANALYTICS_SNIPPET='…' ANALYTICS_HOSTS=… node deploy/add-analytics.js --out /tmp/site`.
-The script refuses to edit the repository's own files; on Cloudflare it edits the build's throwaway copy.
-`node deploy/add-analytics.test.js` and `node deploy/add-site-meta.test.js` check all of this. On another host's
-build service, set `DEPLOY_BUILD=1` along with the other variables and use the same build command.
+`tools/analytics.html` holds the site's Plausible snippet, and `npm run meta` copies it into the head of
+`index.html` and every page in `sims/` (not `TEMPLATE.html`). Plausible sets no cookies, and the pages work the
+same without it. A downloaded copy carries the snippet too: opened from a disk with no network it does nothing.
+To keep copies that other people host out of the counts, add `opensims.wu-physics.net` under *Shields → Hostnames*
+in the site's Plausible settings, so only visits to this site are recorded. To turn analytics off, delete
+`tools/analytics.html` and run `npm run meta`.
 
 ## License and contributions
 
