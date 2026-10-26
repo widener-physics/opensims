@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<!--
+  Blackbody radiation and the colors of stars - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Planck's law adds up to the
+  Stefan-Boltzmann law with sigma computed from h, c and k, peaks where Wien's law says, and gives the measured
+  solar constant for the Sun; the colors lie on the CIE's Planckian locus; the stars' radii and temperatures give
+  their published luminosities.
+  Credit: color-matching curves from C. Wyman, P.-P. Sloan and P. Shirley, J. Computer Graphics Techniques 2, 1
+  (2013); star data from published measurements (see the notes on each tab).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blackbody radiation simulation: Planck, Wien, Stefan–Boltzmann and star colors | Open Physics Sims</title>
+<meta name="description" content="Heat a body from skin temperature to a blue-white star and watch its glow slide across the spectrum and change color. Measure stars' temperatures through blue and yellow filters as astronomers do, then see how Betelgeuse, cooler than the Sun, outshines it by sheer size.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --curve: #1D4F73; --kept: #7A8790; --sky: #0B1320; --fB: #3D6FD8; --fV: #8DA51C;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 400; }
+  #scene.pick { cursor: pointer; }
+  #graph { aspect-ratio: 900 / 220; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 10px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.8; }
+    #graph { aspect-ratio: 1 / 0.62; }
+    #graph.two { aspect-ratio: 1 / 1.15; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+<!-- site tags: written by tools/page-meta.js from sims.js (npm run meta); edits here are replaced -->
+<link rel="canonical" href="https://opensims.wu-physics.net/sims/blackbody">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Open Physics Sims">
+<meta property="og:title" content="Blackbody radiation simulation: Planck, Wien, Stefan–Boltzmann and star colors">
+<meta property="og:description" content="Heat a body from skin temperature to a blue-white star and watch its glow slide across the spectrum and change color. Measure stars' temperatures through blue and yellow filters as astronomers do, then see how Betelgeuse, cooler than the Sun, outshines it by sheer size.">
+<meta property="og:url" content="https://opensims.wu-physics.net/sims/blackbody">
+<meta property="og:image" content="https://opensims.wu-physics.net/share.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Open Physics Sims: free interactive physics simulations for teaching">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-RIyzwHpiR6eo6nzLty9EI.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+<!-- /site tags -->
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Blackbody radiation and the colors of stars</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>The spectrum</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Measuring a star</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Size from light</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="The spectrum"></canvas>
+  <div class="row2">
+    <button id="keep" class="secondary">Keep this curve</button>
+    <button id="unkeep" class="secondary">Clear the kept curve</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="The color you would see"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_t"><div class="row"><span>Temperature</span><span class="val" id="t_v"></span></div><input type="range" id="t" min="0" max="1000" step="1"></label>
+    <div class="grp" id="lab_pre"><div>Set it to</div><div class="seg" id="pre" role="group" aria-label="Set the temperature to"></div></div>
+    <div class="grp" id="lab_rng"><div>Wavelengths shown</div><div class="seg" id="rng" role="group" aria-label="Wavelengths shown"><button data-v="2">0–2 µm</button><button data-v="10">0–10 µm</button><button data-v="40">0–40 µm</button></div></div>
+    <div class="grp" id="lab_star"><div>Star</div><div class="seg" id="star" role="group" aria-label="Star"></div></div>
+    <div class="grp" id="lab_flt"><div>Look through</div><div class="seg" id="flt" role="group" aria-label="Filter"><button data-v="none">no filter</button><button data-v="B">B (blue)</button><button data-v="V">V (yellow-green)</button></div></div>
+    <div class="grp" id="lab_sa"><div>Star A</div><div class="seg" id="sa" role="group" aria-label="Star A"></div></div>
+    <label id="lab_tb"><div class="row"><span>Star B: temperature</span><span class="val" id="tb_v"></span></div><input type="range" id="tb" min="0" max="1000" step="1"></label>
+    <label id="lab_rb"><div class="row"><span>Star B: radius</span><span class="val" id="rb_v"></span></div><input type="range" id="rb" min="0" max="1000" step="1"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/blackbody.test.js)
+  // ================================================================
+  // ---- physics core: blackbody radiation ----
+  // SI units: wavelength in meters, temperature in kelvin.
+  const PC = { h: 6.62607015e-34, c: 2.99792458e8, k: 1.380649e-23, sigma: 5.670374419e-8, wien: 2.897771955e-3,
+               Tsun: 5772, Rsun: 6.957e8, Lsun: 3.828e26 };      // IAU 2015 nominal solar values
+  // Planck's law: power per unit area, per unit solid angle, per unit wavelength (W m^-2 sr^-1 m^-1)
+  function planck(lam, T) {
+    const x = PC.h * PC.c / (lam * PC.k * T);
+    if (x > 700) return 0;
+    return 2 * PC.h * PC.c * PC.c / Math.pow(lam, 5) / Math.expm1(x);
+  }
+  // the same, as power leaving each square meter of the surface per meter of wavelength (times pi: all directions)
+  const exitance = (lam, T) => Math.PI * planck(lam, T);
+  const peakWavelength = T => PC.wien / T;                          // Wien's displacement law
+  const totalPower = T => PC.sigma * Math.pow(T, 4);                // Stefan-Boltzmann, W per square meter
+  // the share of the power between two wavelengths (Simpson's rule on a log grid)
+  function share(T, l1, l2) {
+    const n = 600, a = Math.log(l1), b = Math.log(l2), dh = (b - a) / n; let s = 0;
+    for (let i = 0; i <= n; i++) { const l = Math.exp(a + i * dh), w = i === 0 || i === n ? 1 : i % 2 ? 4 : 2; s += w * exitance(l, T) * l; }
+    return s * dh / 3 / totalPower(T);
+  }
+
+  // ---- the color the eye sees ----
+  // CIE 1931 color-matching functions, as the multi-lobe fit of Wyman, Sloan and Shirley (2013); wavelength in nm
+  const lobe = (x, mu, s1, s2) => { const t = (x - mu) / (x < mu ? s1 : s2); return Math.exp(-0.5 * t * t); };
+  const cmf = nm => [1.056 * lobe(nm, 599.8, 37.9, 31.0) + 0.362 * lobe(nm, 442.0, 16.0, 26.7) - 0.065 * lobe(nm, 501.1, 20.4, 26.2),
+                     0.821 * lobe(nm, 568.8, 46.9, 40.5) + 0.286 * lobe(nm, 530.9, 16.3, 31.1),
+                     1.217 * lobe(nm, 437.0, 11.8, 36.0) + 0.681 * lobe(nm, 459.0, 26.0, 13.8)];
+  // tristimulus values X, Y, Z of a blackbody (arbitrary overall scale), and its chromaticity x, y
+  function xyz(T) { let X = 0, Y = 0, Z = 0; for (let nm = 360; nm <= 830; nm += 1) { const p = planck(nm * 1e-9, T), m = cmf(nm); X += p * m[0]; Y += p * m[1]; Z += p * m[2]; } return [X, Y, Z]; }
+  function chroma(T) { const v = xyz(T), s = v[0] + v[1] + v[2]; return [v[0] / s, v[1] / s]; }
+  // the color as screen RGB (sRGB, 0-255), at full brightness: only its hue and saturation, not how bright it is.
+  // Colors outside the screen's range are brought in by mixing in white.
+  function srgb(X, Y, Z) {
+    let r = 3.2406 * X - 1.5372 * Y - 0.4986 * Z, g = -0.9689 * X + 1.8758 * Y + 0.0415 * Z, b = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+    const lo = Math.min(r, g, b); if (lo < 0) { r -= lo; g -= lo; b -= lo; }
+    const hi = Math.max(r, g, b); r /= hi; g /= hi; b /= hi;
+    const enc = v => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
+    return [enc(r), enc(g), enc(b)];
+  }
+  const rgb = T => srgb(...xyz(T));
+
+  // ---- measuring a star's color with filters ----
+  // Johnson B and V filters, as bell curves with their standard centers and widths (445 nm, 94 nm wide; 551 nm, 88 nm)
+  const FILTERS = { B: { c: 445e-9, w: 94e-9 }, V: { c: 551e-9, w: 88e-9 } };
+  const filterT = (f, lam) => { const s = FILTERS[f].w / 2.3548; return Math.exp(-0.5 * Math.pow((lam - FILTERS[f].c) / s, 2)); };
+  // the light a detector counts through a filter (photons, so weighted by wavelength), arbitrary scale
+  function through(f, T) { let s = 0; for (let nm = 250; nm <= 850; nm += 1) { const l = nm * 1e-9; s += planck(l, T) * filterT(f, l) * l; } return s; }
+  // the color index B - V = -2.5 log10(B/V) + zero point; the zero point makes Vega (a 9602 K blackbody here) 0.00
+  const VEGA_T = 9602;
+  const ZP = 2.5 * Math.log10(through('B', VEGA_T) / through('V', VEGA_T));
+  const colorIndex = T => -2.5 * Math.log10(through('B', T) / through('V', T)) + ZP;
+  // and back: the temperature with a given color index (bisection on log T; B - V falls as T rises)
+  function tempFromIndex(bv) { let lo = Math.log(1500), hi = Math.log(60000); for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (colorIndex(Math.exp(m)) > bv) lo = m; else hi = m; } return Math.exp((lo + hi) / 2); }
+
+  // ---- size from light ----
+  // a star's luminosity, in units of the Sun's, from its radius (in Sun radii) and surface temperature
+  const luminosity = (R, T) => R * R * Math.pow(T / PC.Tsun, 4);
+  const radiusFrom = (L, T) => Math.sqrt(L) * Math.pow(PC.Tsun / T, 2);
+  // some stars: surface temperature (K), radius and luminosity (in the Sun's), apparent V magnitude. The luminosities
+  // are published ones, measured separately; luminosity() should come out close to them.
+  const STARS = [
+    { id: 'sun', name: 'the Sun', T: 5772, R: 1, L: 1 },
+    { id: 'proxima', name: 'Proxima Centauri', T: 3042, R: 0.154, L: 0.00155, V: 11.13 },
+    { id: 'betelgeuse', name: 'Betelgeuse', T: 3700, R: 760, L: 87000, V: 0.50 },
+    { id: 'aldebaran', name: 'Aldebaran', T: 3900, R: 44.1, L: 439, V: 0.86 },
+    { id: 'arcturus', name: 'Arcturus', T: 4286, R: 25.4, L: 170, V: -0.05 },
+    { id: 'procyon', name: 'Procyon', T: 6530, R: 2.05, L: 6.93, V: 0.34 },
+    { id: 'vega', name: 'Vega', T: 9602, R: 2.36, L: 40, V: 0.03 },
+    { id: 'sirius', name: 'Sirius', T: 9940, R: 1.711, L: 25.4, V: -1.46 },
+    { id: 'rigel', name: 'Rigel', T: 12100, R: 74.1, L: 120000, V: 0.13 },
+    { id: 'siriusB', name: 'Sirius B', T: 25000, R: 0.008098, L: 0.02448, V: 8.44 }
+  ];
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. SETTINGS AND STATE
+  // ================================================================
+  const star = id => STARS.find(s => s.id === id);
+  const PRESETS = [{ name: 'a person', T: 310 }, { name: 'stove coil', T: 1000 }, { name: 'lava', T: 1400 }, { name: 'light bulb', T: 2800 },
+                   { name: 'Betelgeuse', T: 3700 }, { name: 'the Sun', T: 5772 }, { name: 'Sirius', T: 9940 }, { name: 'Rigel', T: 12100 }];
+  const SKY = ['sirius', 'vega', 'rigel', 'betelgeuse', 'arcturus', 'aldebaran', 'procyon'];      // tab 2
+  const SKY_POS = { sirius: [0.30, 0.70], vega: [0.80, 0.22], rigel: [0.56, 0.78], betelgeuse: [0.44, 0.30], arcturus: [0.15, 0.32], aldebaran: [0.70, 0.52], procyon: [0.88, 0.80] };
+  const SA = ['sun', 'proxima', 'sirius', 'siriusB', 'arcturus', 'betelgeuse', 'rigel'];          // tab 3
+  // log sliders: 300 K to 30 000 K (tab 1); 2500 K to 40 000 K and 0.005 to 1000 Sun radii (tab 3)
+  const logMap = (lo, hi) => ({ to: v => lo * Math.pow(hi / lo, v / 1000), from: x => Math.round(1000 * Math.log(x / lo) / Math.log(hi / lo)) });
+  const MT = logMap(300, 30000), MTB = logMap(2500, 40000), MRB = logMap(0.005, 1000);
+  const S = { T: 5772, kept: null, range: 2, sel: 'betelgeuse', flt: 'none', A: 'betelgeuse', TB: 5772, RB: 1 };
+  let tab = 1;
+
+  // ================================================================
+  // 3. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y, halo) { ctx.save(); ctx.strokeStyle = halo || C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹', sup = n => (n < 0 ? '⁻' : '') + String(Math.abs(n)).split('').map(d => SUP[+d]).join('');
+  const colorOf = T => 'rgb(' + rgb(T).join(',') + ')';
+  const kfmt = T => Math.round(T).toLocaleString('en-US') + ' K';
+  // a number with an SI prefix: 83 M, 1.2 k, 32
+  function si(v, d) { const P = [[1e12, 'T'], [1e9, 'G'], [1e6, 'M'], [1e3, 'k'], [1, ''], [1e-3, 'm']]; for (const [f, p] of P) if (Math.abs(v) >= f * 0.9995) return (v / f).toFixed(d === undefined ? (v / f < 10 ? 1 : 0) : d) + ' ' + p; return v.toPrecision(2) + ' '; }
+  const nice = x => { const e = Math.floor(Math.log10(x)), m = x / 10 ** e; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * 10 ** e; };
+  const lenStr = l => l < 1e-6 ? (l * 1e9).toFixed(0) + ' nm' : l < 1e-4 ? (l * 1e6).toFixed(l < 1e-5 ? 2 : 1) + ' µm' : (l * 1e3).toFixed(2) + ' mm';
+  function band(l) { const nm = l * 1e9; if (nm < 380) return 'ultraviolet'; if (nm > 750) return 'infrared';
+    return nm < 450 ? 'violet' : nm < 495 ? 'blue' : nm < 570 ? 'green' : nm < 590 ? 'yellow' : nm < 620 ? 'orange' : 'red'; }
+  // the color of light of one wavelength, for the rainbow under the graph
+  function spectral(nm) { let r = 0, g = 0, b = 0;
+    if (nm < 440) { r = (440 - nm) / 60; b = 1; } else if (nm < 490) { g = (nm - 440) / 50; b = 1; } else if (nm < 510) { g = 1; b = (510 - nm) / 20; } else if (nm < 580) { r = (nm - 510) / 70; g = 1; } else if (nm < 645) { r = 1; g = (645 - nm) / 65; } else r = 1;
+    const k = nm < 420 ? 0.3 + 0.7 * (nm - 380) / 40 : nm > 700 ? 0.3 + 0.7 * (750 - nm) / 50 : 1; return 'rgb(' + [r, g, b].map(v => Math.round(255 * v * k)).join(',') + ')'; }
+
+  // ---- tab 1: the spectrum ----
+  const perUm = (l, T) => exitance(l, T) * 1e-6;          // W per square meter per micrometer
+  function drawSpectrum(ctx, W, H, compact) {
+    const lmax = S.range * 1e-6, b = { x: compact ? 44 : 58, y: 30, w: 0, h: H - 30 - 46 }; b.w = W - b.x - 14;
+    const curves = [S.T].concat(S.kept ? [S.kept] : []);
+    // the vertical scale fits the taller of the two curves, within the wavelengths shown
+    const top = Math.max(...curves.map(T => { const lp = Math.min(peakWavelength(T), lmax); return perUm(lp, T); })) * 1.18;
+    const X = l => b.x + l / lmax * b.w, Y = v => b.y + b.h - v / top * b.h;
+    // the visible band
+    const v0 = X(380e-9), v1 = X(750e-9);
+    if (v1 - v0 > 3) { const gr = ctx.createLinearGradient(v0, 0, v1, 0); for (let nm = 380; nm <= 750; nm += 10) gr.addColorStop((nm - 380) / 370, spectral(nm)); ctx.globalAlpha = 0.16; ctx.fillStyle = gr; ctx.fillRect(v0, b.y, v1 - v0, b.h); ctx.globalAlpha = 1; ctx.fillStyle = gr; ctx.fillRect(v0, b.y + b.h + 1, v1 - v0, 7); }
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    // axes
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    const step = nice(top / 4); for (let v = 0; v < top * 0.999; v += step) { const y = Y(v); ctx.strokeStyle = C('--soft'); if (v) { ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y); ctx.stroke(); } ctx.fillText(v ? si(v) : '0', b.x - 5, y + 3); }
+    ctx.textAlign = 'center'; const xs = S.range === 2 ? 0.25 : S.range === 10 ? 1 : 5;
+    for (let u = 0; u <= S.range + 1e-9; u += xs) { if (compact && S.range === 2 && Math.round(u * 4) % 2) continue; ctx.fillText(String(+u.toFixed(2)), X(u * 1e-6), b.y + b.h + 20); }
+    ctx.textAlign = 'right'; ctx.fillText('wavelength (µm)', b.x + b.w, b.y + b.h + 34);
+    ctx.save(); ctx.translate(12, b.y + b.h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText('W/m² per µm', 0, 0); ctx.restore();
+    // the curves
+    const path = T => { ctx.beginPath(); const n = Math.round(b.w * 1.5); for (let i = 1; i <= n; i++) { const l = lmax * i / n; const y = Y(perUm(l, T)); i > 1 ? ctx.lineTo(X(l), y) : ctx.moveTo(X(l), y); } };
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+    if (S.kept) { path(S.kept); ctx.strokeStyle = C('--kept'); ctx.lineWidth = 1.8; ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]); }
+    path(S.T); ctx.lineTo(X(lmax), Y(0)); ctx.lineTo(X(lmax / Math.round(b.w * 1.5)), Y(0)); ctx.closePath(); ctx.fillStyle = 'rgba(29,79,115,0.10)'; ctx.fill();
+    path(S.T); ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore();
+    // the peak
+    const lp = peakWavelength(S.T); font(ctx, 11); ctx.fillStyle = C('--hot');
+    if (lp <= lmax) { const x = X(lp), y = Y(perUm(lp, S.T)); ctx.strokeStyle = C('--hot'); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+      const t = 'peak: ' + lenStr(lp), tw = ctx.measureText(t).width; ctx.textAlign = 'left'; label(ctx, t, Math.min(b.x + b.w - tw - 4, x + 6), Math.max(b.y + 14, y - 8)); }
+    else { ctx.textAlign = 'right'; label(ctx, 'peak at ' + lenStr(lp) + ' →', b.x + b.w - 6, b.y + 16); }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'glow of a ' + kfmt(S.T) + ' body' : 'light given off by a ' + kfmt(S.T) + ' surface, at each wavelength' + (S.kept ? '; dashed: ' + kfmt(S.kept) : ''), b.x, 18);
+    if (compact && S.kept) { ctx.textAlign = 'right'; label(ctx, 'dashed: ' + kfmt(S.kept), W - 14, 18); }
+  }
+
+  // ---- a patch of night sky ----
+  const FIELD = Array.from({ length: 140 }, (_, i) => { const r = Math.sin(i * 91.7) * 43758.5453, r2 = Math.sin(i * 12.9 + 4.1) * 23421.631, r3 = Math.sin(i * 3.3 + 1.7) * 9371.13; return [r - Math.floor(r), r2 - Math.floor(r2), r3 - Math.floor(r3)]; });
+  function skyBack(ctx, W, H) { ctx.fillStyle = C('--sky'); ctx.fillRect(0, 0, W, H); FIELD.forEach(([a, b, c]) => { ctx.fillStyle = 'rgba(220,228,240,' + (0.15 + 0.5 * c * c).toFixed(2) + ')'; ctx.fillRect(a * W, b * H, c > 0.85 ? 1.6 : 1, c > 0.85 ? 1.6 : 1); }); }
+  // a star: a bright core in its color with a soft glow; size and glow grow with brightness b (0..1)
+  function glowStar(ctx, x, y, col, b) {
+    const r = 2.2 + 7 * Math.sqrt(b), g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2);
+    g.addColorStop(0, 'rgba(255,255,255,' + Math.min(1, 0.4 + b).toFixed(2) + ')'); g.addColorStop(0.18, col); g.addColorStop(0.45, col.replace('rgb(', 'rgba(').replace(')', ',0.35)')); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, TAU); ctx.fill();
+  }
+  // tab 1: the blackbody among stars of known temperature, colors only
+  const REF = ['betelgeuse', 'arcturus', 'procyon', 'vega', 'rigel'];
+  function drawSkyColor(ctx, W, H, compact) {
+    skyBack(ctx, W, H);
+    const cx = W / 2, cy = H * 0.48;
+    if (S.T < 800) { ctx.strokeStyle = 'rgba(200,210,225,0.5)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, 14, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+    else { const dim = S.T < 1300 ? 0.25 + 0.75 * (S.T - 800) / 500 : 1; ctx.globalAlpha = dim; glowStar(ctx, cx, cy, colorOf(S.T), 1); ctx.globalAlpha = 1; }
+    font(ctx, 12, 600); ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; label(ctx, kfmt(S.T), cx, cy + 40, C('--sky'));
+    if (S.T < 800) { font(ctx, 11); ctx.fillStyle = '#C9D3DE'; label(ctx, 'too cool to glow: all infrared', cx, cy + 56, C('--sky')); }
+    // the reference stars, spaced across, alternately higher and lower
+    const refs = compact ? ['betelgeuse', 'procyon', 'rigel'] : REF;
+    refs.forEach((id, i) => { const s = star(id), n = refs.length, x = W * (0.1 + 0.8 * (i + (i >= n / 2 ? 1 : 0)) / n), y = H * (i % 2 ? 0.62 : 0.34);
+      glowStar(ctx, x, y, colorOf(s.T), 0.35); font(ctx, 11); ctx.fillStyle = '#C9D3DE'; ctx.textAlign = 'center'; label(ctx, s.name, x, y + 26, C('--sky')); ctx.fillStyle = '#8D9AAA'; label(ctx, kfmt(s.T), x, y + 40, C('--sky')); });
+    font(ctx, 10); ctx.fillStyle = '#8D9AAA'; ctx.textAlign = 'left'; label(ctx, compact ? 'colors as the eye sees them' : 'the colors as the eye would see them, among stars of known temperature (brightness not to scale)', 10, 14, C('--sky'));
+  }
+
+  // ---- tab 2: the sky through a filter ----
+  const vFlux = s => Math.pow(10, -0.4 * s.V);             // brightness through V, from its V magnitude
+  const fluxIn = (s, f) => f === 'B' ? vFlux(s) * Math.pow(10, -0.4 * colorIndex(s.T)) : vFlux(s);
+  function skyLayout(W, H) { return SKY.map(id => ({ id, x: 30 + SKY_POS[id][0] * (W - 60), y: 34 + SKY_POS[id][1] * (H - 64) })); }
+  function drawSkyFilter(ctx, W, H, compact) {
+    skyBack(ctx, W, H);
+    const top = Math.max(...SKY.map(id => fluxIn(star(id), 'B')), ...SKY.map(id => vFlux(star(id))));
+    skyLayout(W, H).forEach(p => { const s = star(p.id), f = S.flt === 'none' ? vFlux(s) : fluxIn(s, S.flt), b = Math.pow(f / top, 0.5);
+      glowStar(ctx, p.x, p.y, S.flt === 'none' ? colorOf(s.T) : 'rgb(235,238,242)', b);
+      if (p.id === S.sel) { ctx.strokeStyle = '#F2C14E'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, TAU); ctx.stroke(); }
+      font(ctx, 11); ctx.fillStyle = p.id === S.sel ? '#F2C14E' : '#C9D3DE'; ctx.textAlign = 'center'; label(ctx, s.name, p.x, p.y + 36, C('--sky')); });
+    font(ctx, 10); ctx.fillStyle = '#8D9AAA'; ctx.textAlign = 'left';
+    label(ctx, S.flt === 'none' ? (compact ? 'tap a star to measure it' : 'seven bright stars, in their colors (not their real places in the sky); click one to measure it') : (compact ? 'through the ' + S.flt + ' filter' : 'a black-and-white camera through the ' + S.flt + ' filter: each star as bright as the light it lets through'), 10, 14, C('--sky'));
+  }
+  // the selected star's spectrum with the two filters, and the blackbody curve of B - V against temperature
+  function drawMeasure(ctx, W, H, compact) {
+    const s = star(S.sel), stack = compact;
+    const P = stack ? [{ x: 40, y: 22, w: W - 52, h: H / 2 - 50 }, { x: 40, y: H / 2 + 22, w: W - 52, h: H / 2 - 50 }] : [{ x: 44, y: 22, w: W / 2 - 64, h: H - 56 }, { x: W / 2 + 44, y: 22, w: W / 2 - 56, h: H - 56 }];
+    { const b = P[0], l0 = 300e-9, l1 = 900e-9, X = l => b.x + (l - l0) / (l1 - l0) * b.w;
+      let top = 0; for (let nm = 300; nm <= 900; nm += 2) top = Math.max(top, planck(nm * 1e-9, s.T)); const Y = v => b.y + b.h - v / top * b.h * 0.92;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+      // the light each filter lets through: the spectrum times the filter
+      [['B', '--fB'], ['V', '--fV']].forEach(([f, col]) => { ctx.fillStyle = C(col); ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.moveTo(X(l0), Y(0));
+        for (let nm = 300; nm <= 900; nm += 2) { const l = nm * 1e-9; ctx.lineTo(X(l), Y(planck(l, s.T) * filterT(f, l))); } ctx.lineTo(X(l1), Y(0)); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.strokeStyle = C(col); ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.beginPath(); for (let nm = 300; nm <= 900; nm += 3) { const l = nm * 1e-9; nm > 300 ? ctx.lineTo(X(l), Y(top * filterT(f, l))) : ctx.moveTo(X(l), Y(top * filterT(f, l))); } ctx.stroke(); ctx.setLineDash([]); });
+      ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2; ctx.beginPath(); for (let nm = 300; nm <= 900; nm += 2) { const l = nm * 1e-9; nm > 300 ? ctx.lineTo(X(l), Y(planck(l, s.T))) : ctx.moveTo(X(l), Y(planck(l, s.T))); } ctx.stroke();
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; [300, 500, 700, 900].forEach(nm => ctx.fillText(nm + '', X(nm * 1e-9), b.y + b.h + 13)); ctx.textAlign = 'right'; ctx.fillText('nm', b.x + b.w, b.y + b.h + 26);
+      font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); ctx.fillText(s.name + '’s light', b.x + 2, b.y - 7); let x = b.x + 2 + ctx.measureText(s.name + '’s light').width + 8;
+      [['through B', '--fB'], ['through V', '--fV']].forEach(([t, col]) => { ctx.fillStyle = C(col); ctx.fillText(t, x, b.y - 7); x += ctx.measureText(t).width + 8; }); }
+    { const b = P[1], t0 = Math.log(2500), t1 = Math.log(30000), X = T => b.x + (t1 - Math.log(T)) / (t1 - t0) * b.w, lo = -0.5, hi = 2.2, Y = v => b.y + (v - lo) / (hi - lo) * b.h;
+      ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; [-0.5, 0, 0.5, 1, 1.5, 2].forEach(v => { ctx.strokeStyle = v === 0 ? C('--kept') : C('--soft'); ctx.beginPath(); ctx.moveTo(b.x, Y(v)); ctx.lineTo(b.x + b.w, Y(v)); ctx.stroke(); ctx.fillText(v.toFixed(1), b.x - 4, Y(v) + 3); });
+      ctx.textAlign = 'center'; [3000, 5000, 10000, 20000].forEach(T => ctx.fillText(T >= 10000 ? T / 1000 + 'k' : T + '', X(T), b.y + b.h + 13)); ctx.textAlign = 'right'; ctx.fillText('temperature (K)', b.x + b.w, b.y + b.h + 26);
+      ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i <= 200; i++) { const T = Math.exp(t0 + (t1 - t0) * i / 200); i ? ctx.lineTo(X(T), Y(colorIndex(T))) : ctx.moveTo(X(T), Y(colorIndex(T))); } ctx.stroke();
+      const bv = colorIndex(s.T), px = X(s.T), py = Y(bv);
+      ctx.strokeStyle = C('--hot'); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(b.x, py); ctx.lineTo(px, py); ctx.lineTo(px, b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.arc(px, py, 5, 0, TAU); ctx.fill();
+      font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'B − V against temperature' : 'B − V of a blackbody, against its temperature (hotter to the left)', b.x + 2, b.y - 7); }
+  }
+
+  // ---- tab 3: two stars to scale, and the H-R diagram ----
+  function drawPair(ctx, W, H, compact) {
+    ctx.fillStyle = C('--sky'); ctx.fillRect(0, 0, W, H);
+    const A = star(S.A), Bs = { name: 'Star B', T: S.TB, R: S.RB }, big = Math.max(A.R, Bs.R), room = Math.min(W / 4 - 16, H / 2 - 40), s = room / big;
+    [[A, W * 0.27], [Bs, W * 0.73]].forEach(([st, x]) => {
+      const y = H / 2 + 6, r = st.R * s;
+      if (r >= 1.5) { const c = rgb(st.T), dark = 'rgb(' + c.map(v => Math.round(v * 0.62)).join(',') + ')', g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, colorOf(st.T)); g.addColorStop(0.7, colorOf(st.T)); g.addColorStop(1, dark); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
+      else { glowStar(ctx, x, y, colorOf(st.T), 0.05); }
+      font(ctx, 12, 600); ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; label(ctx, st === A ? A.name : 'Star B', x, 24, C('--sky'));
+      font(ctx, 11); ctx.fillStyle = '#C9D3DE'; label(ctx, kfmt(st.T) + ', ' + (compact ? rStr(st.R).replace(' × the Sun’s radius', ' R☉') : rStr(st.R)), x, 40, C('--sky'));
+      if (r < 1.5) { ctx.fillStyle = '#8D9AAA'; label(ctx, 'a dot at this scale', x, y + 24, C('--sky')); }
+    });
+    // the Sun, for scale
+    const rs = s; font(ctx, 10); ctx.fillStyle = '#8D9AAA'; ctx.textAlign = 'left';
+    if (rs >= 1) { ctx.strokeStyle = 'rgba(242,193,78,0.8)'; ctx.setLineDash([2, 2]); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(W / 2, H - 22, rs, 0, TAU); ctx.stroke(); ctx.setLineDash([]); label(ctx, 'the Sun, at the same scale', W / 2 + rs + 6, H - 18, C('--sky')); }
+    else label(ctx, 'to scale: the Sun would be ' + (2 * rs).toFixed(2) + ' pixels across', 10, H - 10, C('--sky'));
+  }
+  const rStr = R => (R < 0.1 ? R.toFixed(R < 0.01 ? 4 : 3) : R < 10 ? R.toFixed(2) : Math.round(R).toLocaleString('en-US')) + ' × the Sun’s radius';
+  const Lstr = L => L >= 1e4 ? Math.round(L).toLocaleString('en-US') : L >= 10 ? L.toFixed(0) : L >= 0.1 ? L.toFixed(2) : L.toPrecision(2);
+  // which side of its dot each star's name goes: [right (1) or left (-1), up (-1) / level (0) / down (1)]
+  const LABEL_AT = { vega: [-1, -1], sirius: [1, 1], aldebaran: [1, -1], arcturus: [1, 1], proxima: [-1, 0], betelgeuse: [1, 0], procyon: [1, -1], sun: [1, 1] };
+  function drawHR(ctx, W, H, compact) {
+    const b = { x: compact ? 44 : 54, y: 22, w: 0, h: H - 22 - 34 }; b.w = W - b.x - 14;
+    const t0 = Math.log10(40000), t1 = Math.log10(2500), l0 = -5, l1 = 6, X = T => b.x + (t0 - Math.log10(T)) / (t0 - t1) * b.w, Y = L => b.y + (l1 - Math.log10(L)) / (l1 - l0) * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    for (let e = l0 + 1; e <= l1; e += 2) { const y = Y(10 ** e); ctx.strokeStyle = C('--soft'); ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x + b.w, y); ctx.stroke(); ctx.fillText(e === 0 ? '1' : '10' + sup(e), b.x - 4, y + 3); }
+    ctx.textAlign = 'center'; [40000, 20000, 10000, 5000, 2500].forEach(T => ctx.fillText(T.toLocaleString('en-US'), X(T), b.y + b.h + 13)); ctx.textAlign = 'right'; ctx.fillText('surface temperature (K), hotter to the left', b.x + b.w, b.y + b.h + 26);
+    // lines of equal size: L = R^2 (T/Tsun)^4
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+    [0.001, 0.01, 0.1, 1, 10, 100, 1000].forEach(R => { ctx.strokeStyle = 'rgba(122,135,144,0.55)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(40000), Y(luminosity(R, 40000))); ctx.lineTo(X(2500), Y(luminosity(R, 2500))); ctx.stroke(); ctx.setLineDash([]);
+      // the label goes where the line comes in, at the top edge or the left edge
+      const Ttop = PC.Tsun * Math.pow(10 ** l1 / (R * R), 0.25), atTop = Ttop < 40000, x = atTop ? X(Ttop) : b.x, y = atTop ? b.y : Y(luminosity(R, 40000));
+      if (y < b.y + b.h - 12 && x < b.x + b.w - 40) { font(ctx, 10); ctx.fillStyle = C('--kept'); ctx.textAlign = 'left'; ctx.fillText(R + ' R☉', x + 4, y + 12); } });
+    ctx.restore();
+    // the named stars
+    STARS.forEach(s => { const x = X(s.T), y = Y(luminosity(s.R, s.T)); ctx.fillStyle = colorOf(s.T); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x, y, 4, 0, TAU); ctx.fill(); ctx.stroke();
+      if (!compact || s.id === S.A) { const o = (LABEL_AT[s.id] || [1, 0]).slice(); if (x > b.x + b.w - 70) o[0] = -1; font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = o[0] > 0 ? 'left' : 'right'; label(ctx, s.name, x + 12 * o[0], y + 3 + 11 * o[1]); } });
+    const A = star(S.A), pts = [[X(A.T), Y(luminosity(A.R, A.T)), 'A'], [X(S.TB), Y(luminosity(S.RB, S.TB)), 'B']];
+    pts.forEach(([x, y, n]) => { ctx.strokeStyle = C('--hot'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 9, 0, TAU); ctx.stroke(); font(ctx, 11, 600); ctx.fillStyle = C('--hot'); ctx.textAlign = 'right'; label(ctx, n, x - 11, y - 7); });
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'luminosity (Suns) against temperature' : 'luminosity, in Suns, against surface temperature (the H–R diagram); dashed: stars of one size', b.x + 2, b.y - 7);
+    ctx.save(); ctx.translate(12, b.y + b.h / 2); ctx.rotate(-Math.PI / 2); font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('luminosity (Suns)', 0, 0); ctx.restore();
+  }
+
+  function draw() {
+    const s = fit($('scene')), g = fit($('graph'));
+    s.ctx.clearRect(0, 0, s.W, s.H); g.ctx.clearRect(0, 0, g.W, g.H);
+    const okS = s.W >= 120 && s.H >= 80, okG = g.W >= 160 && g.H >= 90;
+    if (tab === 1) { if (okS) drawSpectrum(s.ctx, s.W, s.H, s.compact); if (okG) drawSkyColor(g.ctx, g.W, g.H, g.compact); }
+    else if (tab === 2) { if (okS) drawSkyFilter(s.ctx, s.W, s.H, s.compact); if (okG) drawMeasure(g.ctx, g.W, g.H, g.compact); }
+    else { if (okS) drawPair(s.ctx, s.W, s.H, s.compact); if (okG) drawHR(g.ctx, g.W, g.H, g.compact); }
+  }
+
+  // ================================================================
+  // 4. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const lp = peakWavelength(S.T), P = totalPower(S.T), vis = share(S.T, 380e-9, 750e-9), sun = totalPower(PC.Tsun);
+      html = card('Brightest at', lenStr(lp), 'in the ' + band(lp) + (lp > 750e-9 ? '' : ' part of the spectrum') + '; Wien’s law: 2.898 mm·K ÷ ' + kfmt(S.T));
+      html += card('Power from each square meter', si(P) + 'W', 'σT⁴; ' + (Math.abs(P / sun - 1) < 0.005 ? 'the same as' : times(P / sun) + ' times') + ' the Sun’s surface. Double the temperature: 16 times the power');
+      html += card('Share that is visible light', vis < 1e-4 ? (vis < 1e-12 ? 'none' : (100 * vis).toExponential(1) + '%') : (100 * vis).toFixed(vis < 0.1 ? 2 : 0) + '%', vis < 1e-12 ? 'all of it is infrared: we feel it as warmth but can’t see it' : 'between 380 and 750 nm; ' + (100 * share(S.T, 750e-9, 1) ).toFixed(0) + '% is infrared, ' + (100 * share(S.T, 1e-9, 380e-9)).toFixed(0) + '% ultraviolet');
+    } else if (tab === 2) {
+      const s = star(S.sel), fb = through('B', s.T), fv = through('V', s.T), bv = colorIndex(s.T), Tm = tempFromIndex(bv);
+      html = card('Through B, through V', 'B/V = ' + (fb / fv * Math.pow(10, -0.4 * ZP)).toFixed(2), 'the ratio of the light each filter lets through, measured against Vega’s; bluer stars give more');
+      html += card('Color index B − V', (bv >= 0 ? '+' : '−') + Math.abs(bv).toFixed(2), '−2.5 log₁₀ of that ratio: astronomers’ magnitudes. Positive is redder than Vega, negative bluer');
+      html += card('Temperature from its color', kfmt(Math.round(Tm / 10) * 10), 'read off the blackbody curve. ' + s.name + '’s measured surface temperature: about ' + kfmt(s.T));
+    } else {
+      const A = star(S.A), LA = luminosity(A.R, A.T), LB = luminosity(S.RB, S.TB), r = LB / LA, rr = (S.RB / A.R) ** 2, tt = (S.TB / A.T) ** 4;
+      html = card(A.name, Lstr(+LA.toPrecision(3)) + (A.id === 'sun' ? ' Sun' : ' Suns'), rStr(A.R) + ', ' + kfmt(A.T) + (A.id !== 'sun' ? '; published luminosity about ' + Lstr(A.L) : ''));
+      html += card('Star B', Lstr(+LB.toPrecision(3)) + (Math.abs(LB - 1) < 0.005 ? ' Sun' : ' Suns'), rStr(S.RB) + ', ' + kfmt(S.TB));
+      html += card('Star B compared with A', Math.abs(r - 1) < 0.005 ? 'just as bright' : (r > 1 ? times(r) + ' times brighter' : times(1 / r) + ' times fainter'), '= (radius ratio)² × (temperature ratio)⁴ = ' + fmtR(rr) + ' × ' + fmtR(tt) + '; the surface area times σT⁴');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+  const fmtR = v => { if (v >= 1000 || v < 0.01) { const e = Math.floor(Math.log10(v)); return (v / 10 ** e).toFixed(1) + ' × 10' + sup(e); } return +v.toPrecision(3) + ''; };
+  const times = v => v >= 10 ? Lstr(+v.toPrecision(3)) : fmtR(v);
+
+  const TEXT = {
+    1: { lede: 'Everything gives off light because it is warm: you, a stove coil, the Sun. Predict: as something gets hotter, does the color of its glow change, or only how bright it is?',
+         notes: '<p><b>What to try.</b> Start with a person: the curve peaks near 10 µm, far into the infrared, so switch to the 0–40 µm range to see all of it. Warm it up to a stove coil and lava and watch the peak slide toward the visible band as the curve grows enormously. Keep the Sun’s curve, then try Betelgeuse and Rigel: the hotter curve is higher at <i>every</i> wavelength, and its peak is bluer. Notice that the Sun peaks in the green but looks white: its curve is spread across all the colors.</p>' +
+                '<p><b>Why.</b> A blackbody absorbs all light that falls on it, and gives off light with a spectrum that depends only on its temperature (Planck’s law). The peak moves to shorter wavelengths in proportion to 1/T (Wien’s law), and the total power from each square meter grows as σT⁴ (the Stefan–Boltzmann law). Stars are close to blackbodies, so their colors tell their temperatures: the cool red giant Betelgeuse peaks in the near infrared, the hot Rigel in the ultraviolet.</p>' +
+                '<p><b>The model.</b> Planck’s law, with the 2019 SI constants. The power is per square meter of surface, per micrometer of wavelength, into all directions. The colors shown are what the eye would see, from the CIE’s color-matching curves, displayed at full brightness so only the hue changes; below about 800 K a body’s glow is too faint and too red to see. Temperatures: a person’s skin about 310 K (37 °C); a glowing stove coil about 1000 K; lava about 1400 K; a light bulb’s filament about 2800 K.</p>' },
+    2: { lede: 'Astronomers can’t take a star’s temperature with a thermometer. Predict: with just a camera and two colored filters, how could you tell which star is hottest?',
+         notes: '<p><b>What to try.</b> Look at the sky through the B filter, then the V filter. Betelgeuse and Aldebaran fade a lot through B, while Rigel and Vega barely change: blue light is a bigger share of a hot star’s light. Click each star and watch its point move along the curve. Compare Sirius and Vega: almost the same color, so almost the same temperature.</p>' +
+                '<p><b>Why.</b> A camera behind a filter measures how much light the star gives in one range of colors. The ratio of the brightnesses through the blue (B) and yellow-green (V) filters doesn’t depend on how far away the star is or how big, only on the shape of its spectrum, which for a blackbody depends only on temperature. Astronomers write the ratio on their logarithmic magnitude scale as the color index B − V, set to zero for Vega. Reading it off the blackbody curve gives the temperature; this is how the temperatures of millions of stars are found.</p>' +
+                '<p><b>The model.</b> Each star is a blackbody at its measured surface temperature, seen through bell-shaped approximations of the standard B and V filters (445 and 551 nm). Brightnesses through V are from the stars’ measured V magnitudes; their positions are not their real places in the sky. Real stars are not perfect blackbodies: dark absorption lines and the hydrogen in their atmospheres change their colors, so astronomers calibrate the color–temperature relation with stars of known temperature. The Sun’s measured B − V, for example, is 0.65, redder than the 0.44 of a 5772 K blackbody here.</p>' },
+    3: { lede: 'Betelgeuse is cooler than the Sun: its surface is about 3700 K, the Sun’s 5772 K. Predict: does Betelgeuse give off more light than the Sun, or less?',
+         notes: '<p><b>What to try.</b> With Betelgeuse as star A and the Sun as star B, compare: each square meter of Betelgeuse gives off a sixth of what the Sun’s does, but it has about 580 000 times the surface area. Then raise star B’s radius at a fixed temperature and watch it climb straight up the H–R diagram; raise its temperature at a fixed radius and watch it slide along a dashed line. Try Sirius B: hotter than any of the others, but tiny, so it is faint.</p>' +
+                '<p><b>Why.</b> A star’s total output, its luminosity, is its surface area 4πR² times the power from each square meter, σT⁴. So L = 4πR²σT⁴, or in terms of the Sun, L = (R/R☉)² (T/T☉)⁴. Turned around, this is how astronomers find the sizes of most stars: the color gives the temperature, the brightness and distance give the luminosity, and the radius follows. On the H–R diagram, stars of one size lie along a line; the big, cool giants sit at the top right, the small, hot white dwarfs at the bottom left.</p>' +
+                '<p><b>The model.</b> Stars as blackbody spheres. Temperatures, radii and luminosities from published measurements: the Sun (IAU 2015 values), Proxima Centauri, Sirius A and B, Arcturus, Betelgeuse (its radius from Joyce et al. 2020; it varies) and Rigel. The luminosities computed from radius and temperature agree with the published ones to within about 20%. The two stars in the picture are drawn to the same scale.</p>' }
+  };
+
+  // ================================================================
+  // 5. CONTROLS
+  // ================================================================
+  $('pre').innerHTML = PRESETS.map((p, i) => '<button data-i="' + i + '">' + p.name + '</button>').join('');
+  $('star').innerHTML = SKY.map(id => '<button data-v="' + id + '">' + star(id).name + '</button>').join('');
+  $('sa').innerHTML = SA.map(id => '<button data-v="' + id + '">' + star(id).name.replace('the Sun', 'Sun') + '</button>').join('');
+  function visibility() {
+    $('lab_t').hidden = tab !== 1; $('lab_pre').hidden = tab !== 1; $('lab_rng').hidden = tab !== 1;
+    $('lab_star').hidden = tab !== 2; $('lab_flt').hidden = tab !== 2;
+    $('lab_sa').hidden = tab !== 3; $('lab_tb').hidden = tab !== 3; $('lab_rb').hidden = tab !== 3;
+    $('keep').hidden = tab !== 1; $('unkeep').hidden = tab !== 1; $('unkeep').disabled = !S.kept;
+    $('hint').textContent = tab === 1 ? (S.kept ? 'kept: ' + kfmt(S.kept) : '') : tab === 2 ? 'click a star in the sky, or pick one below' : '';
+    document.querySelectorAll('#pre button').forEach(b => b.setAttribute('aria-pressed', String(PRESETS[+b.dataset.i].T === Math.round(S.T))));
+    document.querySelectorAll('#rng button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.range)));
+    document.querySelectorAll('#star button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.sel)));
+    document.querySelectorAll('#flt button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.flt)));
+    document.querySelectorAll('#sa button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.A)));
+    $('scene').classList.toggle('pick', tab === 2); $('graph').classList.toggle('two', tab === 2);
+    $('scene').setAttribute('aria-label', tab === 1 ? 'The spectrum of a blackbody' : tab === 2 ? 'Bright stars in the night sky, seen through a filter' : 'Two stars drawn to the same scale');
+    $('graph').setAttribute('aria-label', tab === 1 ? 'The color of the glow, among stars of known temperature' : tab === 2 ? 'The star’s spectrum through each filter, and color index against temperature' : 'Hertzsprung–Russell diagram');
+  }
+  function vals() {
+    $('t').value = String(MT.from(S.T)); $('t_v').textContent = kfmt(S.T) + ' (' + Math.round(S.T - 273.15).toLocaleString('en-US') + ' °C)';
+    $('tb').value = String(MTB.from(S.TB)); $('tb_v').textContent = kfmt(S.TB);
+    $('rb').value = String(MRB.from(S.RB)); $('rb_v').textContent = rStr(S.RB).replace(' × the Sun’s radius', ' R☉');
+  }
+  function upd() { visibility(); vals(); draw(); readout(); }
+  function setTab(k) {
+    tab = k; [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes; upd();
+  }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  // a round number for the slider's temperature, so presets and the slider agree
+  const roundT = T => T < 1000 ? Math.round(T / 5) * 5 : Math.round(T / 10) * 10;
+  $('t').addEventListener('input', () => { S.T = roundT(MT.to(+$('t').value)); upd(); });
+  document.querySelectorAll('#pre button').forEach(b => b.addEventListener('click', () => { const p = PRESETS[+b.dataset.i]; S.T = p.T;
+    // switch to a range that shows the peak
+    const lp = peakWavelength(p.T) * 1e6; if (lp > S.range * 0.8 || (S.range > 2 && lp < S.range / 8)) S.range = lp < 1.6 ? 2 : lp < 8 ? 10 : 40; upd(); }));
+  document.querySelectorAll('#rng button').forEach(b => b.addEventListener('click', () => { S.range = +b.dataset.v; upd(); }));
+  $('keep').addEventListener('click', () => { S.kept = S.T; upd(); });
+  $('unkeep').addEventListener('click', () => { S.kept = null; upd(); });
+  document.querySelectorAll('#star button').forEach(b => b.addEventListener('click', () => { S.sel = b.dataset.v; upd(); }));
+  document.querySelectorAll('#flt button').forEach(b => b.addEventListener('click', () => { S.flt = b.dataset.v; upd(); }));
+  document.querySelectorAll('#sa button').forEach(b => b.addEventListener('click', () => { S.A = b.dataset.v; upd(); }));
+  $('tb').addEventListener('input', () => { S.TB = Math.round(MTB.to(+$('tb').value) / 10) * 10; upd(); });
+  $('rb').addEventListener('input', () => { const r = MRB.to(+$('rb').value); S.RB = +r.toPrecision(r < 1 ? 2 : 3); upd(); });
+  // clicking a star in the sky
+  $('scene').addEventListener('click', e => { if (tab !== 2) return; const r = $('scene').getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, bd = 1e9; skyLayout(r.width, r.height).forEach(p => { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p.id; } });
+    if (best && bd < 60) { S.sel = best; upd(); } });
+  window.addEventListener('resize', draw);
+  setTab(1);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

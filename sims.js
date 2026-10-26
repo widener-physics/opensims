@@ -19,6 +19,17 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'blackbody',
+    title: 'Blackbody radiation and the colors of stars',
+    pageTitle: 'Blackbody radiation simulation: Planck, Wien, Stefan–Boltzmann and star colors',
+    topic: 'astronomy',
+    tags: ['blackbody radiation', 'Planck', "Wien's law", 'Stefan-Boltzmann law', 'star color', 'stellar temperature', 'color index', 'B-V', 'H-R diagram', 'luminosity'],
+    blurb: "Heat a body from skin temperature to a blue-white star and watch its glow slide across the spectrum and change color. Measure stars' temperatures through blue and yellow filters as astronomers do, then see how Betelgeuse, cooler than the Sun, outshines it by sheer size.",
+    level: 'intro',
+    added: '2026-10-23',
+    status: 'ready'
+  },
+  {
     slug: 'entropy',
     title: 'Entropy and microstates',
     pageTitle: 'Entropy simulation: microstates, S = k ln Ω, and why heat flows hot to cold',
