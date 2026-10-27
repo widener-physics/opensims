@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://opensims.wu-physics.net/</loc></url>
+  <url><loc>https://opensims.wu-physics.net/sims/fluid-pressure</loc></url>
   <url><loc>https://opensims.wu-physics.net/sims/blackbody</loc></url>
   <url><loc>https://opensims.wu-physics.net/sims/entropy</loc></url>
   <url><loc>https://opensims.wu-physics.net/sims/fourier</loc></url>

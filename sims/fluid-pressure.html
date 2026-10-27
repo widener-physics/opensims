@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<!--
+  Pressure in fluids - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The forces on the liquid in each
+  vessel balance its weight, with the walls' push found by adding up the pressure over them; air pressure matches
+  the U.S. Standard Atmosphere; the buoyant force from the pressure on a cube's faces matches Archimedes'
+  principle, and a released cube floats with the density ratio under the surface.
+  Credit: none; hydrostatics is standard textbook physics.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluid pressure simulation: hydrostatic paradox, straws and barometers, buoyancy | Open Physics Sims</title>
+<meta name="description" content="Fill four very differently shaped vessels to the same depth and find the same pressure at every bottom. Suck on a 14 m straw and see why the air can push water no higher than 10 m, then watch the pressure on a block's faces add up to the buoyant force that floats it.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --curve: #1D4F73; --arrow: #C8321E; --air: #2E7D32; --glass: #8FA3B0; --sky: #E7F0F6; --ground: #D9D2C3;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 400; touch-action: pan-y; }
+  #scene.grab { touch-action: none; cursor: grab; }
+  #graph { aspect-ratio: 900 / 200; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 10px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.95; }
+    #graph { aspect-ratio: 1 / 0.62; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+<!-- site tags: written by tools/page-meta.js from sims.js (npm run meta); edits here are replaced -->
+<link rel="canonical" href="https://opensims.wu-physics.net/sims/fluid-pressure">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Open Physics Sims">
+<meta property="og:title" content="Fluid pressure simulation: hydrostatic paradox, straws and barometers, buoyancy">
+<meta property="og:description" content="Fill four very differently shaped vessels to the same depth and find the same pressure at every bottom. Suck on a 14 m straw and see why the air can push water no higher than 10 m, then watch the pressure on a block's faces add up to the buoyant force that floats it.">
+<meta property="og:url" content="https://opensims.wu-physics.net/sims/fluid-pressure">
+<meta property="og:image" content="https://opensims.wu-physics.net/share.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Open Physics Sims: free interactive physics simulations for teaching">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-RIyzwHpiR6eo6nzLty9EI.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+<!-- /site tags -->
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Pressure in fluids</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Shape doesn’t matter</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>The weight of the air</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Why things float</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="Four vessels filled to the same depth"></canvas>
+  <div class="row2" id="row2">
+    <button id="go">Let go</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Pressure against depth"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_liq"><div>Liquid</div><div class="seg" id="liq" role="group" aria-label="Liquid"></div></div>
+    <label id="lab_h"><div class="row"><span>Depth of the liquid</span><span class="val" id="h_v"></span></div><input type="range" id="h" min="0" max="40" step="1"></label>
+    <label id="lab_pin"><div class="row"><span>Pressure inside the straw</span><span class="val" id="pin_v"></span></div><input type="range" id="pin" min="0" max="100" step="1"></label>
+    <div class="grp" id="lab_where"><div>Where</div><div class="seg" id="where" role="group" aria-label="Where"><button data-v="0">sea level</button><button data-v="1609">Denver, 1609 m</button><button data-v="8849">top of Everest, 8849 m</button></div></div>
+    <div class="grp" id="lab_mat"><div>Block made of</div><div class="seg" id="mat" role="group" aria-label="Block made of"></div></div>
+    <label id="lab_d"><div class="row"><span>Depth of the block’s top</span><span class="val" id="d_v"></span></div><input type="range" id="d" min="-12" max="40" step="0.5"></label>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/fluid-pressure.test.js)
+  // ================================================================
+  // ---- physics core: pressure in fluids ----
+  // SI units. Pressures are "gauge" (above the air's) unless they say otherwise.
+  const G = 9.80665;                       // m/s^2, standard gravity
+  const P_ATM = 101325;                    // Pa, standard sea-level air pressure
+  // densities at 20 C, kg/m^3
+  const LIQUIDS = [
+    { id: 'water', name: 'water', rho: 998.2, color: '#5B9BD5' },
+    { id: 'sea', name: 'seawater', rho: 1025, color: '#3F7FAF' },
+    { id: 'ethanol', name: 'alcohol', rho: 789.3, color: '#C9DDF0' },
+    { id: 'glycerin', name: 'glycerin', rho: 1261, color: '#D8C27A' },
+    { id: 'mercury', name: 'mercury', rho: 13546, color: '#A9B0B7' }
+  ];
+  const MATERIALS = [
+    { id: 'cork', name: 'cork', rho: 240 }, { id: 'pine', name: 'pine', rho: 500 }, { id: 'ice', name: 'ice', rho: 917 },
+    { id: 'aluminum', name: 'aluminum', rho: 2700 }, { id: 'steel', name: 'steel', rho: 7850 }, { id: 'gold', name: 'gold', rho: 19300 }
+  ];
+  // pressure at depth d below a liquid's surface: rho g d (the air's pressure adds the same amount everywhere)
+  const pressure = (rho, d) => d > 0 ? rho * G * d : 0;
+
+  // ---- vessels of different shapes, all with the same base: radius r (m) at height y above the bottom ----
+  const R0 = 0.06, HMAX = 0.4;
+  const VESSELS = [
+    { id: 'straight', name: 'straight', r: y => R0 },
+    { id: 'widening', name: 'widening', r: y => R0 + 0.3 * y },
+    { id: 'narrowing', name: 'narrowing', r: y => R0 * (1 - 0.75 * y / HMAX) },
+    { id: 'neck', name: 'thin neck', r: y => y < 0.12 ? R0 : 0.012 }
+  ];
+  // liquid filled to height h: its volume and weight, and the forces on the bottom and from the walls
+  function vesselForces(v, h, rho) {
+    const n = 4000, dy = h / n; let V = 0, Fw = 0;
+    for (let i = 0; i < n; i++) {
+      const y0 = i * dy, y1 = y0 + dy, ym = y0 + dy / 2, r = v.r(ym);
+      V += Math.PI * r * r * dy;
+      // the vertical push of the wall on the liquid in this slice: pressure times the change in the area it covers
+      // (a wall leaning in pushes down; leaning out holds up)
+      Fw += pressure(rho, h - ym) * Math.PI * (v.r(y1) * v.r(y1) - v.r(y0) * v.r(y0));
+    }
+    const A = Math.PI * v.r(0) * v.r(0), Fb = pressure(rho, h) * A;
+    return { volume: V, weight: rho * G * V, bottomForce: Fb, wallsUp: Fw, base: A };
+  }
+
+  // ---- the air ----
+  // air pressure at altitude z (m), from the International Standard Atmosphere (troposphere, up to 11 km)
+  const airPressure = z => P_ATM * Math.pow(1 - 2.25577e-5 * z, 5.25588);
+  // a liquid drawn up a tube by lowering the pressure inside it: the height it rises
+  const riseHeight = (pOutside, pInside, rho) => Math.max(0, pOutside - pInside) / (rho * G);
+
+  // ---- a cube of side a in a liquid, its top face at depth d (negative: above the surface) ----
+  function cubeForces(a, d, rhoL, rhoB) {
+    const top = pressure(rhoL, d) * a * a, bottom = pressure(rhoL, d + a) * a * a;
+    const sub = Math.min(a, Math.max(0, d + a));             // how much of its height is under the surface
+    return { top, bottom, buoyancy: bottom - top, submerged: sub / a, displaced: rhoL * G * a * a * sub, weight: rhoB * G * a * a * a };
+  }
+  // let go: the cube moves under its weight, the buoyant force and the liquid's drag (and wave-making at the surface), until it floats or rests on the
+  // bottom at depth `floor`. Drag: 1/2 rho Cd A v^2, Cd = 1.05 for a cube. One step of dt seconds; state { d, v } (v down)
+  function cubeStep(st, dt, a, rhoL, rhoB, floor) {
+    const f = cubeForces(a, st.d, rhoL, rhoB), m = rhoB * a * a * a, sub = f.submerged;
+    let drag = 0.5 * rhoL * 1.05 * a * a * st.v * Math.abs(st.v) * Math.max(sub, 0.05);
+    // bobbing at the surface also makes waves, which carry energy away: a gentle damping while it is partly under
+    if (sub > 0 && sub < 1) drag += 2 * 0.25 * Math.sqrt(rhoL * G * a * a * m) * st.v;
+    let acc = (f.weight - f.buoyancy - drag) / m;
+    let v = st.v + acc * dt, d = st.d + v * dt;
+    if (d + a > floor) { d = floor - a; v = 0; }
+    return { d, v };
+  }
+  // where a floating cube settles: the fraction under the surface is the density ratio
+  const floatFraction = (rhoB, rhoL) => Math.min(1, rhoB / rhoL);
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. SETTINGS AND STATE
+  // ================================================================
+  const liquid = id => LIQUIDS.find(l => l.id === id), material = id => MATERIALS.find(m => m.id === id);
+  const TUBE = 14, TANK = { w: 0.8, h: 0.5 }, CUBE = 0.1;
+  const S = { liq: { 1: 'water', 2: 'water', 3: 'water' }, h: 0, pin: 100, z: 0, mat: 'pine', d: 0.2 };
+  let tab = 1, free = false, vel = 0;
+
+  // ================================================================
+  // 3. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  const kPa = (p, d) => (p / 1000).toFixed(d === undefined ? (p < 10000 ? 2 : 1) : d) + ' kPa';
+  const N = f => (f < 10 ? f.toFixed(2) : f < 100 ? f.toFixed(1) : f.toFixed(0)) + ' N';
+  const tint = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; };
+  // an arrow from (x, y) in direction (ux, uy), of length L, ending at the point it pushes on
+  function arrow(ctx, x, y, ux, uy, L, col, w) {
+    if (L < 2) return; const x0 = x - ux * L, y0 = y - uy * L, hl = Math.min(7, L * 0.5);
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w || 1.6; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x - ux * hl * 0.8, y - uy * hl * 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - ux * hl - uy * hl * 0.5, y - uy * hl + ux * hl * 0.5); ctx.lineTo(x - ux * hl + uy * hl * 0.5, y - uy * hl - ux * hl * 0.5); ctx.closePath(); ctx.fill();
+  }
+  const scaleNote = (ctx, x, y, px, txt) => { ctx.strokeStyle = C('--arrow'); ctx.fillStyle = C('--arrow'); arrow(ctx, x + px, y, 1, 0, px, C('--arrow'), 1.6); font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(txt, x + px + 6, y + 3); };
+
+  // ---- tab 1: four vessels ----
+  function drawVessels(ctx, W, H, compact) {
+    const L = liquid(S.liq[1]), rows = compact ? 2 : 1, cols = compact ? 2 : 4, top = 30, bot = compact ? 18 : 26;
+    const cw = (W - 20) / cols, ch = (H - top - bot) / rows, rmax = R0 + 0.3 * HMAX, s = Math.min((cw - 24) / (2 * rmax), (ch - 30) / (HMAX + 0.03));
+    const kA = 44 / (L.rho * G * HMAX);       // arrow length per pascal: 44 px for the deepest this liquid can be
+    VESSELS.forEach((v, i) => {
+      const cx = 10 + (i % cols + 0.5) * cw, by = top + (Math.floor(i / cols) + 1) * ch - 18, X = r => cx + r * s, Yy = y => by - y * s;
+      // the liquid
+      ctx.fillStyle = tint(L.color, 0.55); ctx.beginPath(); const n = 60;
+      for (let k = 0; k <= n; k++) { const y = S.h * k / n; ctx.lineTo(X(-v.r(y)), Yy(y)); } for (let k = n; k >= 0; k--) { const y = S.h * k / n; ctx.lineTo(X(v.r(y)), Yy(y)); } ctx.closePath(); ctx.fill();
+      // the walls
+      ctx.strokeStyle = C('--glass'); ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.beginPath();
+      for (let k = 0; k <= 120; k++) { const y = HMAX * (1 - k / 120); ctx.lineTo(X(-v.r(y)), Yy(y)); } for (let k = 0; k <= 120; k++) { const y = HMAX * k / 120; ctx.lineTo(X(v.r(y)), Yy(y)); } ctx.stroke();
+      // the pressure: arrows pushing out on the walls (at right angles to them) and down on the bottom
+      for (let k = 1; k <= 5; k++) { const y = S.h * (k - 0.5) / 5, p = pressure(L.rho, S.h - y), dr = (v.r(y + 1e-3) - v.r(y - 1e-3)) / 2e-3, nl = Math.hypot(1, dr);
+        [1, -1].forEach(sd => arrow(ctx, X(sd * v.r(y)), Yy(y), sd / nl, dr / nl, kA * p, C('--arrow'))); }
+      // the thin neck's shoulder: the liquid pushes up on it
+      if (v.id === 'neck' && S.h > 0.12) { const p = pressure(L.rho, S.h - 0.12); [-1, 1].forEach(sd => arrow(ctx, X(sd * (R0 + 0.012) / 2), Yy(0.12), 0, -1, kA * p, C('--arrow'))); }
+      const pb = pressure(L.rho, S.h); [-0.6, 0, 0.6].forEach(f => arrow(ctx, X(f * R0), Yy(0), 0, 1, kA * pb, C('--arrow')));
+      font(ctx, 12, 600); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, v.name, cx, by + 16);
+    });
+    // the common depth
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'all filled ' + Math.round(S.h * 100) + ' cm deep' : 'all four filled with ' + L.name + ' to the same depth, ' + Math.round(S.h * 100) + ' cm; all have the same base', 10, 18);
+    if (!compact) scaleNote(ctx, W - 170, 14, kA * 1000 * (L.rho > 5000 ? 10 : 1), (L.rho > 5000 ? '10 kPa' : '1 kPa') + ' (above the air’s)');
+  }
+  // pressure against depth: every liquid faint, the chosen one bold
+  function drawDepthGraph(ctx, W, H, compact) {
+    const L = liquid(S.liq[1]), b = { x: compact ? 44 : 54, y: 24, w: 0, h: H - 24 - 34 }; b.w = W - b.x - 14;
+    const pmax = L.rho > 5000 ? 60000 : 6000, X = d => b.x + d / HMAX * b.w, Y = p => b.y + b.h - p / pmax * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    for (let p = 0; p <= pmax + 1; p += pmax / 3) { ctx.strokeStyle = C('--soft'); if (p) { ctx.beginPath(); ctx.moveTo(b.x, Y(p)); ctx.lineTo(b.x + b.w, Y(p)); ctx.stroke(); } ctx.fillText((p / 1000).toFixed(0), b.x - 5, Y(p) + 3); }
+    ctx.textAlign = 'center'; for (let d = 0; d <= HMAX + 1e-9; d += 0.1) ctx.fillText(Math.round(d * 100) + '', X(d), b.y + b.h + 13);
+    ctx.textAlign = 'right'; ctx.fillText('depth (cm)', b.x + b.w, b.y + b.h + 26);
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+    LIQUIDS.forEach(l => { ctx.strokeStyle = l.id === L.id ? C('--curve') : 'rgba(92,107,115,0.35)'; ctx.lineWidth = l.id === L.id ? 2.4 : 1.2; ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(HMAX), Y(pressure(l.rho, HMAX))); ctx.stroke(); });
+    ctx.restore();
+    if (!compact) LIQUIDS.forEach(l => { if (l.id === L.id) return; const pe = pressure(l.rho, HMAX); font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      if (pe < pmax) label(ctx, l.name, X(HMAX) - 4, Y(pe) - 4); });
+    const pb = pressure(L.rho, S.h); ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.arc(X(S.h), Y(pb), 5, 0, TAU); ctx.fill();
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(compact ? 'pressure (kPa above the air’s)' : 'pressure (kPa above the air’s) against depth, in ' + L.name + ' and, faint, the others; the shape never enters', b.x + 2, b.y - 7);
+  }
+
+  // ---- tab 2: a very long straw ----
+  function drawStraw(ctx, W, H, compact) {
+    const L = liquid(S.liq[2]), pout = airPressure(S.z), pin = pout * S.pin / 100, rise = Math.min(TUBE, riseHeight(pout, pin, L.rho)), hmax = riseHeight(pout, 0, L.rho);
+    const g0 = H - 24, s = (g0 - 18 - 56) / TUBE, Yy = z => g0 - 18 - z * s;      // the glass's liquid surface is 18 px above the ground
+    // sky and ground
+    ctx.fillStyle = C('--sky'); ctx.fillRect(0, 0, W, g0); ctx.fillStyle = C('--ground'); ctx.fillRect(0, g0, W, H - g0);
+    const tx = W * (compact ? 0.5 : 0.42), tw = 12, gw = 90;
+    // a ruler: meters up from the glass's surface
+    font(ctx, 10); ctx.textAlign = 'right'; ctx.fillStyle = C('--muted');
+    const rx = tx - gw / 2 - 10; for (let z = 0; z <= TUBE; z += 2) { const y = Yy(z); ctx.strokeStyle = 'rgba(92,107,115,0.45)'; ctx.beginPath(); ctx.moveTo(rx, y); ctx.lineTo(rx + 8, y); ctx.stroke(); ctx.fillText(z + ' m', rx - 4, y + 3); }
+    // the highest the liquid could go: a perfect vacuum in the straw
+    if (hmax < TUBE) { const y = Yy(hmax); ctx.strokeStyle = C('--hot'); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(rx, y); ctx.lineTo(tx + 90, y); ctx.stroke(); ctx.setLineDash([]);
+      font(ctx, 11); ctx.fillStyle = C('--hot'); ctx.textAlign = 'left'; label(ctx, (compact ? 'limit ' : 'the most it can rise: ') + hmax.toFixed(2) + ' m', tx + 14, y - 5); }
+    // the glass, with its liquid
+    ctx.fillStyle = tint(L.color, 0.6); ctx.fillRect(tx - gw / 2, Yy(0), gw, g0 - Yy(0)); ctx.strokeStyle = C('--glass'); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(tx - gw / 2, Yy(0) - 14); ctx.lineTo(tx - gw / 2, g0); ctx.lineTo(tx + gw / 2, g0); ctx.lineTo(tx + gw / 2, Yy(0) - 14); ctx.stroke();
+    // the straw, and the liquid in it
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(tx - tw / 2, Yy(TUBE), tw, g0 - 6 - Yy(TUBE));
+    ctx.fillStyle = tint(L.color, 0.85); ctx.fillRect(tx - tw / 2, Yy(rise), tw, g0 - 6 - Yy(rise));
+    ctx.strokeStyle = C('--glass'); ctx.lineWidth = 1.6; ctx.strokeRect(tx - tw / 2, Yy(TUBE), tw, g0 - 6 - Yy(TUBE));
+    // at the top: a pump (or your mouth)
+    ctx.fillStyle = C('--ink'); ctx.fillRect(tx - 14, Yy(TUBE) - 12, 28, 12); font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); label(ctx, S.pin < 100 ? 'pump: ' + kPa(pin, 0) + ' inside' : 'open: ' + kPa(pin, 0) + ' inside', tx + 20, Yy(TUBE) - 2);
+    // the air pushing down: on the open surface, and inside the straw on the column
+    const kA = 34 / P_ATM;
+    [-0.38, -0.22, 0.22, 0.38].forEach(f => arrow(ctx, tx + f * gw, Yy(0) - 1, 0, 1, kA * pout, C('--air'), 2));
+    if (pin > 50) arrow(ctx, tx, Yy(rise) - 1, 0, 1, Math.min(kA * pin, Math.max(0, (Yy(rise) - Yy(TUBE)) - 4)), C('--air'), 2);
+    // a person, for scale (to scale)
+    const px = compact ? W * 0.82 : W * 0.72, ph = 1.75 * s; ctx.fillStyle = 'rgba(23,33,40,0.75)'; ctx.beginPath(); ctx.arc(px, g0 - ph + ph * 0.07, ph * 0.07, 0, TAU); ctx.fill(); ctx.fillRect(px - ph * 0.08, g0 - ph * 0.86, ph * 0.16, ph * 0.45); ctx.fillRect(px - ph * 0.07, g0 - ph * 0.42, ph * 0.05, ph * 0.42); ctx.fillRect(px + ph * 0.02, g0 - ph * 0.42, ph * 0.05, ph * 0.42);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('a person', px, g0 + 14);
+    font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = C('--muted');
+    label(ctx, compact ? 'a ' + TUBE + ' m straw; heights to scale' : 'a ' + TUBE + ' m straw in a glass of ' + L.name + '; heights to scale, widths not. Green arrows: the air pushing down', 10, 16);
+  }
+  function drawAltitude(ctx, W, H, compact) {
+    const b = { x: compact ? 40 : 50, y: 24, w: 0, h: H - 24 - 34 }; b.w = W - b.x - 14;
+    const zmax = 11000, X = z => b.x + z / zmax * b.w, Y = p => b.y + b.h - p / P_ATM * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; [0, 25, 50, 75, 100].forEach(p => { ctx.strokeStyle = C('--soft'); ctx.beginPath(); ctx.moveTo(b.x, Y(p * 1000)); ctx.lineTo(b.x + b.w, Y(p * 1000)); ctx.stroke(); ctx.fillText(p + '', b.x - 4, Y(p * 1000) + 3); });
+    ctx.textAlign = 'center'; for (let z = 0; z <= zmax; z += 2000) ctx.fillText(z / 1000 + '', X(z), b.y + b.h + 13); ctx.textAlign = 'right'; ctx.fillText('height above sea level (km)', b.x + b.w, b.y + b.h + 26);
+    ctx.strokeStyle = C('--curve'); ctx.lineWidth = 2.2; ctx.beginPath(); for (let i = 0; i <= 200; i++) { const z = zmax * i / 200; i ? ctx.lineTo(X(z), Y(airPressure(z))) : ctx.moveTo(X(z), Y(airPressure(z))); } ctx.stroke();
+    [[0, 'sea level'], [1609, 'Denver'], [8849, 'Everest']].forEach(([z, n]) => { const on = z === S.z; if (compact && !on && z === 1609) { ctx.fillStyle = C('--muted'); ctx.beginPath(); ctx.arc(X(z), Y(airPressure(z)), 3.5, 0, TAU); ctx.fill(); return; } ctx.fillStyle = on ? C('--hot') : C('--muted'); ctx.beginPath(); ctx.arc(X(z), Y(airPressure(z)), on ? 5 : 3.5, 0, TAU); ctx.fill();
+      font(ctx, 10); ctx.textAlign = z > 8000 ? 'right' : 'left'; label(ctx, n + ' ' + kPa(airPressure(z), 0), X(z) + (z > 8000 ? -8 : 8), Y(airPressure(z)) + (z === 0 ? 14 : -6)); });
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'air pressure (kPa) with height' : 'air pressure (kPa) against height: the weight of the air above, which thins out as you climb', b.x + 2, b.y - 7);
+  }
+
+  // ---- tab 3: a block in a tank ----
+  function tankGeom(W, H) { const top = 40, s = Math.min((W - 40) / TANK.w, (H - top - 24) / (TANK.h + 0.14)), x0 = (W - TANK.w * s) / 2, ys = top + 0.12 * s; return { s, x0, ys, X: x => x0 + x * s, Y: d => ys + d * s }; }
+  function drawTank(ctx, W, H, compact) {
+    const L = liquid(S.liq[3]), M = material(S.mat), g = tankGeom(W, H), f = cubeForces(CUBE, S.d, L.rho, M.rho);
+    ctx.fillStyle = tint(L.color, 0.5); ctx.fillRect(g.X(0), g.Y(0), TANK.w * g.s, TANK.h * g.s);
+    ctx.strokeStyle = C('--glass'); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(g.X(0), g.Y(-0.1)); ctx.lineTo(g.X(0), g.Y(TANK.h)); ctx.lineTo(g.X(TANK.w), g.Y(TANK.h)); ctx.lineTo(g.X(TANK.w), g.Y(-0.1)); ctx.stroke();
+    // the block
+    const bx = g.X(TANK.w / 2 - CUBE / 2), by = g.Y(S.d), bs = CUBE * g.s, col = { cork: '#C9A272', pine: '#E3C58F', ice: '#E6F2F8', aluminum: '#C5CBD0', steel: '#7D868C', gold: '#D9B23A' }[M.id];
+    ctx.fillStyle = col; ctx.fillRect(bx, by, bs, bs); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2; ctx.strokeRect(bx, by, bs, bs);
+    // the liquid's pressure on the faces: down on the top, up on the bottom, in on the sides
+    const kA = 36 / (L.rho * G * TANK.h);
+    [0.25, 0.5, 0.75].forEach(t => { const x = bx + t * bs;
+      arrow(ctx, x, by, 0, 1, kA * pressure(L.rho, S.d), C('--arrow')); arrow(ctx, x, by + bs, 0, -1, kA * pressure(L.rho, S.d + CUBE), C('--arrow')); });
+    [0.2, 0.5, 0.8].forEach(t => { const d = S.d + t * CUBE, y = by + t * bs, p = pressure(L.rho, d); arrow(ctx, bx, y, 1, 0, kA * p, C('--arrow')); arrow(ctx, bx + bs, y, -1, 0, kA * p, C('--arrow')); });
+    // the total forces on the block: its weight, and the buoyant force
+    const kF = 70 / Math.max(f.weight, L.rho * G * CUBE ** 3), cx = bx + bs / 2, cy = by + bs / 2;
+    arrow(ctx, cx - 9, cy + kF * f.weight, 0, 1, kF * f.weight, C('--ink'), 3); if (f.buoyancy > 0) arrow(ctx, cx + 9, cy - kF * f.buoyancy, 0, -1, kF * f.buoyancy, C('--body'), 3);
+    font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); label(ctx, 'weight ' + N(f.weight), bx + bs + 12, Math.min(g.Y(TANK.h) - 6, cy + kF * f.weight));
+    if (f.buoyancy > 0) { ctx.fillStyle = C('--body'); label(ctx, 'buoyant force ' + N(f.buoyancy), bx + bs + 12, Math.max(14, cy - kF * f.buoyancy + 4)); }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'a 10 cm block of ' + M.name : 'a 10 cm block of ' + M.name + ' in ' + L.name + '; red: the liquid’s push on each face', 10, 16);
+    if (!compact) scaleNote(ctx, W - 160, 16, kA * 1000 * (L.rho > 5000 ? 10 : 1), (L.rho > 5000 ? '10 kPa' : '1 kPa') + ' (above the air’s)');
+  }
+  // buoyant force against the depth of the block's top; its weight across
+  function drawBuoyGraph(ctx, W, H, compact) {
+    const L = liquid(S.liq[3]), M = material(S.mat), b = { x: compact ? 44 : 54, y: 24, w: 0, h: H - 24 - 34 }; b.w = W - b.x - 14;
+    const d0 = -0.12, d1 = TANK.h - CUBE, wt = M.rho * G * CUBE ** 3, full = L.rho * G * CUBE ** 3, fmax = Math.max(wt, full) * 1.2, X = d => b.x + (d - d0) / (d1 - d0) * b.w, Y = f => b.y + b.h - f / fmax * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; const st = fmax > 200 ? 50 : fmax > 60 ? 20 : fmax > 20 ? 5 : 2;
+    for (let f = 0; f <= fmax; f += st) { ctx.strokeStyle = C('--soft'); if (f) { ctx.beginPath(); ctx.moveTo(b.x, Y(f)); ctx.lineTo(b.x + b.w, Y(f)); ctx.stroke(); } ctx.fillText(f + '', b.x - 4, Y(f) + 3); }
+    ctx.textAlign = 'center'; for (let d = -0.1; d <= d1 + 1e-9; d += 0.1) ctx.fillText(Math.round(d * 100) + '', X(d), b.y + b.h + 13); ctx.textAlign = 'right'; ctx.fillText('depth of the block’s top (cm)', b.x + b.w, b.y + b.h + 26);
+    ctx.strokeStyle = 'rgba(92,107,115,0.6)'; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(0), b.y); ctx.lineTo(X(0), b.y + b.h); ctx.moveTo(X(-CUBE), b.y); ctx.lineTo(X(-CUBE), b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.6; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(b.x, Y(wt)); ctx.lineTo(b.x + b.w, Y(wt)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = C('--body'); ctx.lineWidth = 2.4; ctx.beginPath(); for (let i = 0; i <= 200; i++) { const d = d0 + (d1 - d0) * i / 200, f = cubeForces(CUBE, d, L.rho, M.rho).buoyancy; i ? ctx.lineTo(X(d), Y(f)) : ctx.moveTo(X(d), Y(f)); } ctx.stroke();
+    const f = cubeForces(CUBE, S.d, L.rho, M.rho); ctx.fillStyle = C('--hot'); ctx.beginPath(); ctx.arc(X(S.d), Y(f.buoyancy), 5, 0, TAU); ctx.fill();
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; if (!compact) { label(ctx, 'touching the surface', X(-CUBE) + 3, b.y + 12); label(ctx, 'just under', X(0) + 3, b.y + 24); }
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'buoyant force (N); dashed: weight' : 'buoyant force (N) against depth; dashed: the block’s weight', b.x + 2, b.y - 7);
+  }
+
+  function draw() {
+    const s = fit($('scene')), g = fit($('graph'));
+    s.ctx.clearRect(0, 0, s.W, s.H); g.ctx.clearRect(0, 0, g.W, g.H);
+    const okS = s.W >= 120 && s.H >= 80, okG = g.W >= 160 && g.H >= 90;
+    if (tab === 1) { if (okS) drawVessels(s.ctx, s.W, s.H, s.compact); if (okG) drawDepthGraph(g.ctx, g.W, g.H, g.compact); }
+    else if (tab === 2) { if (okS) drawStraw(s.ctx, s.W, s.H, s.compact); if (okG) drawAltitude(g.ctx, g.W, g.H, g.compact); }
+    else { if (okS) drawTank(s.ctx, s.W, s.H, s.compact); if (okG) drawBuoyGraph(g.ctx, g.W, g.H, g.compact); }
+  }
+
+  // ================================================================
+  // 4. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab === 1) {
+      const L = liquid(S.liq[1]), fs = VESSELS.map(v => vesselForces(v, S.h, L.rho));
+      html = card('Pressure at the bottom', kPa(pressure(L.rho, S.h)), 'the same in all four: ρgh, above the air’s ' + kPa(P_ATM, 0) + '. Only the depth counts, not the shape');
+      html += card('Weight of the ' + L.name, fs.map((f, i) => N(f.weight)).join(', '), VESSELS.map(v => v.name).join(', ') + ': very different');
+      html += card('Push on each bottom', N(fs[0].bottomForce) + ' in every one', 'pressure × area. The difference from the weight is held up by walls that lean out, or pushed down by walls that lean in');
+    } else if (tab === 2) {
+      const L = liquid(S.liq[2]), pout = airPressure(S.z), pin = pout * S.pin / 100, r = riseHeight(pout, pin, L.rho), hmax = riseHeight(pout, 0, L.rho);
+      html = card('Air pressure here', kPa(pout, 1), S.z === 0 ? 'the weight of the whole atmosphere above each square meter: about 10 tonnes' : 'less air above you, so less weight pressing down');
+      html += card('Pressure inside the straw', kPa(pin, 1), S.pin === 100 ? 'the same as outside: nothing pushes the liquid up' : kPa(pout - pin, 1) + ' less than outside, so the air outside pushes the liquid up');
+      html += card('The ' + L.name + ' rises', (r > TUBE ? '> ' + TUBE : r.toFixed(r < 1 ? 3 : 2)) + ' m', 'until its weight balances the difference: h = Δp/ρg. The most possible, with nothing in the straw at all: ' + hmax.toFixed(2) + ' m');
+    } else {
+      const L = liquid(S.liq[3]), M = material(S.mat), f = cubeForces(CUBE, S.d, L.rho, M.rho);
+      html = card('Push from below', N(f.bottom), f.bottom > 0 ? kPa(pressure(L.rho, S.d + CUBE)) + ' on the bottom face, ' + Math.round((S.d + CUBE) * 100) + ' cm down' : 'out of the liquid: no push');
+      html += card('Push from above', N(f.top), f.top > 0 ? kPa(pressure(L.rho, S.d)) + ' on the top face, ' + Math.round(S.d * 100) + ' cm down' : 'the top is above the surface: no push from the liquid');
+      const settled = free && Math.abs(vel) < 0.002, onFloor = S.d + CUBE >= TANK.h - 1e-6;
+      html += card('Buoyant force: the difference', N(f.buoyancy), '= the weight of the ' + L.name + ' the block pushes aside. The block weighs ' + N(f.weight) + (settled ? (onFloor ? ': it has sunk to the bottom' : ': it floats, ' + Math.round(100 * f.submerged) + '% under the surface') : ''));
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'Four vessels of very different shapes stand on the same size base, filled with water to the same depth. Predict: which has the greatest pressure at the bottom?',
+         notes: '<p><b>What to try.</b> Change the depth and watch the arrows grow together in all four vessels: at the same depth, the pressure is the same everywhere, whatever is above. Compare the weights: the widening vessel holds several times the water of the thin neck, yet both bottoms feel the same push. Look at which way the arrows on the walls point, then try mercury: the same picture, about 14 times stronger.</p>' +
+                '<p><b>Why.</b> Pressure at a depth is set by the weight of the liquid directly above each square meter, ρgh, and it pushes equally in every direction. So it depends only on depth, and the bottom of each vessel feels the same pressure. Where the walls lean out, the liquid pushes on them partly downward, and they hold up the extra liquid; where they lean in, the walls push down on the liquid, adding to what the bottom feels. This “hydrostatic paradox” is why a tall, thin pipe of water can split a barrel, and why a dam is built as thick at the bottom whatever the size of the lake behind it.</p>' +
+                '<p><b>The model.</b> Liquids at rest, at 20 °C, that don’t compress. The vessels are round, all with a base 12 cm across. Pressures are shown above the air’s, which presses equally on the liquid’s surface and the outside of the vessel, so it cancels. The arrows push at right angles to each surface, longer for more pressure; their scale is shown at the top right.</p>' },
+    2: { lede: 'When you drink through a straw, do you pull the drink up, or does something push it? Predict: with a strong enough pump, how long a straw could you drink through?',
+         notes: '<p><b>What to try.</b> Lower the pressure inside the straw a little: the water rises about 10 cm for every kPa. Take all the air out and the water stops at about 10.3 m, however hard you pump. Switch to mercury: it rises only 76 cm, which is how Torricelli made the first barometer in 1643. Then go to Denver and to the top of Everest, and watch the most possible height fall.</p>' +
+                '<p><b>Why.</b> You can’t pull on a liquid. Lowering the pressure inside the straw lets the air outside, pressing down on the drink with the weight of the whole atmosphere above it, push the liquid up the straw. It rises until the weight of the column balances the difference in pressure. Even a perfect vacuum can only lower the inside to zero, so the air can push water up no more than about 10 m at sea level: deep wells need pumps at the bottom that push, not pumps at the top that suck. Higher up, there is less air above you, so less push.</p>' +
+                '<p><b>The model.</b> Air pressure from the U.S. Standard Atmosphere (1976), which averages over weather; the measured pressure at the top of Everest is a little higher than its 31 kPa. The liquids at 20 °C; mercury’s 76 cm is the height of 101.3 kPa of mercury at 0 °C, and is 0.4% higher at 20 °C. The liquid’s own vapor and the straw’s thinness are ignored. Heights are to scale; the glass and the straw are drawn wider than they would be.</p>' },
+    3: { lede: 'A block is held under water. Predict: does the water push on it at all, and if so, which way, and does the push change as you hold it deeper?',
+         notes: '<p><b>What to try.</b> Drag the block down from above the surface and watch the arrows: the push from below grows faster than the push from above until the block is just under, and then both grow together, so their difference, the buoyant force, stays the same at any depth. Let go and see where pine, ice and cork float. Then put steel in mercury: it floats. Try ice in alcohol: it sinks.</p>' +
+                '<p><b>Why.</b> The liquid pushes on every face of the block, and harder on the deeper faces. The pushes on the sides cancel, but the bottom face is deeper than the top, so the liquid pushes up on it harder than it pushes down on the top. The difference is the buoyant force, and it equals the weight of the liquid the block pushes aside (Archimedes’ principle): ρ<sub>liquid</sub> g V. A block lighter than that much liquid floats, sinking until the liquid it pushes aside weighs as much as it does, so the share under the surface is the ratio of the densities: about 92% for ice in water.</p>' +
+                '<p><b>The model.</b> A 10 cm cube kept upright, in a tank 50 cm deep. Pressures are shown above the air’s, which presses equally on every side of the block and cancels. When let go, the block moves under its weight, the buoyant force and the liquid’s drag; while it bobs at the surface, the waves it makes slowly calm it. The rise of the surface as the block goes in is ignored (the tank is much wider than the block). Densities: cork 240, pine 500, ice 917, aluminum 2700, steel 7850 and gold 19 300 kg/m³.</p>' }
+  };
+
+  // ================================================================
+  // 5. CONTROLS
+  // ================================================================
+  $('liq').innerHTML = LIQUIDS.map(l => '<button data-v="' + l.id + '">' + l.name + '</button>').join('');
+  $('mat').innerHTML = MATERIALS.map(m => '<button data-v="' + m.id + '">' + m.name + '</button>').join('');
+  function visibility() {
+    $('lab_h').hidden = tab !== 1; $('lab_pin').hidden = tab !== 2; $('lab_where').hidden = tab !== 2; $('lab_mat').hidden = tab !== 3; $('lab_d').hidden = tab !== 3;
+    $('go').hidden = tab !== 3; $('go').textContent = free ? 'Hold it' : 'Let go';
+    $('hint').textContent = tab === 3 ? (free ? '' : 'or drag the block up and down') : tab === 1 && S.h === 0 ? 'fill them with the depth slider' : '';
+    $('go').parentElement.hidden = tab === 2;
+    document.querySelectorAll('#liq button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.liq[tab])));
+    document.querySelectorAll('#where button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.z)));
+    document.querySelectorAll('#mat button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.mat)));
+    $('scene').classList.toggle('grab', tab === 3);
+    $('scene').setAttribute('aria-label', tab === 1 ? 'Four vessels filled to the same depth, with arrows for the pressure on their walls' : tab === 2 ? 'A very long straw in a glass, with a pump at the top' : 'A block in a tank of liquid, with arrows for the pressure on its faces');
+    $('graph').setAttribute('aria-label', tab === 1 ? 'Pressure against depth' : tab === 2 ? 'Air pressure against height above sea level' : 'Buoyant force against depth');
+  }
+  function vals() {
+    $('h').value = String(Math.round(S.h * 100)); $('h_v').textContent = Math.round(S.h * 100) + ' cm';
+    const pout = airPressure(S.z); $('pin').value = String(S.pin); $('pin_v').textContent = kPa(pout * S.pin / 100, 1) + (S.pin === 100 ? ' (same as outside)' : S.pin === 0 ? ' (a vacuum)' : '');
+    $('d').value = String(Math.round(S.d * 200) / 2); $('d_v').textContent = (S.d * 100).toFixed(1) + ' cm' + (S.d < -CUBE ? ' (out of the liquid)' : S.d < 0 ? ' (partly in)' : '');
+  }
+  function upd() { visibility(); vals(); draw(); readout(); }
+  function setTab(k) { tab = k; [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k))); $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes; upd(); }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  document.querySelectorAll('#liq button').forEach(b => b.addEventListener('click', () => { S.liq[tab] = b.dataset.v; upd(); }));
+  document.querySelectorAll('#where button').forEach(b => b.addEventListener('click', () => { S.z = +b.dataset.v; upd(); }));
+  document.querySelectorAll('#mat button').forEach(b => b.addEventListener('click', () => { S.mat = b.dataset.v; upd(); }));
+  $('h').addEventListener('input', () => { S.h = +$('h').value / 100; upd(); });
+  $('pin').addEventListener('input', () => { S.pin = +$('pin').value; upd(); });
+  $('d').addEventListener('input', () => { S.d = +$('d').value / 100; free = false; vel = 0; upd(); });
+  $('go').addEventListener('click', () => { free = !free; vel = 0; upd(); });
+  window.addEventListener('resize', draw);
+  // dragging the block
+  const sc = $('scene'); let drag = null;
+  sc.addEventListener('pointerdown', e => { if (tab !== 3) return; const r = sc.getBoundingClientRect(), g = tankGeom(r.width, r.height), y = e.clientY - r.top;
+    drag = { off: (y - g.ys) / g.s - S.d }; if (Math.abs(drag.off - CUBE / 2) > CUBE * 1.5) drag.off = CUBE / 2; free = false; vel = 0; sc.setPointerCapture(e.pointerId); e.preventDefault(); move(e); });
+  function move(e) { if (!drag) return; const r = sc.getBoundingClientRect(), g = tankGeom(r.width, r.height); S.d = Math.max(-0.12, Math.min(TANK.h - CUBE, (e.clientY - r.top - g.ys) / g.s - drag.off)); upd(); }
+  sc.addEventListener('pointermove', move);
+  const end = () => { drag = null; }; sc.addEventListener('pointerup', end); sc.addEventListener('pointercancel', end);
+
+  // ================================================================
+  // 6. LOOP: only the released block moves
+  // ================================================================
+  let last = null;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+    if (tab === 3 && free && dt > 0 && !document.hidden) {
+      const L = liquid(S.liq[3]), M = material(S.mat); let st = { d: S.d, v: vel };
+      if (reduced) { for (let i = 0; i < 20000; i++) st = cubeStep(st, 1e-3, CUBE, L.rho, M.rho, TANK.h); }
+      else for (let i = 0; i < Math.round(dt / 1e-3); i++) st = cubeStep(st, 1e-3, CUBE, L.rho, M.rho, TANK.h);
+      S.d = Math.max(-0.12, st.d); vel = st.v; if (S.d === -0.12 && vel < 0) vel = 0;
+      upd();
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

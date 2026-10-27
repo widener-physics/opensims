@@ -10,6 +10,7 @@ window.TOPICS = {
   rotation:     { name: 'Rotation',            color: '#7A4B22' },
   oscillations: { name: 'Oscillations & waves', color: '#B5306D' },
   thermo:       { name: 'Thermodynamics',      color: '#C8321E' },
+  fluids:       { name: 'Fluids',              color: '#0E7C86' },
   em:           { name: 'Electricity & magnetism', color: '#D9651B' },
   optics:       { name: 'Optics',              color: '#E8A317' },
   modern:       { name: 'Modern physics',      color: '#5B3F8C' },
@@ -18,6 +19,17 @@ window.TOPICS = {
 };
 
 window.SIMS = [
+  {
+    slug: 'fluid-pressure',
+    title: 'Pressure in fluids',
+    pageTitle: 'Fluid pressure simulation: hydrostatic paradox, straws and barometers, buoyancy',
+    topic: 'fluids',
+    tags: ['pressure', 'hydrostatic pressure', 'hydrostatic paradox', "Pascal's vases", 'atmospheric pressure', 'barometer', 'buoyancy', "Archimedes' principle", 'density', 'floating and sinking'],
+    blurb: "Fill four very differently shaped vessels to the same depth and find the same pressure at every bottom. Suck on a 14 m straw and see why the air can push water no higher than 10 m, then watch the pressure on a block's faces add up to the buoyant force that floats it.",
+    level: 'intro',
+    added: '2026-10-26',
+    status: 'ready'
+  },
   {
     slug: 'blackbody',
     title: 'Blackbody radiation and the colors of stars',
