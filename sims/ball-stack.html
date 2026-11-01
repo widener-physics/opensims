@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<!--
+  The bouncing ball stack - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Collisions keep momentum and
+  give back the set share of the speed; each contact lasts its set time; the one-at-a-time model reproduces the
+  textbook sequence of collisions and the tower's (2^N - 1) limit; perfectly bouncy balls keep their energy.
+  Credit: the spring contacts follow O. R. Walton and R. L. Braun, J. Rheology 30, 949 (1986). On why real balls
+  beat the simple spring model: R. Cross, Am. J. Phys. 75, 1009 (2007); Y. Berdeni, A. Champneys and R. Szalai,
+  Proc. R. Soc. A 471, 20150286 (2015).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ball stack simulation: why a tennis ball dropped on a basketball bounces so high | Open Physics Sims</title>
+<meta name="description" content="Drop a tennis ball sitting on a basketball and it flies three times as high as it started. Swap in real balls, stack a tower whose top ball can leave at many times the speed it fell, slow the bounce down to a thousandth of a second, and turn the stack upside down.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --curve: #1D4F73; --floor: #C9BFAE; --up: #2E7D32;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 420; }
+  #graph { aspect-ratio: 900 / 200; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 10px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+  .checks { display: grid; grid-template-columns: auto auto; justify-content: start; gap: 4px 18px; }
+  .checks label { display: flex; gap: 8px; align-items: center; cursor: pointer; white-space: nowrap; }
+  .checks input { width: 16px; height: 16px; margin: 0; accent-color: var(--body); }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.95; }
+    #graph { aspect-ratio: 1 / 0.7; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+<!-- site tags: written by tools/page-meta.js from sims.js (npm run meta); edits here are replaced -->
+<link rel="canonical" href="https://opensims.wu-physics.net/sims/ball-stack">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Open Physics Sims">
+<meta property="og:title" content="Ball stack simulation: why a tennis ball dropped on a basketball bounces so high">
+<meta property="og:description" content="Drop a tennis ball sitting on a basketball and it flies three times as high as it started. Swap in real balls, stack a tower whose top ball can leave at many times the speed it fell, slow the bounce down to a thousandth of a second, and turn the stack upside down.">
+<meta property="og:url" content="https://opensims.wu-physics.net/sims/ball-stack">
+<meta property="og:image" content="https://opensims.wu-physics.net/share.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Open Physics Sims: free interactive physics simulations for teaching">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-RIyzwHpiR6eo6nzLty9EI.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+<!-- /site tags -->
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>The bouncing ball stack</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>Two balls</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>A tower</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Slow motion</button>
+    <button role="tab" id="tab4" aria-selected="false"><span>4</span>Upside down</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="A stack of balls dropped on the floor"></canvas>
+  <div class="row2">
+    <button id="go">Drop</button>
+    <button id="slow" class="secondary" aria-pressed="false">Speed: real time</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Height of each ball against time"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_bot"><div>Bottom ball</div><div class="seg" id="bot" role="group" aria-label="Bottom ball"><button data-v="basketball">basketball</button><button data-v="soccer">soccer ball</button></div></div>
+    <div class="grp" id="lab_top"><div>Top ball</div><div class="seg" id="top" role="group" aria-label="Top ball"><button data-v="tennis">tennis ball</button><button data-v="golf">golf ball</button><button data-v="pingpong">ping-pong ball</button></div></div>
+    <div class="grp" id="lab_tower"><div>Balls in the tower (heaviest at the bottom)</div><div class="checks" id="tower"></div></div>
+    <div class="grp" id="lab_sm"><div>Stack</div><div class="seg" id="sm" role="group" aria-label="Stack"><button data-v="2">basketball + tennis ball</button><button data-v="3">+ ping-pong ball</button></div></div>
+    <label id="lab_ts"><div class="row"><span>Time since the floor was hit</span><span class="val" id="ts_v"></span></div><input type="range" id="ts" min="0" max="1000" step="1"></label>
+    <div class="grp" id="lab_order"><div>Which is on the bottom</div><div class="seg" id="order" role="group" aria-label="Which is on the bottom"><button data-v="heavy">the heavy ball</button><button data-v="light">the light ball</button></div></div>
+    <div class="grp" id="lab_model"><div>Collisions</div><div class="seg" id="model" role="group" aria-label="How the collisions happen"><button data-v="ideal">one at a time (textbook)</button><button data-v="springy">squashed together (spring model)</button></div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/ball-stack.test.js)
+  // ================================================================
+  // ---- physics core: the bouncing ball stack ----
+  // SI units; heights are of each ball's bottom above the floor (y), velocities positive upward.
+  const G = 9.81;
+  // real balls: mass (kg), diameter (m), coefficient of restitution on a hard floor, and roughly how long a bounce
+  // on a hard floor lasts (s). Masses and sizes from the sports' rules; bounciness from the rules' drop tests.
+  const BALLS = {
+    basketball: { name: 'basketball', m: 0.62,   d: 0.24,   e: 0.77, tau: 0.010,  color: '#D9651B' },
+    soccer:     { name: 'soccer ball', m: 0.43,  d: 0.22,   e: 0.84, tau: 0.009,  color: '#F2F2F2' },
+    tennis:     { name: 'tennis ball', m: 0.058, d: 0.067,  e: 0.75, tau: 0.005,  color: '#D7E34A' },
+    golf:       { name: 'golf ball',  m: 0.0459, d: 0.0427, e: 0.86, tau: 0.0005, color: '#FFFFFF' },
+    pingpong:   { name: 'ping-pong ball', m: 0.0027, d: 0.040, e: 0.89, tau: 0.001, color: '#FFB347' }
+  };
+  // two balls meeting: bounciness between them estimated as the geometric mean of their floor bounciness
+  const pairE = (a, b) => Math.sqrt(a.e * b.e);
+  // an instant collision of two masses moving along a line, with restitution e: velocities after
+  function collide(m1, v1, m2, v2, e) {
+    const p = m1 * v1 + m2 * v2, M = m1 + m2;
+    return [(p - m2 * e * (v1 - v2)) / M, (p + m1 * e * (v1 - v2)) / M];
+  }
+
+  // ---- the stack as springs: each contact squashes like a spring ----
+  // A contact pushes back like a spring of stiffness k while it is being squashed, and more steeply, k/e^2, while it
+  // springs back, so that it gives back the share e^2 of the energy it stored, whatever is pressing on it (Walton and
+  // Braun's model of inelastic contacts). A ball bouncing on a rigid floor is in contact for tau seconds, which
+  // sets k = m (pi (1 + e) / (2 tau))^2. Two balls touching act as their two springs in series.
+  // "ideal": every contact is very short (0.05 ms) and the balls start a few millimeters apart, so they collide one
+  // pair at a time, as in the textbook argument. "springy": each ball's own bounce time, and the balls start touching.
+  const IDEAL_TAU = 5e-5, IDEAL_GAP = 0.003;
+  function stiffness(ball, ideal) { const t = ideal ? IDEAL_TAU : ball.tau; return ball.m * Math.pow(Math.PI * (1 + ball.e) / (2 * t), 2); }
+  // the push of one contact, squashed by s (> 0), which has been squashed at most smax so far
+  function contactForce(c, s, smax) {
+    if (s <= 0) return 0;
+    if (s >= smax) return c.k * s;                                  // being squashed further
+    const ku = c.k / (c.e * c.e), s0 = smax * (1 - c.e * c.e);      // springing back, more steeply
+    return Math.max(0, ku * (s - s0));
+  }
+  // set up a stack (ids from the bottom up), its bottom ball's bottom at height h, all at rest
+  function makeStack(ids, h, ideal) {
+    const balls = ids.map(id => BALLS[id]); let y = h; const ys = [];
+    balls.forEach((b, i) => { ys.push(y); y += b.d + (ideal ? IDEAL_GAP : 0); });
+    const k = balls.map(b => stiffness(b, ideal));
+    // the contacts: with the floor (any ball can reach it), and each ball with the one above
+    const floor = balls.map((b, i) => ({ k: k[i], e: b.e, smax: 0 }));
+    const pairs = balls.slice(0, -1).map((b, i) => ({ k: k[i] * k[i + 1] / (k[i] + k[i + 1]), e: pairE(b, balls[i + 1]), smax: 0 }));
+    // time step: a small part of the quickest contact
+    const quick = Math.min(...floor.map((c, i) => Math.PI / 2 * Math.sqrt(balls[i].m / c.k) * (1 + c.e)), ...pairs.map((c, i) => Math.PI / 2 * Math.sqrt(balls[i].m * balls[i + 1].m / (balls[i].m + balls[i + 1].m) / c.k) * (1 + c.e)));
+    const tmin = quick;
+    return { ids, balls, y: ys, v: ys.map(() => 0), t: 0, floor, pairs, dt: tmin / 40, ideal };
+  }
+  // the forces now: gravity, the floor, and the neighbors. With commit, each contact remembers its deepest squash.
+  function forces(st, commit) {
+    const n = st.balls.length, F = st.balls.map(b => -b.m * G);
+    for (let i = 0; i < n; i++) { const c = st.floor[i], s = -st.y[i]; F[i] += contactForce(c, s, c.smax); if (commit) c.smax = s > 0 ? Math.max(c.smax, s) : 0; }
+    for (let i = 0; i < n - 1; i++) { const c = st.pairs[i], s = st.y[i] + st.balls[i].d - st.y[i + 1], f = contactForce(c, s, c.smax); F[i] -= f; F[i + 1] += f; if (commit) c.smax = s > 0 ? Math.max(c.smax, s) : 0; }
+    return F;
+  }
+  // one step (velocity Verlet)
+  function step(st) {
+    const dt = st.dt, F0 = forces(st, false), n = st.balls.length;
+    for (let i = 0; i < n; i++) { st.v[i] += 0.5 * dt * F0[i] / st.balls[i].m; st.y[i] += dt * st.v[i]; }
+    const F1 = forces(st, true); for (let i = 0; i < n; i++) st.v[i] += 0.5 * dt * F1[i] / st.balls[i].m;
+    st.t += dt;
+  }
+  // after the bounce, later contacts (the balls landing again) use each ball's own bounce time: in the ideal model this
+  // changes nothing that matters, and it saves following very stiff springs for seconds
+  function soften(st) {
+    if (!st.ideal) return;
+    const k = st.balls.map(b => stiffness(b, false));
+    st.floor.forEach((c, i) => { c.k = k[i]; });
+    st.pairs.forEach((c, i) => { c.k = k[i] * k[i + 1] / (k[i] + k[i + 1]); });
+    st.dt = Math.min(...st.balls.map(b => b.tau)) / 40; st.ideal = false;
+  }
+  const touching = st => st.y.some((y, i) => y < 0 || (i < st.y.length - 1 && y + st.balls[i].d > st.y[i + 1] + 1e-12));
+  // drop the stack from h and follow it until the top ball has reached its highest point (or tMax).
+  // Records every frame (every `rec` seconds, and every step while anything is in contact), and returns the
+  // greatest height each ball reaches after the bounce, and the speeds just after.
+  function drop(ids, h, ideal, opts) {
+    opts = opts || {}; const st = makeStack(ids, h, ideal), n = ids.length, rec = opts.rec || 0.004, frames = [];
+    const tMax = opts.tMax || 30; let lastRec = -1, bounced = false, top = Array(n).fill(-1), speedAfter = null, contactStart = null, contactEnd = null;
+    const save = () => frames.push({ t: st.t, y: st.y.slice(), v: st.v.slice() });
+    save();
+    while (st.t < tMax) {
+      // between contacts, fly freely to the next one (or the next frame) in big steps
+      const c = touching(st);
+      if (!c) {
+        // time until the next contact, if all fly freely (no one's position is above another's top yet)
+        let tn = Infinity;
+        for (let i = 0; i < n; i++) { const a = -G / 2, b = st.v[i], cc = st.y[i]; const r = (-b - Math.sqrt(b * b - 4 * a * cc)) / (2 * a); if (r > 0) tn = Math.min(tn, r); }
+        for (let i = 0; i < n - 1; i++) { const gap = st.y[i + 1] - (st.y[i] + st.balls[i].d), dv = st.v[i] - st.v[i + 1]; if (dv > 0) tn = Math.min(tn, gap / dv); }
+        const jump = Math.min(tn * 0.999, rec, (bounced ? 1e9 : 1e9)) - st.dt;
+        if (jump > st.dt * 4) { for (let i = 0; i < n; i++) { st.y[i] += st.v[i] * jump - G * jump * jump / 2; st.v[i] -= G * jump; } st.t += jump; }
+        else step(st);
+      } else { if (!bounced && st.y.some(y => y < 0)) { bounced = true; contactStart = st.t; } step(st); }
+      if (bounced && speedAfter === null && !touching(st) && st.v[0] >= 0 && st.v.every((v, i) => i === 0 || v >= st.v[i - 1])) {
+        // the bounce is over once nothing is touching and nothing is heading for another collision
+        speedAfter = st.v.slice(); contactEnd = st.t; soften(st);
+      }
+      if (bounced) for (let i = 0; i < n; i++) top[i] = Math.max(top[i], st.y[i]);
+      // every step during the bounce itself (for slow motion); otherwise every `rec` seconds
+      if ((touching(st) && speedAfter === null) || st.t - lastRec >= rec - 1e-12) { save(); lastRec = st.t; }
+      // stop once every ball that left has had time to reach its highest point
+      if (speedAfter && st.t > contactEnd + 2 * Math.max(...speedAfter, 0) / G + 0.2) break;
+    }
+    return { frames, top, speedAfter, contactStart, contactEnd, st };
+  }
+  // ---- the textbook result: one collision at a time, from the bottom up, each ball arriving at speed v ----
+  function idealSequence(ids, h) {
+    const balls = ids.map(id => BALLS[id]), v0 = Math.sqrt(2 * G * h), v = balls.map(() => -v0);
+    v[0] = balls[0].e * v0;                                       // the floor turns the bottom ball around
+    for (let i = 0; i < balls.length - 1; i++) { const r = collide(balls[i].m, v[i], balls[i + 1].m, v[i + 1], pairE(balls[i], balls[i + 1])); v[i] = r[0]; v[i + 1] = r[1]; }
+    return v;
+  }
+  // the limit of very light balls above very heavy ones, all perfectly bouncy: the top ball leaves at (2^N - 1) v
+  const towerLimit = N => Math.pow(2, N) - 1;
+  // ---- air resistance (left out of the motion, but large for a light ball going fast) ----
+  // drag 1/2 rho Cd A v^2 on a sphere (Cd = 0.47, air 1.2 kg/m^3): the speed at which it balances the weight, and how
+  // high a ball launched straight up at v would get with it: (vt^2 / 2g) ln(1 + v^2 / vt^2)
+  const terminal = b => Math.sqrt(2 * b.m * G / (1.2 * 0.47 * Math.PI * b.d * b.d / 4));
+  const riseWithDrag = (b, v) => { const vt = terminal(b); return vt * vt / (2 * G) * Math.log(1 + v * v / (vt * vt)); };
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. SETTINGS AND STATE
+  // ================================================================
+  const H0 = 1.0;                                          // the bottom ball's bottom starts 1 m up
+  const ORDER = ['basketball', 'soccer', 'tennis', 'golf', 'pingpong'];       // heaviest first
+  const S = { bot: 'basketball', top: 'tennis', tower: { basketball: true, tennis: true, pingpong: true }, sm: 2, order: 'heavy', model: { 1: 'ideal', 2: 'ideal', 3: 'ideal', 4: 'ideal' }, slow: false };
+  let tab = 1;
+  // the stack each tab drops, from the bottom up
+  function stackIds(k) {
+    if (k === 1) return [S.bot, S.top];
+    if (k === 2) return ORDER.filter(id => S.tower[id]);
+    if (k === 3) return S.sm === 2 ? ['basketball', 'tennis'] : ['basketball', 'tennis', 'pingpong'];
+    return S.order === 'heavy' ? [S.bot, S.top] : [S.top, S.bot];
+  }
+  // a run: computed when dropped, then played back
+  const RUN = { 1: null, 2: null, 3: null, 4: null }, PLAY = { 1: 0, 2: 0, 3: 0, 4: 0 }, DONE = { 1: false, 2: false, 3: false, 4: false };
+  let playing = false, TS = 0;
+  function compute(k) {
+    const ids = stackIds(k), r = drop(ids, H0, S.model[k] === 'ideal');
+    // the highest each ball gets after the bounce, and the overall highest point (for the scale)
+    r.ids = ids; r.peak = Math.max(...r.frames.map(f => Math.max(...f.y.map((y, i) => y + BALLS[ids[i]].d))));
+    r.start = []; let y = H0; ids.forEach((id, i) => { r.start.push(y); y += BALLS[id].d + (S.model[k] === 'ideal' ? IDEAL_GAP : 0); });
+    r.end = r.frames[r.frames.length - 1].t; RUN[k] = r; PLAY[k] = 0; DONE[k] = false;
+  }
+  // the state at time t (between recorded frames, flying freely)
+  function frameAt(r, t) {
+    const F = r.frames; let lo = 0, hi = F.length - 1;
+    if (t >= F[hi].t) return F[hi];
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (F[m].t <= t) lo = m; else hi = m; }
+    const a = F[lo], dt = t - a.t, b = F[hi];
+    // within a recorded contact the frames are close together: interpolate; otherwise fly freely
+    if (b.t - a.t < 1e-3) { const u = dt / (b.t - a.t); return { t, y: a.y.map((y, i) => y + u * (b.y[i] - y)), v: a.v.map((v, i) => v + u * (b.v[i] - v)) }; }
+    return { t, y: a.y.map((y, i) => y + a.v[i] * dt - G * dt * dt / 2), v: a.v.map(v => v - G * dt) };
+  }
+
+  // ================================================================
+  // 3. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  const nice = x => { const e = Math.floor(Math.log10(x)), m = x / 10 ** e; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * 10 ** e; };
+  const COL = { basketball: '#D9651B', soccer: '#F4F4F4', tennis: '#CFDC3F', golf: '#FFFFFF', pingpong: '#FFB347' };
+  // a ball, centered at (x, y), radius r, with a little detail so each kind is recognizable
+  function ball(ctx, id, x, y, r) {
+    ctx.fillStyle = COL[id]; ctx.strokeStyle = C('--ink'); ctx.lineWidth = Math.min(1.5, Math.max(0.6, r / 10)); ctx.beginPath(); ctx.arc(x, y, Math.max(r, 1.5), 0, TAU); ctx.fill(); ctx.stroke();
+    if (r < 6) return;
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.clip(); ctx.lineWidth = Math.max(0.8, r / 18); ctx.strokeStyle = 'rgba(23,33,40,0.55)';
+    if (id === 'basketball') { ctx.beginPath(); ctx.moveTo(x - r, y); ctx.lineTo(x + r, y); ctx.moveTo(x, y - r); ctx.lineTo(x, y + r); ctx.moveTo(x - r * 0.75, y - r); ctx.quadraticCurveTo(x - r * 0.25, y, x - r * 0.75, y + r); ctx.moveTo(x + r * 0.75, y - r); ctx.quadraticCurveTo(x + r * 0.25, y, x + r * 0.75, y + r); ctx.stroke(); }
+    else if (id === 'tennis') { ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = Math.max(1, r / 8); ctx.beginPath(); ctx.arc(x - r * 1.1, y, r * 0.8, -1, 1); ctx.stroke(); ctx.beginPath(); ctx.arc(x + r * 1.1, y, r * 0.8, Math.PI - 1, Math.PI + 1); ctx.stroke(); }
+    else if (id === 'soccer') { ctx.fillStyle = C('--ink'); ctx.beginPath(); for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + k * TAU / 5; ctx.lineTo(x + r * 0.32 * Math.cos(a), y + r * 0.32 * Math.sin(a)); } ctx.fill(); }
+    else if (id === 'golf') { ctx.fillStyle = 'rgba(23,33,40,0.18)'; for (let k = 0; k < 7; k++) { const a = k * 0.9, rr = r * (0.25 + 0.45 * ((k * 37) % 10) / 10); ctx.beginPath(); ctx.arc(x + rr * Math.cos(a), y + rr * Math.sin(a), r * 0.08, 0, TAU); ctx.fill(); } }
+    ctx.restore();
+  }
+  // the stack at time t: a close-up of the bounce on the left, to scale; the whole flight on the right
+  function drawStack(ctx, W, H, compact) {
+    const r = RUN[tab], ids = stackIds(tab), t = PLAY[tab], f = r ? frameAt(r, t) : null;
+    const startY = r ? r.start : (() => { let y = H0; return ids.map(id => { const v = y; y += BALLS[id].d + (S.model[tab] === 'ideal' ? IDEAL_GAP : 0); return v; }); })();
+    const ys = f ? f.y : startY, gy = H - 26, topStart = startY[startY.length - 1] + BALLS[ids[ids.length - 1]].d;
+    // left: close-up, 0 to a little above the stack
+    const L = { x: 0, w: compact ? W * 0.46 : W * 0.4 }, zmax = topStart + 0.25, sL = Math.min((gy - 30) / zmax, L.w * 0.9 / 0.5);
+    ctx.fillStyle = C('--floor'); ctx.fillRect(0, gy, W, H - gy);
+    const xL = L.w / 2 + 8;
+    rulerL(ctx, 26, gy, sL, zmax);
+    ids.forEach((id, i) => { const d = BALLS[id].d, y = ys[i]; ball(ctx, id, xL, gy - (y + d / 2) * sL, d / 2 * sL); });
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, compact ? 'close-up, to scale' : 'close-up, to scale', 10, 16);
+    // right: the whole flight
+    const R0 = L.w + 10, Rw = W - R0 - 8, zR = SCALE[tab].z, sR = (gy - 30) / zR, xR = R0 + Rw * 0.55;
+    ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(R0 - 5, 6); ctx.lineTo(R0 - 5, gy); ctx.stroke();
+    rulerR(ctx, R0 + 34, gy, sR, zR);
+    // the path of the top ball so far, and the highest point it reached
+    if (r) { const n = ids.length - 1; ctx.strokeStyle = 'rgba(200,50,30,0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath(); let first = true;
+      r.frames.forEach(fr => { if (fr.t > t || fr.t < (r.contactStart || 0)) return; const yy = gy - (fr.y[n] + BALLS[ids[n]].d / 2) * sR; first ? ctx.moveTo(xR + 10, yy) : ctx.lineTo(xR + 10, yy); first = false; }); ctx.stroke(); ctx.setLineDash([]);
+      if (DONE[tab]) { const top = r.top[n] + BALLS[ids[n]].d, yy = gy - top * sR; ctx.strokeStyle = C('--hot'); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(xR - 30, yy); ctx.lineTo(xR + 40, yy); ctx.stroke(); font(ctx, 11); ctx.fillStyle = C('--hot'); const ht = (compact ? '' : 'highest: ') + top.toFixed(2) + ' m'; ctx.textAlign = xR + 44 + ctx.measureText(ht).width > W - 4 ? 'right' : 'left'; label(ctx, ht, ctx.textAlign === 'right' ? W - 6 : xR + 44, yy - (ctx.textAlign === 'right' ? 6 : -4)); } }
+    // where it was dropped from
+    const yd = gy - topStart * sR; ctx.strokeStyle = 'rgba(92,107,115,0.6)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(xR - 30, yd); ctx.lineTo(xR + 40, yd); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, compact ? 'start' : 'top ball’s start', xR + 44, yd + 4);
+    ids.forEach((id, i) => { const d = BALLS[id].d, y = ys[i]; ball(ctx, id, xR, gy - (y + d / 2) * sR, Math.max(d / 2 * sR, 2.5)); });
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, compact ? 'the whole flight' : 'the whole flight (balls drawn bigger if they’d be too small to see)', R0 + 4, 16);
+    font(ctx, 10); ctx.textAlign = 'right'; ctx.fillText((S.slow ? 'slowed down ×10; ' : '') + 't = ' + t.toFixed(2) + ' s', W - 8, H - 8);
+  }
+  // fixed scales, the same for every drop on a tab, so drops can be compared
+  const SCALE = { 1: { z: 6, t: 3 }, 2: { z: 20, t: 5 }, 4: { z: 6, t: 3 } };
+  const niceTop = z => { const s = nice(z / 5); return Math.ceil(z / s) * s; };
+  function rulerL(ctx, x, gy, s, zmax) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.strokeStyle = 'rgba(92,107,115,0.5)'; ctx.lineWidth = 1;
+    for (let z = 0; z <= zmax + 1e-9; z += 0.5) { const y = gy - z * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 6, y); ctx.stroke(); ctx.fillText(z.toFixed(1), x - 2, y + 3); } ctx.textAlign = 'left'; ctx.fillText('m', x + 8, 30); }
+  function rulerR(ctx, x, gy, s, zmax) { const st = nice(zmax / 5); font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.strokeStyle = 'rgba(92,107,115,0.5)'; ctx.lineWidth = 1;
+    for (let z = 0; z <= zmax + 1e-9; z += st) { const y = gy - z * s; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 6, y); ctx.stroke(); ctx.fillText(+z.toFixed(1) + ' m', x - 2, y + 3); } }
+
+  // ---- tab 3: the bounce in slow motion ----
+  function windowOf(r) { const a = r.contactStart - (S.model[3] === 'ideal' ? 0.0001 : 0.001), b = r.contactEnd + (S.model[3] === 'ideal' ? 0.0001 : 0.002); return [a, b]; }
+  function drawSlow(ctx, W, H, compact) {
+    const r = RUN[3], ids = stackIds(3), [a, b] = windowOf(r), t = a + (b - a) * TS / 1000, f = frameAt(r, t), gy = H - 26;
+    ctx.fillStyle = C('--floor'); ctx.fillRect(0, gy, W, H - gy);
+    const top = r.start[ids.length - 1] - H0 + BALLS[ids[ids.length - 1]].d, s = Math.min((gy - 40) / (top + 0.05), W * 0.35 / 0.3), x = W * 0.3;
+    // the balls, at their heights above the floor (at the moment of the bounce they are all near it)
+    const base = f.y[0] < 0.2 ? 0 : f.y[0];
+    ids.forEach((id, i) => { const d = BALLS[id].d; ball(ctx, id, x, gy - (f.y[i] - base + d / 2) * s, d / 2 * s); });
+    // velocity arrows, same scale for every ball: up green, down red
+    const vs = 14; ids.forEach((id, i) => { const d = BALLS[id].d, yc = gy - (f.y[i] - base + d / 2) * s, v = f.v[i], L = v * vs, col = v >= 0 ? C('--up') : C('--hot'), xa = x + d / 2 * s + 26 + i * 4;
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(xa, yc); ctx.lineTo(xa, yc - L); ctx.stroke();
+      if (Math.abs(L) > 4) { const sg = Math.sign(L); ctx.beginPath(); ctx.moveTo(xa, yc - L - sg * 2); ctx.lineTo(xa - 6, yc - L + sg * 8); ctx.lineTo(xa + 6, yc - L + sg * 8); ctx.closePath(); ctx.fill(); }
+      font(ctx, 12); ctx.textAlign = 'left'; ctx.fillStyle = C('--ink'); label(ctx, BALLS[id].name + ': ' + (v >= 0 ? '↑ ' : '↓ ') + Math.abs(v).toFixed(2) + ' m/s', xa + 12, yc + 4); });
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'the bounce, frozen in time' : 'the bounce, frozen in time; arrows: each ball’s velocity (the balls fell at 4.43 m/s)', 10, 16);
+    font(ctx, 12, 600); ctx.fillStyle = C('--ink'); ctx.textAlign = 'right'; label(ctx, ((t - r.contactStart) * 1000).toFixed(S.model[3] === 'ideal' ? 3 : 2) + ' ms', W - 10, 20);
+  }
+  function drawSlowGraph(ctx, W, H, compact) {
+    const r = RUN[3], ids = stackIds(3), [a, b] = windowOf(r), b0 = { x: compact ? 38 : 48, y: 22, w: 0, h: H - 22 - 32 }; b0.w = W - b0.x - 12;
+    const vmax = Math.max(5, ...r.frames.filter(f => f.t >= a && f.t <= b).map(f => Math.max(...f.v.map(Math.abs)))) * 1.08, X = t => b0.x + (t - a) / (b - a) * b0.w, Y = v => b0.y + b0.h / 2 - v / vmax * b0.h / 2;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b0.x, b0.y, b0.w, b0.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; const st = vmax > 12 ? 5 : 2;
+    for (let v = -Math.floor(vmax / st) * st; v <= vmax; v += st) { ctx.strokeStyle = v === 0 ? 'rgba(92,107,115,0.6)' : C('--soft'); ctx.beginPath(); ctx.moveTo(b0.x, Y(v)); ctx.lineTo(b0.x + b0.w, Y(v)); ctx.stroke(); ctx.fillText(v + '', b0.x - 4, Y(v) + 3); }
+    const ms = (b - a) * 1000, tst = nice(ms / 5); ctx.textAlign = 'center';
+    for (let m = Math.ceil(((a - r.contactStart) * 1000) / tst) * tst; m <= (b - r.contactStart) * 1000; m += tst) ctx.fillText(+m.toFixed(3) + '', X(r.contactStart + m / 1000), b0.y + b0.h + 13);
+    ctx.textAlign = 'right'; ctx.fillText('ms after the floor is hit', b0.x + b0.w, b0.y + b0.h + 26);
+    ids.forEach((id, i) => { ctx.strokeStyle = id === 'golf' || id === 'soccer' ? '#7A8790' : COL[id]; ctx.lineWidth = 2.4; ctx.beginPath(); let pen = false;
+      r.frames.forEach(fr => { if (fr.t < a || fr.t > b) return; pen ? ctx.lineTo(X(fr.t), Y(fr.v[i])) : ctx.moveTo(X(fr.t), Y(fr.v[i])); pen = true; }); ctx.stroke(); });
+    const t = a + (b - a) * TS / 1000; ctx.strokeStyle = C('--ink'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(t), b0.y); ctx.lineTo(X(t), b0.y + b0.h); ctx.stroke(); ctx.setLineDash([]);
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'velocity (m/s, up +)' : 'each ball’s velocity (m/s, up positive) through the bounce', b0.x + 2, b0.y - 7);
+  }
+  // heights against time
+  function drawHeights(ctx, W, H, compact) {
+    const r = RUN[tab], ids = stackIds(tab), b0 = { x: compact ? 38 : 48, y: 22, w: 0, h: H - 22 - 32 }; b0.w = W - b0.x - 12;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b0.x, b0.y, b0.w, b0.h);
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'height (m) of each ball' : 'height (m) of the bottom of each ball, against time', b0.x + 2, b0.y - 7);
+    if (!r) { font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.fillText('press Drop', b0.x + b0.w / 2, b0.y + b0.h / 2); return; }
+    const T = SCALE[tab].t, zmax = SCALE[tab].z, X = t => b0.x + t / T * b0.w, Y = z => b0.y + b0.h - z / zmax * b0.h;
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; const zs = nice(zmax / 4);
+    for (let z = 0; z <= zmax + 1e-9; z += zs) { ctx.strokeStyle = C('--soft'); if (z) { ctx.beginPath(); ctx.moveTo(b0.x, Y(z)); ctx.lineTo(b0.x + b0.w, Y(z)); ctx.stroke(); } ctx.fillText(+z.toFixed(1) + '', b0.x - 4, Y(z) + 3); }
+    ctx.textAlign = 'center'; const ts = T > 3 ? 1 : 0.5; for (let t = 0; t <= T + 1e-9; t += ts) ctx.fillText(t + '', X(t), b0.y + b0.h + 13); ctx.textAlign = 'right'; ctx.fillText('time (s)', b0.x + b0.w, b0.y + b0.h + 26);
+    const tNow = PLAY[tab];
+    ids.forEach((id, i) => { ctx.strokeStyle = id === 'golf' || id === 'soccer' ? '#7A8790' : COL[id]; ctx.lineWidth = 2.2; ctx.beginPath(); let pen = false, last = -1;
+      r.frames.forEach(fr => { if (fr.t > tNow || fr.t - last < T / 1500) return; last = fr.t; pen ? ctx.lineTo(X(fr.t), Y(fr.y[i])) : ctx.moveTo(X(fr.t), Y(fr.y[i])); pen = true; });
+      const fn = frameAt(r, tNow); if (pen) ctx.lineTo(X(tNow), Y(fn.y[i])); ctx.stroke(); });
+    // the legend
+    let lx = b0.x + b0.w - 6; font(ctx, 10); ctx.textAlign = 'right';
+    ids.slice().reverse().forEach(id => { const t = BALLS[id].name; ctx.fillStyle = id === 'golf' || id === 'soccer' ? '#7A8790' : COL[id] === '#CFDC3F' ? '#9AA42A' : COL[id]; ctx.fillText(t, lx, b0.y + 12); lx -= ctx.measureText(t).width + 10; });
+  }
+
+  function draw() {
+    const s = fit($('scene')), g = fit($('graph'));
+    s.ctx.clearRect(0, 0, s.W, s.H); g.ctx.clearRect(0, 0, g.W, g.H);
+    const okS = s.W >= 120 && s.H >= 80, okG = g.W >= 160 && g.H >= 90;
+    if (tab === 3) { if (!RUN[3]) compute(3); if (okS) drawSlow(s.ctx, s.W, s.H, s.compact); if (okG) drawSlowGraph(g.ctx, g.W, g.H, g.compact); }
+    else { if (okS) drawStack(s.ctx, s.W, s.H, s.compact); if (okG) drawHeights(g.ctx, g.W, g.H, g.compact); }
+  }
+
+  // ================================================================
+  // 4. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const vFall = Math.sqrt(2 * G * H0);
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    const ids = stackIds(tab), n = ids.length - 1, nm = id => BALLS[id].name;
+    if (tab === 3) {
+      const r = RUN[3], [a, b] = windowOf(r), t = a + (b - a) * TS / 1000, f = frameAt(r, t), touch = [];
+      if (f.y[0] < 0) touch.push('floor and ' + nm(ids[0])); for (let i = 0; i < n; i++) if (f.y[i] + BALLS[ids[i]].d > f.y[i + 1] + 1e-12) touch.push(nm(ids[i]) + ' and ' + nm(ids[i + 1]));
+      html = card('In contact now', touch.length ? touch.join('; ') : 'nothing', S.model[3] === 'ideal' ? 'one pair at a time: each collision is over before the next begins' : 'the contacts overlap: the bottom ball is still squashed against the floor when the next ball lands on it');
+      html += card('Top ball’s velocity', (f.v[n] >= 0 ? '↑ ' : '↓ ') + Math.abs(f.v[n]).toFixed(2) + ' m/s', 'it arrived at ↓ ' + vFall.toFixed(2) + ' m/s; it leaves at ↑ ' + r.speedAfter[n].toFixed(2) + ' m/s, ' + (r.speedAfter[n] / vFall).toFixed(2) + ' times as fast');
+      html += card('Bottom ball’s velocity', (f.v[0] >= 0 ? '↑ ' : '↓ ') + Math.abs(f.v[0]).toFixed(2) + ' m/s', 'it gives most of its speed to the ball above: it leaves at ↑ ' + r.speedAfter[0].toFixed(2) + ' m/s');
+    } else {
+      const r = RUN[tab];
+      if (!r || !DONE[tab]) html = card('Top ball (' + nm(ids[n]) + ')', '—', r ? 'falling…' : 'press Drop') + card('Speed just after the bounce', '—', '') + card(tab === 2 ? 'The textbook limit' : 'Bottom ball (' + nm(ids[0]) + ')', '—', '');
+      else {
+        const top = r.top[n] + BALLS[ids[n]].d, start = r.start[n] + BALLS[ids[n]].d, rise = r.top[n] - r.start[n];
+        const air = riseWithDrag(BALLS[ids[n]], r.speedAfter[n]), noAir = r.speedAfter[n] ** 2 / (2 * G), airNote = air < 0.9 * noAir ? '. Air resistance, left out here, would hold it to about ' + (r.top[n] - rise + air + BALLS[ids[n]].d).toFixed(1) + ' m' : '';
+        html = card('Top ball (' + nm(ids[n]) + ') rises to', top.toFixed(2) + ' m', (top / start).toFixed(top / start < 0.95 ? 2 : 1) + ' times the height it was dropped from (' + start.toFixed(2) + ' m, measured to its top)' + (tab === 4 ? '; dropped alone it would bounce back to ' + (BALLS[ids[n]].e ** 2 * (start - BALLS[ids[n]].d) + BALLS[ids[n]].d).toFixed(2) + ' m' : '') + airNote);
+        html += card('Speed just after the bounce', r.speedAfter[n].toFixed(2) + ' m/s', 'it fell at ' + vFall.toFixed(2) + ' m/s: ' + (r.speedAfter[n] / vFall).toFixed(2) + ' times as fast, so it climbs ' + (r.speedAfter[n] / vFall).toFixed(2) + '² = ' + ((r.speedAfter[n] / vFall) ** 2).toFixed((r.speedAfter[n] / vFall) ** 2 < 0.95 ? 2 : 1) + ' times as far as it fell');
+        if (tab === 2) html += card('The textbook limit', (2 ** ids.length - 1) + ' times as fast', 'for ' + ids.length + ' perfectly bouncy balls, each much lighter than the one below: 2ᴺ − 1. Real masses and bounciness give less');
+        else html += card('Bottom ball (' + nm(ids[0]) + ') rises to', (r.top[0] + BALLS[ids[0]].d).toFixed(2) + ' m', 'dropped alone it would bounce back to ' + (BALLS[ids[0]].e ** 2 * H0 + BALLS[ids[0]].d).toFixed(2) + ' m (to its top)');
+      }
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'Hold a tennis ball on top of a basketball and drop them together from a meter up. Predict: how high will the tennis ball bounce: as high as it started, a little lower, or higher?',
+         notes: '<p><b>What to try.</b> Drop the tennis ball on the basketball and watch the right-hand view: the tennis ball goes up about three times as high as it started. Swap in a golf ball, then a ping-pong ball: the lighter the top ball, the higher it goes. Then switch the collisions to the spring model and drop again (see below).</p>' +
+                '<p><b>Why.</b> The basketball hits the floor first and bounces back up at nearly the speed it fell, v. It then meets the tennis ball, still coming down at v: they approach each other at 2v. A light ball bouncing off a much heavier one leaves at that closing speed, relative to the heavy one, which is still moving up at v: so it leaves at 2v + v = 3v, and climbs 3² = 9 times as high. Real balls lose some speed in each collision, and the tennis ball isn’t that light, so it gets less than 3v; the basketball, having given away much of its momentum, hardly bounces.</p>' +
+                '<p><b>The model.</b> Each contact is a stiff spring that gives back the ball’s measured share of the speed (its bounciness, from the sports’ own drop tests). “One at a time” makes every contact very short and leaves tiny gaps between the balls, so the collisions happen in turn, as in the textbook. “Squashed together” gives each ball its real bounce time (about 10 ms for a basketball, 5 ms for a tennis ball) and starts the balls touching, so the contacts overlap: this simple spring model predicts a much smaller boost. Real balls dropped this way do go about three to four times as high, close to the textbook; physicists have traced the spring model’s shortfall to the way a hollow ball’s skin flexes and springs back (Cross 2007; Berdeni, Champneys and Szalai 2015). Air resistance is ignored.</p>' },
+    2: { lede: 'Stack more balls, each lighter than the one below. Predict: does adding a third ball on top help much, or does the extra boost fade away?',
+         notes: '<p><b>What to try.</b> Start with the basketball and tennis ball, then add the ping-pong ball on top and drop again: the top ball now goes far higher than before. Try other towers. Compare the speed the top ball leaves with to the textbook limit.</p>' +
+                '<p><b>Why.</b> Each collision works like the two-ball case: the ball above leaves at roughly twice the speed of the ball below plus its own falling speed. With perfectly bouncy balls, each much lighter than the one below, the speeds go v, 3v, 7v, 15v, …: (2ᴺ − 1)v for a tower of N balls. Heights grow as the square: a five-ball tower could, in principle, launch its top ball 961 times as high as it fell. Real balls aren’t that bouncy and aren’t that different in mass, so the growth is slower, but still dramatic. Toys such as the Astro Blaster are stacks of rubber balls built on this idea, and astronomers use it as a picture of how the rebounding core of a collapsing star can blast off its lighter outer layers in a supernova.</p>' +
+                '<p><b>The model.</b> As on the first tab: real masses and bounciness. Each pair of balls is given the average bounciness of the two (geometric mean), an estimate. The whole-flight view rescales to fit the highest bounce. Air resistance is left out of the motion; it would slow a ping-pong ball launched this fast a great deal, and the readout says how high it would really get.</p>' },
+    3: { lede: 'The whole bounce lasts a few thousandths of a second. Slow it right down. Predict: does the tennis ball get its speed from the basketball, or from the floor?',
+         notes: '<p><b>What to try.</b> Drag the time slider through the bounce, watching the arrows and the graph. With collisions one at a time, the basketball turns around at the floor first, then meets the tennis ball and nearly stops while the tennis ball shoots up. Add the ping-pong ball and the same thing happens twice. Then switch to the spring model: the contacts overlap, the basketball is still squashed against the floor when the tennis ball lands on it, and less speed reaches the top.</p>' +
+                '<p><b>Why.</b> The floor only pushes on the bottom ball. The tennis ball gets its speed from the basketball, which has a lot of momentum to give: by stopping almost dead, the basketball passes on most of its upward momentum, and because the tennis ball is light, that becomes a big speed. Momentum is conserved in each collision between the balls; the floor (and the Earth behind it) supplies the momentum that turns the basketball around.</p>' +
+                '<p><b>The model.</b> As on the first tab. In the one-at-a-time model each contact lasts 0.05 ms and the balls start 3 mm apart, so the whole sequence takes under a millisecond; in the spring model the bounce takes about 13 ms.</p>' },
+    4: { lede: 'Now turn the stack upside down: the tennis ball underneath, the basketball on top. Predict: does the basketball bounce higher than it would alone?',
+         notes: '<p><b>What to try.</b> Drop the pair with the heavy ball on the bottom, then with the light ball on the bottom. Upside down, the basketball bounces no higher than it would alone, or lower; the tennis ball is squeezed between the two and rattles back and forth.</p>' +
+                '<p><b>Why.</b> The trick needs the heavy ball underneath: it bounces off the floor carrying a lot of momentum, which it hands to the light ball above. With the light ball underneath, the floor turns the tennis ball around, but the tennis ball has too little momentum to turn the heavy basketball around: it bounces off it again and again, between the basketball and the floor, losing energy each time, like a fly trying to stop a truck. The order of the stack matters, not just what is in it.</p>' +
+                '<p><b>The model.</b> As on the first tab. In the one-at-a-time model the tennis ball hits the floor and the basketball many times in quick succession; in the spring model it is squeezed between them in one long contact.</p>' }
+  };
+
+  // ================================================================
+  // 5. CONTROLS
+  // ================================================================
+  $('tower').innerHTML = ORDER.map(id => '<label><input type="checkbox" data-v="' + id + '"> ' + BALLS[id].name + '</label>').join('');
+  function visibility() {
+    $('lab_bot').hidden = !(tab === 1 || tab === 4); $('lab_top').hidden = !(tab === 1 || tab === 4); $('lab_tower').hidden = tab !== 2;
+    $('lab_sm').hidden = tab !== 3; $('lab_ts').hidden = tab !== 3; $('lab_order').hidden = tab !== 4;
+    $('go').textContent = tab === 3 ? (playing ? 'Pause' : 'Play in slow motion') : (playing ? 'Pause' : RUN[tab] && DONE[tab] ? 'Drop again' : RUN[tab] && PLAY[tab] > 0 ? 'Play' : 'Drop');
+    $('slow').hidden = tab === 3; $('slow').textContent = S.slow ? 'Speed: slowed ×10' : 'Speed: real time'; $('slow').setAttribute('aria-pressed', String(S.slow));
+    $('hint').textContent = tab === 3 ? 'or drag the time slider' : '';
+    document.querySelectorAll('#bot button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.bot)));
+    document.querySelectorAll('#top button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.top)));
+    document.querySelectorAll('#tower input').forEach(b => { b.checked = !!S.tower[b.dataset.v]; b.disabled = S.tower[b.dataset.v] && ORDER.filter(id => S.tower[id]).length <= 2; });
+    document.querySelectorAll('#sm button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.sm)));
+    document.querySelectorAll('#order button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.order)));
+    document.querySelectorAll('#model button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.model[tab])));
+    $('scene').setAttribute('aria-label', tab === 3 ? 'The bounce in slow motion, with each ball’s velocity' : 'A stack of balls dropped on the floor: a close-up and the whole flight');
+    $('graph').setAttribute('aria-label', tab === 3 ? 'Each ball’s velocity through the bounce' : 'Height of each ball against time');
+  }
+  function vals() { if (tab === 3 && RUN[3]) { const r = RUN[3], [a, b] = windowOf(r), t = a + (b - a) * TS / 1000; $('ts').value = String(Math.round(TS)); $('ts_v').textContent = ((t - r.contactStart) * 1000).toFixed(S.model[3] === 'ideal' ? 3 : 2) + ' ms'; } }
+  function upd() { visibility(); vals(); draw(); readout(); }
+  function setTab(k) { tab = k; playing = false; [1, 2, 3, 4].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k))); $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes; upd(); }
+  [1, 2, 3, 4].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  // a change of balls or model clears the run (it has to be dropped again)
+  const changed = () => { playing = false; RUN[tab] = null; if (tab === 4 || tab === 1) { RUN[1] = null; RUN[4] = null; } if (tab === 3) { compute(3); TS = 0; } upd(); };
+  document.querySelectorAll('#bot button').forEach(b => b.addEventListener('click', () => { S.bot = b.dataset.v; changed(); }));
+  document.querySelectorAll('#top button').forEach(b => b.addEventListener('click', () => { S.top = b.dataset.v; changed(); }));
+  document.querySelectorAll('#tower input').forEach(b => b.addEventListener('change', () => { S.tower[b.dataset.v] = b.checked; changed(); }));
+  document.querySelectorAll('#sm button').forEach(b => b.addEventListener('click', () => { S.sm = +b.dataset.v; changed(); }));
+  document.querySelectorAll('#order button').forEach(b => b.addEventListener('click', () => { S.order = b.dataset.v; changed(); }));
+  document.querySelectorAll('#model button').forEach(b => b.addEventListener('click', () => { S.model[tab] = b.dataset.v; changed(); }));
+  $('ts').addEventListener('input', () => { TS = +$('ts').value; playing = false; upd(); });
+  $('slow').addEventListener('click', () => { S.slow = !S.slow; upd(); });
+  $('go').addEventListener('click', () => {
+    if (playing) { playing = false; upd(); return; }
+    if (tab === 3) { if (TS >= 1000) TS = 0; playing = true; upd(); return; }
+    if (!RUN[tab] || DONE[tab]) compute(tab);
+    playing = true; upd();
+  });
+  window.addEventListener('resize', draw);
+
+  // ================================================================
+  // 6. LOOP
+  // ================================================================
+  let last = null;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(ts) {
+    const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+    if (playing && dt > 0 && !document.hidden) {
+      if (tab === 3) { TS = Math.min(1000, TS + (reduced ? 1000 : dt * 1000 / 4)); if (TS >= 1000) playing = false; }   // the whole bounce in about 4 s
+      else { const r = RUN[tab]; PLAY[tab] = reduced ? r.end : Math.min(r.end, PLAY[tab] + dt * (S.slow ? 0.1 : 1)); if (PLAY[tab] >= r.end) { playing = false; DONE[tab] = true; } }
+      upd();
+    }
+    requestAnimationFrame(frame);
+  }
+  setTab(1);
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

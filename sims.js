@@ -20,6 +20,17 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'ball-stack',
+    title: 'The bouncing ball stack',
+    pageTitle: 'Ball stack simulation: why a tennis ball dropped on a basketball bounces so high',
+    topic: 'dynamics',
+    tags: ['collisions', 'momentum', 'coefficient of restitution', 'basketball and tennis ball', 'stacked ball drop', 'elastic collision', 'energy'],
+    blurb: "Drop a tennis ball sitting on a basketball and it flies three times as high as it started. Swap in real balls, stack a tower whose top ball can leave at many times the speed it fell, slow the bounce down to a thousandth of a second, and turn the stack upside down.",
+    level: 'intro',
+    added: '2026-11-01',
+    status: 'ready'
+  },
+  {
     slug: 'fluid-pressure',
     title: 'Pressure in fluids',
     pageTitle: 'Fluid pressure simulation: hydrostatic paradox, straws and barometers, buoyancy',
