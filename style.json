@@ -149,7 +149,7 @@
     "level": "intro | intermediate",
     "added": "YYYY-MM-DD",
     "status": "ready | beta",
-    "thumb": "optional path to a 16:9 image"
+    "thumb": "path to the card picture, thumbs/<slug>.svg: a simple line drawing of the setup in the topic color, 320 x 180 on white (a 16:9 image also works); without it the card shows a generic drawing for the topic"
   },
   "submission_checklist": [
     "Opens from a local file with no network and no console errors",

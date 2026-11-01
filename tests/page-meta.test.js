@@ -1,7 +1,7 @@
 // The pages are in step with sims.js (run `npm run meta` to update them): every listed simulation's page has its
 // title, description, link-preview tags and the site's analytics; drafts (pages not listed yet) ask search engines
 // to leave them out; the home page's HTML lists every simulation, as its script draws them; and sitemap.xml and
-// robots.txt match.
+// robots.txt match; and every card picture sims.js names exists.
 'use strict';
 const fs = require('fs'), path = require('path');
 const M = require('../tools/page-meta.js');
@@ -28,6 +28,8 @@ ok(ix.includes('<link rel="canonical" href="' + M.SITE_URL + '/">') && ix.includ
 const locs = [...read('sitemap.xml').matchAll(/<loc>([^<]*)<\/loc>/g)].map(m => m[1]);
 ok(locs.length === SIMS.length + 1 && locs[0] === M.SITE_URL + '/' && SIMS.every(s => locs.includes(M.SITE_URL + '/sims/' + s.slug)), 'sitemap.xml lists the home page and every simulation');
 ok(read('robots.txt').includes('Sitemap: ' + M.SITE_URL + '/sitemap.xml'), 'robots.txt points to the sitemap');
+const noPic = SIMS.filter(s => s.thumb && !fs.existsSync(path.join(ROOT, s.thumb))).map(s => s.slug);
+ok(!noPic.length, 'every card picture named in sims.js is there' + (noPic.length ? ': missing for ' + noPic.join(', ') : ''));
 const png = fs.readFileSync(path.join(ROOT, 'share.png'));
 ok(png.slice(1, 4).toString() === 'PNG' && png.readUInt32BE(16) === 1200 && png.readUInt32BE(20) === 630, 'share.png is a 1200 × 630 PNG');
 

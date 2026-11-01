@@ -44,6 +44,7 @@ opening a pull request, run `npm test`. GitHub runs the same tests on every push
 index.html        the directory page (search + topic filters)
 sims.js           the manifest: one entry per simulation
 sims/             the simulations, one .html each
+thumbs/           each simulation's picture for its card on the home page (an SVG, 320 × 180)
 TEMPLATE.html     a complete starter simulation to copy from
 PROMPT.md         how to draft a simulation with an AI model, with the prompt to use
 STYLE_GUIDE.md    what a simulation should look and behave like, and why
@@ -82,6 +83,7 @@ for a new simulation.
   slug: 'rolling-race',                  // must match the file name
   title: 'Rolling race',
   topic: 'rotation',                     // one of the keys in TOPICS at the top of sims.js
+  thumb: 'thumbs/rolling-race.svg',      // its card picture (step 4)
   tags: ['moment of inertia', 'energy'],
   blurb: 'Hoop, disc and sphere down the same ramp, with kinetic energy split into translational and rotational.',
   level: 'intro',                        // 'intro' or 'intermediate'
@@ -96,7 +98,9 @@ for a new simulation.
    name. Search engines show these, so give `pageTitle` the words a teacher would type: "Brachistochrone
    simulation: the fastest slide" rather than just "The fastest slide". It also adds the page to the home page's
    list and the sitemap. The tests fail if a page has drifted from its entry.
-4. Optionally add `thumb: 'thumbs/rolling-race.png'` for a real screenshot (16:9). Without it the card gets a schematic drawn from the topic.
+4. Give it a picture for its card: a simple line drawing in the topic's color, saved as `thumbs/rolling-race.svg`
+   (320 × 180, white background; the ones already there show the style), and add `thumb: 'thumbs/rolling-race.svg'`
+   to the entry. A 16:9 screenshot works too. Until it has one, the card shows a generic drawing for its topic.
 5. Run through the checklist at the end of `STYLE_GUIDE.md`, then open a pull request.
 
 To add a topic, add a key to `TOPICS` in `sims.js` with a display name and a color.

@@ -21,6 +21,7 @@ window.TOPICS = {
 window.SIMS = [
   {
     slug: 'ball-stack',
+    thumb: 'thumbs/ball-stack.svg',
     title: 'The bouncing ball stack',
     pageTitle: 'Ball stack simulation: why a tennis ball dropped on a basketball bounces so high',
     topic: 'dynamics',
@@ -32,6 +33,7 @@ window.SIMS = [
   },
   {
     slug: 'fluid-pressure',
+    thumb: 'thumbs/fluid-pressure.svg',
     title: 'Pressure in fluids',
     pageTitle: 'Fluid pressure simulation: hydrostatic paradox, straws and barometers, buoyancy',
     topic: 'fluids',
@@ -43,6 +45,7 @@ window.SIMS = [
   },
   {
     slug: 'blackbody',
+    thumb: 'thumbs/blackbody.svg',
     title: 'Blackbody radiation and the colors of stars',
     pageTitle: 'Blackbody radiation simulation: Planck, Wien, Stefan–Boltzmann and star colors',
     topic: 'astronomy',
@@ -54,6 +57,7 @@ window.SIMS = [
   },
   {
     slug: 'entropy',
+    thumb: 'thumbs/entropy.svg',
     title: 'Entropy and microstates',
     pageTitle: 'Entropy simulation: microstates, S = k ln Ω, and why heat flows hot to cold',
     topic: 'thermo',
@@ -65,6 +69,7 @@ window.SIMS = [
   },
   {
     slug: 'fourier',
+    thumb: 'thumbs/fourier.svg',
     title: 'Fourier: building waves',
     pageTitle: 'Fourier series simulation: build, draw and hear waves made of harmonics',
     topic: 'oscillations',
@@ -76,6 +81,7 @@ window.SIMS = [
   },
   {
     slug: 'michelson-interferometer',
+    thumb: 'thumbs/michelson-interferometer.svg',
     title: 'The Michelson interferometer',
     pageTitle: 'Michelson interferometer simulation: fringes, refractive index and LIGO',
     topic: 'optics',
@@ -87,6 +93,7 @@ window.SIMS = [
   },
   {
     slug: 'doppler-effect',
+    thumb: 'thumbs/doppler-effect.svg',
     title: 'The Doppler effect',
     pageTitle: 'Doppler effect simulation: sirens, sonic booms and redshift',
     topic: 'oscillations',
@@ -98,6 +105,7 @@ window.SIMS = [
   },
   {
     slug: 'gravitational-lensing',
+    thumb: 'thumbs/gravitational-lensing.svg',
     title: 'Gravitational lensing',
     pageTitle: 'Gravitational lensing simulation: Einstein rings, arcs and microlensing',
     topic: 'astronomy',
@@ -109,6 +117,7 @@ window.SIMS = [
   },
   {
     slug: 'gyroscope',
+    thumb: 'thumbs/gyroscope.svg',
     title: 'Gyroscope precession',
     pageTitle: 'Gyroscope simulation: precession and nutation',
     topic: 'rotation',
@@ -120,6 +129,7 @@ window.SIMS = [
   },
   {
     slug: 'radio-waves',
+    thumb: 'thumbs/radio-waves.svg',
     title: 'Radio waves',
     topic: 'em',
     tags: ['radio waves', 'electromagnetic waves', 'radiation', 'accelerating charge', 'field lines', 'antenna', 'dipole', 'polarization', 'speed of light'],
@@ -130,6 +140,7 @@ window.SIMS = [
   },
   {
     slug: 'stern-gerlach',
+    thumb: 'thumbs/stern-gerlach.svg',
     title: 'Stern–Gerlach: spin',
     pageTitle: 'Stern–Gerlach experiment simulation: spin',
     topic: 'modern',
@@ -141,6 +152,7 @@ window.SIMS = [
   },
   {
     slug: 'tunneling',
+    thumb: 'thumbs/tunneling.svg',
     title: 'Quantum tunneling',
     topic: 'modern',
     tags: ['tunneling', 'wave function', 'Schrodinger equation', 'barrier', 'wave packet', 'transmission', 'scanning tunneling microscope', 'alpha decay', 'Gamow'],
@@ -151,6 +163,7 @@ window.SIMS = [
   },
   {
     slug: 'atwood-machine',
+    thumb: 'thumbs/atwood-machine.svg',
     title: 'Atwood machine',
     pageTitle: 'Atwood machine simulation: pulleys, tension and acceleration',
     topic: 'dynamics',
@@ -162,6 +175,7 @@ window.SIMS = [
   },
   {
     slug: 'ballistic-pendulum',
+    thumb: 'thumbs/ballistic-pendulum.svg',
     title: 'Ballistic pendulum',
     pageTitle: 'Ballistic pendulum simulation: momentum and energy',
     topic: 'dynamics',
@@ -173,6 +187,7 @@ window.SIMS = [
   },
   {
     slug: 'coriolis',
+    thumb: 'thumbs/coriolis.svg',
     title: 'Turning frames: the Coriolis effect',
     pageTitle: 'Coriolis effect simulation: rotating frames',
     topic: 'rotation',
@@ -184,6 +199,7 @@ window.SIMS = [
   },
   {
     slug: 'collisions',
+    thumb: 'thumbs/collisions.svg',
     title: 'Colliding carts',
     pageTitle: 'Collisions and momentum simulation: colliding carts',
     topic: 'dynamics',
@@ -195,6 +211,7 @@ window.SIMS = [
   },
   {
     slug: 'induction',
+    thumb: 'thumbs/induction.svg',
     title: 'Electromagnetic induction',
     pageTitle: 'Electromagnetic induction simulation: Faraday\'s and Lenz\'s laws',
     topic: 'em',
@@ -206,6 +223,7 @@ window.SIMS = [
   },
   {
     slug: 'polarization',
+    thumb: 'thumbs/polarization.svg',
     title: 'Polarized light',
     pageTitle: 'Polarized light simulation: polarizers and Malus\'s law',
     topic: 'optics',
@@ -217,6 +235,7 @@ window.SIMS = [
   },
   {
     slug: 'rotational-inertia',
+    thumb: 'thumbs/rotational-inertia.svg',
     title: 'Torque and rotational inertia',
     topic: 'rotation',
     tags: ['torque', 'rotational inertia', 'moment of inertia', 'angular acceleration', 'parallel-axis theorem', 'tension', 'lab'],
@@ -227,6 +246,7 @@ window.SIMS = [
   },
   {
     slug: 'brachistochrone',
+    thumb: 'thumbs/brachistochrone.svg',
     title: 'The fastest slide',
     pageTitle: 'Brachistochrone simulation: the fastest slide',
     topic: 'dynamics',
@@ -238,6 +258,7 @@ window.SIMS = [
   },
   {
     slug: 'pulling-crate',
+    thumb: 'thumbs/pulling-crate.svg',
     title: 'Pulling a crate',
     pageTitle: 'Friction simulation: pulling a crate at an angle',
     topic: 'dynamics',
@@ -249,6 +270,7 @@ window.SIMS = [
   },
   {
     slug: 'driven-oscillator',
+    thumb: 'thumbs/driven-oscillator.svg',
     title: 'Damped, driven oscillator',
     pageTitle: 'Damped, driven oscillator simulation: resonance',
     topic: 'oscillations',
@@ -260,6 +282,7 @@ window.SIMS = [
   },
   {
     slug: 'exoplanets',
+    thumb: 'thumbs/exoplanets.svg',
     title: 'Finding exoplanets',
     pageTitle: 'Exoplanet simulation: transits and radial velocity',
     topic: 'astronomy',
@@ -271,6 +294,7 @@ window.SIMS = [
   },
   {
     slug: 'ramp',
+    thumb: 'thumbs/ramp.svg',
     title: 'A crate on a ramp',
     pageTitle: 'Inclined plane simulation: a crate on a ramp with friction',
     topic: 'dynamics',
@@ -282,6 +306,7 @@ window.SIMS = [
   },
   {
     slug: 'photoelectric',
+    thumb: 'thumbs/photoelectric.svg',
     title: 'The photoelectric effect',
     pageTitle: 'Photoelectric effect simulation',
     topic: 'modern',
@@ -293,6 +318,7 @@ window.SIMS = [
   },
   {
     slug: 'thin-film',
+    thumb: 'thumbs/thin-film.svg',
     title: 'Thin-film interference',
     topic: 'optics',
     tags: ['interference', 'thin films', 'soap film', 'phase change on reflection', 'anti-reflection coating', 'air wedge', "Newton's rings", 'color'],
@@ -303,6 +329,7 @@ window.SIMS = [
   },
   {
     slug: 'standing-waves',
+    thumb: 'thumbs/standing-waves.svg',
     title: 'Standing waves',
     topic: 'oscillations',
     tags: ['standing waves', 'resonance', 'harmonics', 'normal modes', 'string', 'air columns', 'open and closed pipes', 'speed of sound'],
@@ -313,6 +340,7 @@ window.SIMS = [
   },
   {
     slug: 'relativity',
+    thumb: 'thumbs/relativity.svg',
     title: 'Moving clocks and the twin paradox',
     pageTitle: 'Time dilation simulation: moving clocks and the twin paradox',
     topic: 'modern',
@@ -324,6 +352,7 @@ window.SIMS = [
   },
   {
     slug: 'magnet-tube',
+    thumb: 'thumbs/magnet-tube.svg',
     title: 'Magnet falling through a copper tube',
     pageTitle: 'Magnet in a copper tube simulation: eddy currents',
     topic: 'em',
@@ -335,6 +364,7 @@ window.SIMS = [
   },
   {
     slug: 'heat-engines',
+    thumb: 'thumbs/heat-engines.svg',
     title: 'Heat engines on a PV diagram',
     pageTitle: 'Heat engine simulation: PV diagrams and efficiency',
     topic: 'thermo',
@@ -346,6 +376,7 @@ window.SIMS = [
   },
   {
     slug: 'newtons-cannon',
+    thumb: 'thumbs/newtons-cannon.svg',
     title: "Newton's cannonball",
     pageTitle: 'Newton\'s cannonball simulation: orbits and escape velocity',
     topic: 'astronomy',
@@ -357,6 +388,7 @@ window.SIMS = [
   },
   {
     slug: 'angular-velocity',
+    thumb: 'thumbs/angular-velocity.svg',
     title: 'Angular and linear velocity',
     topic: 'rotation',
     tags: ['angular velocity', 'tangential speed', 'centripetal acceleration', 'period', 'rigid body'],
@@ -367,6 +399,7 @@ window.SIMS = [
   },
   {
     slug: 'forces-1d',
+    thumb: 'thumbs/forces-1d.svg',
     title: 'Forces in one dimension',
     pageTitle: 'Newton\'s second law simulation: forces in one dimension',
     topic: 'dynamics',
@@ -378,6 +411,7 @@ window.SIMS = [
   },
   {
     slug: 'laser',
+    thumb: 'thumbs/laser.svg',
     title: 'How a laser works',
     pageTitle: 'Laser simulation: how stimulated emission works',
     topic: 'modern',
@@ -389,6 +423,7 @@ window.SIMS = [
   },
   {
     slug: 'gauss-law',
+    thumb: 'thumbs/gauss-law.svg',
     title: "Gauss's law",
     topic: 'em',
     tags: ['electric flux', 'field lines', 'symmetry', 'line charge'],
@@ -399,6 +434,7 @@ window.SIMS = [
   },
   {
     slug: 'rocket-staging',
+    thumb: 'thumbs/rocket-staging.svg',
     title: 'Rocket staging',
     topic: 'dynamics',
     tags: ['rocket equation', 'variable mass', 'momentum', 'orbital velocity'],
@@ -409,6 +445,7 @@ window.SIMS = [
   },
   {
     slug: 'static-equilibrium',
+    thumb: 'thumbs/static-equilibrium.svg',
     title: 'Static equilibrium',
     topic: 'rotation',
     tags: ['torque', 'free-body diagram', 'ladder problem', 'reaction forces', 'friction'],
@@ -419,6 +456,7 @@ window.SIMS = [
   },
   {
     slug: 'charged-particle-fields',
+    thumb: 'thumbs/charged-particle-fields.svg',
     title: 'Charged particle in electric and magnetic fields',
     topic: 'em',
     tags: ['magnetic force', 'velocity selector', 'mass spectrometer', 'cyclotron', 'Lorentz force'],
@@ -429,6 +467,7 @@ window.SIMS = [
   },
   {
     slug: 'rolling-race',
+    thumb: 'thumbs/rolling-race.svg',
     title: 'Rolling race',
     pageTitle: 'Rolling race simulation: moment of inertia',
     topic: 'rotation',
@@ -440,6 +479,7 @@ window.SIMS = [
   },
   {
     slug: 'river-crossing',
+    thumb: 'thumbs/river-crossing.svg',
     title: 'River crossing',
     pageTitle: 'River crossing simulation: relative velocity',
     topic: 'kinematics',
@@ -451,6 +491,7 @@ window.SIMS = [
   },
   {
     slug: 'ballistics-cart',
+    thumb: 'thumbs/ballistics-cart.svg',
     title: 'Ballistics cart',
     topic: 'kinematics',
     tags: ['projectiles', 'reference frames', 'relative motion', 'inclined plane'],
@@ -461,6 +502,7 @@ window.SIMS = [
   },
   {
     slug: 'boat-walker',
+    thumb: 'thumbs/boat-walker.svg',
     title: 'Walking on a boat',
     pageTitle: 'Walking on a boat simulation: center of mass',
     topic: 'dynamics',
@@ -472,6 +514,7 @@ window.SIMS = [
   },
   {
     slug: 'orbital-resonance',
+    thumb: 'thumbs/orbital-resonance.svg',
     title: 'Orbital resonance',
     topic: 'astronomy',
     tags: ['orbits', 'Kepler', 'Kirkwood gaps', 'Pluto', 'three-body'],
@@ -482,6 +525,7 @@ window.SIMS = [
   },
   {
     slug: 'pn-junction',
+    thumb: 'thumbs/pn-junction.svg',
     title: 'p-n junction diode',
     topic: 'materials',
     tags: ['semiconductors', 'band diagram', 'doping', 'depletion region', 'diode'],
