@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<!--
+  Motion graphs - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. The walker that follows your
+  finger stays within its speed and acceleration limits and settles without overshooting, and the velocity and
+  acceleration it reports are the rates of change of its position; motion planned from a velocity graph agrees with
+  the constant-acceleration formulas, the area under the graph, and a separate step-by-step integration, walls
+  included; and every graph to match can be walked.
+  Credit: in the spirit of PhET's Java simulation The Moving Man, an independent implementation; see the notes.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motion graphs simulation: position, velocity and acceleration | Open Physics Sims</title>
+<meta name="description" content="Walk a person along a sidewalk and watch the position, velocity and acceleration graphs draw themselves; plan a walk from its velocity graph; or try to walk a given position graph. Hide the graphs to predict them first.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --pos: #1D4F73; --vel: #2E7D32; --acc: #C8321E; --target: #8A97A0;
+    --walk: #E3E0D4; --curb: #B9B4A2; --house: #9C6B4E; --leaf: #5E8C4A;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 190; touch-action: none; cursor: grab; }
+  #scene.grabbing { cursor: grabbing; }
+  #graph { aspect-ratio: 900 / 430; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 10px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  #preset { display: grid; grid-template-columns: 1fr 1fr; }
+  #preset button:nth-child(3) { border-left: 0; }
+  #preset button:nth-child(n+3) { border-top: 1px solid var(--ink); }
+
+  .readout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 18px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.42; }
+    #graph { aspect-ratio: 1 / 1.15; }
+    .readout { grid-template-columns: 1fr 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+<!-- site tags: written by tools/page-meta.js from sims.js (npm run meta); edits here are replaced -->
+<link rel="canonical" href="https://opensims.wu-physics.net/sims/motion-graphs">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Open Physics Sims">
+<meta property="og:title" content="Motion graphs simulation: position, velocity and acceleration">
+<meta property="og:description" content="Walk a person along a sidewalk and watch the position, velocity and acceleration graphs draw themselves; plan a walk from its velocity graph; or try to walk a given position graph. Hide the graphs to predict them first.">
+<meta property="og:url" content="https://opensims.wu-physics.net/sims/motion-graphs">
+<meta property="og:image" content="https://opensims.wu-physics.net/share.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Open Physics Sims: free interactive physics simulations for teaching">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-RIyzwHpiR6eo6nzLty9EI.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+<!-- /site tags -->
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Motion graphs</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>You drive</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Graph to motion</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>Match the graph</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" tabindex="0" aria-label="A sidewalk with a walker you can drag, a house at the left end and a tree at the right"></canvas>
+  <div class="row2" id="row2">
+    <button id="go">Play</button>
+    <button id="again" class="secondary">Start over</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Graphs of position, velocity and acceleration against time"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <div class="grp" id="lab_preset"><div>Start from</div><div class="seg" id="preset" role="group" aria-label="Velocity graph to start from"><button data-v="steady">steady</button><button data-v="faster">speeding up</button><button data-v="turn">turning back</button><button data-v="stopgo">stop and go</button></div></div>
+    <label id="lab_x0"><div class="row"><span>Where the walker starts</span><span class="val" id="x0_v"></span></div><input type="range" id="x0" min="-9" max="9" step="0.5"></label>
+    <div class="grp" id="lab_target"><div>Graph to match</div><div class="seg" id="target" role="group" aria-label="Graph to match"><button data-v="0">1</button><button data-v="1">2</button><button data-v="2">3</button><button data-v="3">4</button><button data-v="4">5</button><button data-v="5">6</button></div></div>
+    <div class="grp" id="lab_vel"><div>Velocity graph</div><div class="seg" id="showv" role="group" aria-label="Velocity graph"><button data-v="1">shown</button><button data-v="0">hidden</button></div></div>
+    <div class="grp" id="lab_acc"><div>Acceleration graph</div><div class="seg" id="showa" role="group" aria-label="Acceleration graph"><button data-v="1">shown</button><button data-v="0">hidden</button></div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/motion-graphs.test.js)
+  // ================================================================
+  // ---- physics core: motion graphs ----
+  // A walker on a sidewalk from -10 m to +10 m (a wall at each end), over a 20 s run. Positions in meters, times in
+  // seconds, velocities in m/s, accelerations in m/s². Everything is recorded at a fixed rate, SAMPLE per second.
+  const WALL = 10, RUN = 20, SAMPLE = 60;
+  const N = RUN * SAMPLE;                                     // samples after t = 0 (so N + 1 in all)
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  // ---- the walker follows your finger, as a person would ----
+  // It heads for the pointer at a speed that eases off as it gets close (K per second of distance), never faster than
+  // VMAX, and never so fast it couldn't stop in time; it changes speed toward that over TAU, never faster than AMAX.
+  const WALKER = { VMAX: 4, AMAX: 5, K: 3, TAU: 0.08, SMOOTH: 0.12, SUB: 8 };      // 4 K TAU ≤ 1: it settles without overshooting
+  // It heads not for the pointer itself but for where the pointer has been over the last SMOOTH seconds or so, the way
+  // a person ignores a twitch of your hand; a mouse or finger moves in little jumps.
+  // one step of dt: from { x, v, g } toward the pointer at xp (g: where it is heading); returns { x, v, a, g }
+  function follow(s, xp, dt, P) {
+    P = P || WALKER; xp = clamp(xp, -WALL, WALL);
+    let { x, v } = s, g = s.g === undefined ? x : s.g, a; const h = dt / P.SUB;
+    for (let j = 0; j < P.SUB; j++) {
+      g += (xp - g) * (1 - Math.exp(-h / P.SMOOTH));
+      const d = g - x, want = Math.sign(d) * Math.min(P.VMAX, P.K * Math.abs(d), Math.sqrt(2 * 0.7 * P.AMAX * Math.abs(d)));
+      a = clamp((want - v) / P.TAU, -P.AMAX, P.AMAX);
+      v += a * h; x += v * h;                                 // semi-implicit Euler: new speed, then new place
+      if (Math.abs(x) > WALL) { x = Math.sign(x) * WALL; v = 0; }
+    }
+    return { x, v, a: (v - s.v) / dt, g };                  // the acceleration over the step: the slope of the velocity graph
+  }
+
+  // ---- motion from a velocity graph ----
+  // The velocity graph is straight lines between knots at KNOT_T; the walker starts at x0. Exact: position is the area
+  // under the velocity graph, acceleration the slope of each line. At a wall, the walker stops and stays.
+  const KNOT_T = [0, 4, 8, 12, 16, 20];
+  const VLIM = 3;                                             // the knots stay within ±3 m/s
+  function planAt(knots, x0, t) {                             // without the walls
+    let x = x0;
+    for (let j = 0; j < KNOT_T.length - 1; j++) {
+      const t0 = KNOT_T[j], t1 = KNOT_T[j + 1], v0 = knots[j], v1 = knots[j + 1], s = (v1 - v0) / (t1 - t0);
+      if (t <= t1 || j === KNOT_T.length - 2) { const u = Math.min(t, t1) - t0; return { x: x + v0 * u + 0.5 * s * u * u, v: v0 + s * u, a: s }; }
+      x += (v0 + v1) / 2 * (t1 - t0);
+    }
+  }
+  // the whole run, sampled; hit: the time the walker reached a wall (or null)
+  function planRun(knots, x0) {
+    const x = new Float64Array(N + 1), v = new Float64Array(N + 1), a = new Float64Array(N + 1); let hit = null;
+    for (let i = 0; i <= N; i++) {
+      const t = i / SAMPLE;
+      if (hit !== null) { x[i] = x[i - 1]; v[i] = 0; a[i] = 0; continue; }
+      const p = planAt(knots, x0, t);
+      if (Math.abs(p.x) >= WALL) {                            // find when it got there, between this sample and the last
+        let lo = (i - 1) / SAMPLE, hi = t; for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; if (Math.abs(planAt(knots, x0, m).x) >= WALL) hi = m; else lo = m; }
+        hit = hi; x[i] = Math.sign(p.x) * WALL; v[i] = 0; a[i] = 0; continue;
+      }
+      x[i] = p.x; v[i] = p.v; a[i] = p.a;
+    }
+    return { x, v, a, hit };
+  }
+  // some velocity graphs to start from
+  const PRESETS = {
+    steady:  { name: 'steady',      x0: -9, v: [0.9, 0.9, 0.9, 0.9, 0.9, 0.9] },
+    faster:  { name: 'speeding up', x0: -8, v: [0, 0.2, 0.4, 0.6, 0.8, 1.0] },
+    turn:    { name: 'turning back', x0: 0, v: [2, 1, 0, -1, -2, -2] },
+    stopgo:  { name: 'stop and go', x0: -8, v: [1.5, 1.5, 0, 0, 1, 1] }
+  };
+
+  // ---- position graphs to match ----
+  // Each starts where the walker is put before "go", stays inside the walls, and is walkable (no faster than 2 m/s).
+  const TARGETS = [
+    t => -8 + 0.6 * t,                                        // 1: away, steadily
+    t => t < 6 ? 6 : Math.max(-6, 6 - (t - 6)),               // 2: wait, then toward the house, then wait
+    t => -9 + 0.04 * t * t,                                   // 3: from rest, faster and faster
+    t => -9 + 1.6 * t - 0.04 * t * t,                         // 4: fast, slowing to a stop
+    t => -6 + 12 * Math.sin(Math.PI * t / 20),                // 5: out and back
+    t => t < 6 ? 8 - 1.5 * t : -1 - 0.25 * (t - 6)            // 6: quickly toward the house, then slowly
+  ];
+  // how far, on average, a walk missed the target (root mean square, in meters), over the samples walked so far
+  function miss(xs, f, upto) { let s = 0; const n = Math.min(upto === undefined ? xs.length - 1 : upto, xs.length - 1); for (let i = 0; i <= n; i++) { const d = xs[i] - f(i / SAMPLE); s += d * d; } return Math.sqrt(s / (n + 1)); }
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. STATE
+  // ================================================================
+  const DT = 1 / SAMPLE;
+  const VR = 4, AR = 6;                                   // the graphs' fixed scales: ±4 m/s and ±6 m/s²
+  const blank = () => ({ x: new Float64Array(N + 1), v: new Float64Array(N + 1), a: new Float64Array(N + 1), n: -1 });
+  const S = {
+    showV: true, showA: true,
+    walker: { x: -6, v: 0, a: 0 }, xp: -6, grab: false, stride: 0, face: 1,
+    // tab 1: a recording that starts when you first move the walker
+    rec: blank(), run1: 'wait',                           // wait | run | pause | done
+    // tab 2: a velocity graph, and playing it
+    knots: PRESETS.steady.v.slice(), x0: PRESETS.steady.x0, preset: 'steady', plan: null, idx: -1, play: false,
+    // tab 3: a graph to match
+    target: 0, rec3: blank(), run3: 'ready', count: 0      // ready | count | run | done
+  };
+  let tab = 1;
+  const plan = () => S.plan || (S.plan = planRun(S.knots, S.x0));
+
+  // ================================================================
+  // 3. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y) { ctx.save(); ctx.strokeStyle = C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  function arrow(ctx, x0, y, x1, col, txt) {
+    if (Math.abs(x1 - x0) < 2) return;
+    const d = Math.sign(x1 - x0); ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1 - d * 6, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x1 - d * 9, y - 5); ctx.lineTo(x1 - d * 9, y + 5); ctx.closePath(); ctx.fill();
+    font(ctx, 11, 600); ctx.textAlign = d > 0 ? 'left' : 'right'; label(ctx, txt, x1 + d * 4, y + 4);
+  }
+  // the walker's state now, whichever screen
+  function now() {
+    if (tab === 2) { const p = plan(), i = Math.max(0, S.idx); return { x: p.x[i], v: p.v[i], a: p.a[i] }; }
+    return S.walker;
+  }
+  let sceneMap = null;
+  function drawScene() {
+    const { ctx, W, H, compact } = fit($('scene')); ctx.clearRect(0, 0, W, H);
+    if (W < 120 || H < 50) return;
+    const m = compact ? 30 : 58, X = x => m + (x + WALL) / (2 * WALL) * (W - 2 * m), ppm = (W - 2 * m) / (2 * WALL);
+    const gy = H - (compact ? 30 : 36); sceneMap = { X, ppm, m, W };
+    // sidewalk, with a mark every meter
+    ctx.fillStyle = C('--walk'); ctx.fillRect(X(-WALL), gy, X(WALL) - X(-WALL), 10); ctx.fillStyle = C('--curb'); ctx.fillRect(X(-WALL), gy + 10, X(WALL) - X(-WALL), 3);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center'; ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1;
+    for (let x = -WALL; x <= WALL; x++) { const big = x % (compact ? 5 : 2) === 0; ctx.beginPath(); ctx.moveTo(X(x), gy); ctx.lineTo(X(x), gy + (big ? 10 : 5)); ctx.stroke(); if (big) ctx.fillText(x + (x === 0 ? ' m' : ''), X(x), gy + 25); }
+    // the house at the left end, the tree at the right
+    const hw = m - 6, hh = Math.min(H * 0.42, hw * 1.1), hx = X(-WALL) - hw;
+    ctx.fillStyle = C('--house'); ctx.fillRect(hx, gy - hh, hw, hh + 13);
+    ctx.beginPath(); ctx.moveTo(hx - 4, gy - hh); ctx.lineTo(hx + hw / 2, gy - hh - hw * 0.6); ctx.lineTo(hx + hw + 4, gy - hh); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C('--panel'); ctx.fillRect(hx + hw * 0.3, gy - hh * 0.55, hw * 0.4, hh * 0.55);
+    const tx = X(WALL) + hw / 2 + 3; ctx.fillStyle = C('--house'); ctx.fillRect(tx - 3, gy - hh * 0.9, 6, hh * 0.9 + 13);
+    ctx.fillStyle = C('--leaf'); ctx.beginPath(); ctx.arc(tx, gy - hh * 1.05, hw * 0.48, 0, TAU); ctx.fill();
+    // the walker
+    const s = now(), x = X(s.x), ht = Math.min(H * 0.48, compact ? 46 : 64), hd = ht * 0.13, step = Math.sin(S.stride) * 0.45 + 0.16, f = S.face;   // 0.16: a standing stance
+    ctx.strokeStyle = C('--ink'); ctx.fillStyle = C('--ink'); ctx.lineWidth = compact ? 2.5 : 3; ctx.lineCap = 'round';
+    const hip = gy - ht * 0.45, neck = gy - ht + 2 * hd;
+    ctx.beginPath(); ctx.moveTo(x, hip); ctx.lineTo(x + Math.sin(step) * ht * 0.45, gy - 1); ctx.moveTo(x, hip); ctx.lineTo(x - Math.sin(step) * ht * 0.45, gy - 1);
+    ctx.moveTo(x, hip); ctx.lineTo(x + f * 2, neck);
+    const sh = neck + ht * 0.06; ctx.moveTo(x + f * 2, sh); ctx.lineTo(x + f * 2 - Math.sin(step) * ht * 0.32, sh + ht * 0.3); ctx.moveTo(x + f * 2, sh); ctx.lineTo(x + f * 2 + Math.sin(step) * ht * 0.32, sh + ht * 0.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + f * 3, neck - hd, hd, 0, TAU); ctx.fill(); ctx.lineCap = 'butt';
+    // arrows for velocity and acceleration, when their graphs are shown
+    let ay = gy - ht - 14;
+    if (S.showV || tab === 2) { arrow(ctx, x, ay, x + s.v * ppm, C('--vel'), 'v'); ay -= 15; }
+    if (S.showA) arrow(ctx, x, ay, x + s.a * ppm * 0.5, C('--acc'), 'a');
+    // messages
+    font(ctx, compact ? 11 : 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    let msg = '';
+    if (tab === 1) msg = S.run1 === 'wait' ? 'grab the walker to start the clock' : S.run1 === 'done' ? 'time’s up' : '';
+    if (tab === 2 && plan().hit !== null && S.idx >= plan().hit * SAMPLE) msg = 'bumped into the ' + (plan().x[N] < 0 ? 'house' : 'tree') + ' at ' + plan().hit.toFixed(1) + ' s';
+    if (tab === 3) msg = S.run3 === 'ready' ? 'the walker is at the graph’s start: press Ready, set, go' : S.run3 === 'done' ? 'done: average miss ' + miss(S.rec3.x, TARGETS[S.target], S.rec3.n).toFixed(2) + ' m' : '';
+    if (msg) label(ctx, msg, X(-WALL) + 6, 16);
+    const word = tab !== 3 ? '' : S.run3 === 'count' ? (S.count > 2 ? 'Ready' : 'Set') : S.run3 === 'run' && S.rec3.n < 0.8 * SAMPLE ? 'Go!' : '';
+    if (word) { font(ctx, compact ? 30 : 40, 600); ctx.fillStyle = C('--ink'); ctx.textAlign = 'center'; label(ctx, word, W / 2, H * 0.42); }
+  }
+
+  // ---- the three graphs ----
+  let graphMap = null;
+  function drawGraphs() {
+    const { ctx, W, H, compact } = fit($('graph')); ctx.clearRect(0, 0, W, H);
+    if (W < 160 || H < 120) return;
+    const L = compact ? 44 : 62, R = 12, top = 8, bot = 30, gap = compact ? 10 : 12, ph = (H - top - bot - 2 * gap) / 3, w = W - L - R;
+    const T = t => L + t / RUN * w;
+    const panels = [
+      { key: 'x', name: 'position', unit: 'm', lim: WALL, step: 5, col: C('--pos'), shown: true },
+      { key: 'v', name: 'velocity', unit: 'm/s', lim: VR, step: 2, col: C('--vel'), shown: S.showV || tab === 2 },
+      { key: 'a', name: 'acceleration', unit: 'm/s²', lim: AR, step: 3, col: C('--acc'), shown: S.showA }
+    ];
+    // what each graph shows, and how far along
+    let data, upto;
+    if (tab === 1) { data = S.rec; upto = S.rec.n; }
+    else if (tab === 2) { data = plan(); upto = S.idx; }
+    else { data = S.rec3; upto = S.rec3.n; }
+    graphMap = { L, w, T, top, ph, gap, panels };
+    panels.forEach((p, k) => {
+      const y0 = top + k * (ph + gap), Y = v => y0 + ph / 2 - Math.max(-1.05, Math.min(1.05, v / p.lim)) * ph / 2;
+      p.Y = Y; p.y0 = y0;
+      ctx.strokeStyle = C('--soft'); ctx.lineWidth = 1;
+      for (let v = -p.lim; v <= p.lim + 1e-9; v += p.step) { ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(L + w, Y(v)); ctx.stroke(); }
+      for (let t = 0; t <= RUN; t += 2) { ctx.beginPath(); ctx.moveTo(T(t), y0); ctx.lineTo(T(t), y0 + ph); ctx.stroke(); }
+      ctx.strokeStyle = C('--muted'); ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(L + w, Y(0)); ctx.stroke();
+      ctx.strokeStyle = C('--rule'); ctx.strokeRect(L, y0, w, ph);
+      font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+      for (let v = -p.lim; v <= p.lim + 1e-9; v += p.step) if (!compact || (v !== 0 && v !== -p.lim)) ctx.fillText(String(v), L - 4, Y(v) + 3);
+      font(ctx, 11, 600); ctx.fillStyle = p.col; ctx.textAlign = 'left'; label(ctx, p.name + ' (' + p.unit + ')', L + 6, y0 + 13);
+      if (!p.shown) {
+        ctx.fillStyle = C('--soft'); ctx.fillRect(L, y0, w, ph); ctx.strokeStyle = C('--rule'); ctx.strokeRect(L, y0, w, ph);
+        font(ctx, compact ? 11 : 12); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+        ctx.fillText(p.name[0].toUpperCase() + p.name.slice(1) + ' graph hidden: sketch what you expect, then show it', L + w / 2, y0 + ph / 2 + 4);
+        return;
+      }
+      ctx.save(); ctx.beginPath(); ctx.rect(L, y0, w, ph); ctx.clip();
+      // the graph to match
+      if (tab === 3 && k === 0) { const f = TARGETS[S.target]; ctx.strokeStyle = C('--target'); ctx.lineWidth = 3; ctx.setLineDash([7, 6]); ctx.beginPath(); for (let i = 0; i <= N; i += 4) { const t = i * DT; i ? ctx.lineTo(T(t), Y(f(t))) : ctx.moveTo(T(t), Y(f(t))); } ctx.stroke(); ctx.setLineDash([]); }
+      // tab 2: the whole velocity graph is the plan
+      const end = tab === 2 && k === 1 ? N : upto;
+      if (end >= 0) { ctx.strokeStyle = p.col; ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.beginPath();
+        for (let i = 0; i <= end; i++) { const yv = Y(data[p.key][i]); i ? ctx.lineTo(T(i * DT), yv) : ctx.moveTo(T(0), yv); } ctx.stroke(); }
+      if (tab === 2 && k === 1) KNOT_T.forEach((t, j) => { ctx.fillStyle = C('--panel'); ctx.strokeStyle = p.col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(T(t), Y(S.knots[j]), compact ? 8 : 7, 0, TAU); ctx.fill(); ctx.stroke(); });
+      ctx.restore();
+    });
+    // the time axis and the present moment
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+    for (let t = 0; t <= RUN; t += compact ? 5 : 2) ctx.fillText(String(t), T(t), H - bot + 13);
+    ctx.textAlign = 'right'; ctx.fillText('time (s)', L + w, H - 4);
+    if (upto > 0) { ctx.strokeStyle = 'rgba(23,33,40,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(T(upto * DT), top); ctx.lineTo(T(upto * DT), H - bot); ctx.stroke(); }
+    if (tab === 2) { font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'drag the dots' : 'drag the dots to shape the velocity graph', L + 4, top + 2 * (ph + gap) - gap + 1); }
+  }
+  function draw() { drawScene(); drawGraphs(); }
+
+  // ================================================================
+  // 4. RUNNING
+  // ================================================================
+  let last = null, acc = 0, raf = 0;
+  const busy = () => S.grab || Math.abs(S.walker.x - S.xp) > 1e-4 || Math.abs(S.walker.v) > 1e-4 || S.run1 === 'run' || S.play || S.run3 === 'count' || S.run3 === 'run';
+  function stepWalker(rec) {
+    const old = S.walker.x; S.walker = follow(S.walker, S.xp, DT);
+    const dx = S.walker.x - old; S.stride += Math.abs(dx) * 3.2; if (Math.abs(S.walker.v) > 0.05) S.face = Math.sign(S.walker.v);
+    if (rec) { rec.n++; rec.x[rec.n] = S.walker.x; rec.v[rec.n] = S.walker.v; rec.a[rec.n] = S.walker.a; }
+  }
+  function tick(ts) {
+    raf = 0; const dt = last === null ? 0 : Math.min(0.1, (ts - last) / 1000); last = ts; acc += dt;
+    while (acc >= DT) {
+      acc -= DT;
+      if (tab === 1) { const r = S.run1 === 'run' ? S.rec : null; if (S.run1 !== 'pause') stepWalker(r); if (r && r.n >= N) S.run1 = 'done'; }
+      else if (tab === 2) { if (S.play) { S.idx++; const p = plan(), i = S.idx, dx = i ? p.x[i] - p.x[i - 1] : 0; S.stride += Math.abs(dx) * 3.2; if (Math.abs(p.v[i]) > 0.05) S.face = Math.sign(p.v[i]); if (S.idx >= N) { S.idx = N; S.play = false; } } }
+      else {
+        if (S.run3 === 'count') { S.count -= DT; if (S.count <= 1) { S.run3 = 'run'; S.rec3 = blank(); S.rec3.n = 0; S.rec3.x[0] = S.walker.x; } }
+        else if (S.run3 === 'run') { stepWalker(S.rec3); if (S.rec3.n >= N) { S.run3 = 'done'; } }
+        else if (S.run3 === 'done') stepWalker(null);
+      }
+    }
+    refresh();
+    if (busy()) raf = requestAnimationFrame(tick); else last = null;
+  }
+  const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+
+  // dragging the walker
+  const toX = e => { const r = $('scene').getBoundingClientRect(); return sceneMap ? clamp((e.clientX - r.left - sceneMap.m) / sceneMap.ppm - WALL, -WALL, WALL) : 0; };
+  const canDrag = () => tab === 1 ? S.run1 !== 'pause' : tab === 3 ? (S.run3 === 'run' || S.run3 === 'done') : false;
+  function startClock() { if (tab === 1 && S.run1 === 'wait') { S.run1 = 'run'; S.rec = blank(); S.rec.n = 0; S.rec.x[0] = S.walker.x; S.rec.v[0] = S.walker.v; } }
+  $('scene').addEventListener('pointerdown', e => {
+    if (!canDrag() || !sceneMap) return;
+    const r = $('scene').getBoundingClientRect(), px = e.clientX - r.left;
+    if (Math.abs(px - sceneMap.X(S.walker.x)) > Math.max(28, sceneMap.ppm * 1.2)) return;     // grab the walker, not the sidewalk
+    S.grab = true; $('scene').setPointerCapture(e.pointerId); $('scene').classList.add('grabbing'); S.xp = toX(e); startClock(); kick(); e.preventDefault();
+  });
+  $('scene').addEventListener('pointermove', e => { if (S.grab) { S.xp = toX(e); kick(); } });
+  const drop = () => { if (S.grab) { S.grab = false; $('scene').classList.remove('grabbing'); kick(); } };
+  $('scene').addEventListener('pointerup', drop); $('scene').addEventListener('pointercancel', drop);
+  $('scene').addEventListener('keydown', e => {
+    if (!canDrag() || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    S.xp = clamp(Math.round(S.xp) + (e.key === 'ArrowRight' ? 1 : -1), -WALL, WALL); startClock(); kick(); e.preventDefault();
+  });
+
+  // dragging the velocity graph's dots (tab 2)
+  let knot = -1;
+  const knotAt = e => { if (!graphMap) return -1; const r = $('graph').getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, p = graphMap.panels[1];
+    let best = -1, bd = 22; KNOT_T.forEach((t, j) => { const d = Math.hypot(x - graphMap.T(t), y - p.Y(S.knots[j])); if (d < bd) { bd = d; best = j; } }); return best; };
+  const setKnot = e => { const r = $('graph').getBoundingClientRect(), p = graphMap.panels[1], y = e.clientY - r.top;
+    S.knots[knot] = clamp(Math.round(((p.y0 + graphMap.ph / 2 - y) / (graphMap.ph / 2) * VR) * 10) / 10, -VLIM, VLIM); S.preset = null; S.plan = null; S.idx = -1; S.play = false; upd(); };
+  $('graph').addEventListener('pointerdown', e => { if (tab !== 2) return; knot = knotAt(e); if (knot >= 0) { $('graph').setPointerCapture(e.pointerId); setKnot(e); e.preventDefault(); } });
+  $('graph').addEventListener('pointermove', e => { if (tab !== 2) return; if (knot >= 0) setKnot(e); else $('graph').style.cursor = knotAt(e) >= 0 ? 'ns-resize' : ''; });
+  $('graph').addEventListener('pointerup', () => { knot = -1; }); $('graph').addEventListener('pointercancel', () => { knot = -1; });
+
+  // ================================================================
+  // 5. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  const num = (v, d) => (v < -0.5 * Math.pow(10, -d) ? '−' : '') + Math.abs(v).toFixed(d);
+  let lastHTML = '';
+  function readout() {
+    const s = now(), t = tab === 1 ? Math.max(0, S.rec.n) * DT : tab === 2 ? Math.max(0, S.idx) * DT : Math.max(0, S.rec3.n) * DT;
+    let html = card('Time', t.toFixed(1) + ' s', tab === 1 ? (S.run1 === 'wait' ? 'starts when you move the walker' : 'of 20') : 'of 20');
+    html += card('Position', num(s.x, 1) + ' m', 'from the middle of the sidewalk; + is toward the tree');
+    if (tab === 3) html += card('Average miss', S.rec3.n > 0 ? miss(S.rec3.x, TARGETS[S.target], S.rec3.n).toFixed(2) + ' m' : '—', 'how far, on average, your walk has been from the graph');
+    html += card('Velocity', S.showV || tab === 2 ? num(s.v, 2) + ' m/s' : 'hidden', 'how fast, and which way: + toward the tree');
+    if (tab !== 3) html += card('Acceleration', S.showA ? num(s.a, 2) + ' m/s²' : 'hidden', 'how fast the velocity is changing');
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'Grab the walker and walk along the sidewalk; the graphs record the walk. Predict first: if you walk steadily away from the house, what will the velocity graph look like, and the acceleration graph? Hide them and sketch your guess, then walk.',
+         notes: '<p><b>What to try.</b> Walk slowly and steadily away from the house, then toward it. Stand still for a while. Walk fast, then slow. Start at the tree and walk to the house, speeding up. For each, sketch the velocity and acceleration graphs before you show them. Pause to discuss a moment; start over to record a new walk.</p>' +
+                '<p><b>Why.</b> The velocity graph shows the slope of the position graph: steep where the walker moves fast, flat where it stands still, below zero where it moves toward the house. The acceleration graph shows the slope of the velocity graph, so walking steadily, at any speed and in either direction, has zero acceleration: only speeding up, slowing down or turning around show up there. Slowing down while walking toward the house is a positive acceleration, which surprises almost everyone.</p>' +
+                '<p><b>The model.</b> The walker follows your finger the way a person would: it walks no faster than 4 m/s, a jog, and speeds up or slows down no faster than 5 m/s², and it eases to a stop without overshooting. That keeps the graphs smooth enough to read; a hand moving a mouse can do things no walker can. It heads for where your finger was a split second ago, so it ignores the small jumps a mouse or finger makes, and when you move steadily it trails about half a meter behind. The graphs are those of the walker’s own motion, recorded 60 times a second. A motion detector in a lab gives the same three graphs, but noisier: it measures only position and has to work out the other two.</p>' },
+    2: { lede: 'Here the velocity graph comes first: drag its dots to plan a walk, or start from one of the walks below. Predict: where will the walker be at the end, and when is it farthest from the house? Then play it, and watch the position graph appear.',
+         notes: '<p><b>What to try.</b> Start from each of the walks and predict the position graph before you play it. Make the velocity graph cross zero: what does the walker do at that moment? Make a velocity graph whose walker ends where it began. Then hide the acceleration graph and predict it from the velocity graph’s slopes.</p>' +
+                '<p><b>Why.</b> How far the walker goes is the area between the velocity graph and the zero line, with the area below the line counting backward, toward the house. So the walker is farthest from the house when the velocity crosses zero, and a walk ends where it began when the areas above and below the line are equal. The acceleration is the slope of each straight piece of the velocity graph, so it is constant over each 4 seconds and jumps at the dots.</p>' +
+                '<p><b>The model.</b> The walker does exactly what the velocity graph says, with no limits on how fast it changes, except that it stops if it reaches the house or the tree, and then stays there.</p>' },
+    3: { lede: 'Here is a position graph. Can you walk it? Read the graph before you start: which way do you go, fast or slow, steadily or changing speed? Then press Ready, set, go, and walk it.',
+         notes: '<p><b>What to try.</b> For each graph, say out loud what the walk will be before you go. Then walk it and look at your average miss. Hide the velocity graph and predict it from the target before you walk; then show it and see whether your walk matches your prediction. In a class, take turns: one person reads the graph aloud while another walks it.</p>' +
+                '<p><b>Why.</b> A position graph tells you where to be at each moment, so its slope tells you how fast to walk and which way. A straight line means a steady pace; a curve that gets steeper means speeding up; a flat part means standing still. Going up means walking toward the tree, whichever way the graph started.</p>' +
+                '<p><b>The model.</b> The same walker as the first screen, which trails your finger by about half a meter when you move it steadily, so you have to lead it a little. Even a finger that traces each graph perfectly misses by a third to a half of a meter on average, because the walker lags behind it. The average miss is the root mean square of the distance between your walk and the graph, over the walk so far.</p>' +
+                '<p><b>Credit.</b> PhET’s The Moving Man (University of Colorado Boulder), a Java simulation, set the pattern for a walker and three graphs; this is an independent implementation.</p>' }
+  };
+
+  // ================================================================
+  // 6. CONTROLS
+  // ================================================================
+  function visibility() {
+    $('lab_preset').hidden = tab !== 2; $('lab_x0').hidden = tab !== 2; $('lab_target').hidden = tab !== 3; $('lab_vel').hidden = tab === 2;
+    document.querySelectorAll('#preset button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.preset)));
+    document.querySelectorAll('#target button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.target)));
+    document.querySelectorAll('#showv button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === S.showV)));
+    document.querySelectorAll('#showa button').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.v === '1') === S.showA)));
+    const go = $('go'), again = $('again'); let hint = '';
+    if (tab === 1) { go.hidden = S.run1 === 'wait' || S.run1 === 'done'; go.textContent = S.run1 === 'pause' ? 'Go on' : 'Pause'; again.disabled = S.run1 === 'wait'; hint = S.run1 === 'wait' ? 'the clock starts when you move the walker' : S.run1 === 'done' ? 'start over to record another walk' : ''; }
+    else if (tab === 2) { go.hidden = false; go.textContent = S.play ? 'Pause' : S.idx >= N ? 'Play again' : S.idx > 0 ? 'Go on' : 'Play'; again.disabled = S.idx < 0; }
+    else { go.hidden = S.run3 !== 'ready'; go.textContent = 'Ready, set, go'; again.disabled = S.run3 === 'ready'; hint = S.run3 === 'run' ? 'walk the dashed line' : ''; }
+    $('hint').textContent = hint;
+    $('graph').style.touchAction = tab === 2 ? 'none' : '';
+    $('scene').style.cursor = canDrag() ? '' : 'default';
+  }
+  function vals() { $('x0').value = String(S.x0); $('x0_v').textContent = num(S.x0, 1) + ' m'; }
+  function refresh() { visibility(); draw(); readout(); }
+  function upd() { vals(); refresh(); }
+  function setTab(k) {
+    tab = k; S.grab = false; [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
+    $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
+    if (k === 3 && S.run3 === 'ready') placeForTarget();
+    if (k !== 2) S.xp = S.walker.x;
+    upd(); kick();
+  }
+  function placeForTarget() { const x = TARGETS[S.target](0); S.walker = { x, v: 0, a: 0 }; S.xp = x; S.rec3 = blank(); S.run3 = 'ready'; }
+  [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  $('go').addEventListener('click', () => {
+    if (tab === 1) S.run1 = S.run1 === 'pause' ? 'run' : 'pause';
+    else if (tab === 2) { if (S.play) S.play = false; else { if (S.idx >= N || S.idx < 0) S.idx = 0; S.play = true; } }
+    else { S.run3 = 'count'; S.count = 3; }
+    upd(); kick();
+  });
+  $('again').addEventListener('click', () => {
+    if (tab === 1) { S.rec = blank(); S.run1 = 'wait'; }
+    else if (tab === 2) { S.idx = -1; S.play = false; }
+    else placeForTarget();
+    upd(); kick();
+  });
+  document.querySelectorAll('#preset button').forEach(b => b.addEventListener('click', () => { const p = PRESETS[b.dataset.v]; S.preset = b.dataset.v; S.knots = p.v.slice(); S.x0 = p.x0; S.plan = null; S.idx = -1; S.play = false; upd(); }));
+  $('x0').addEventListener('input', () => { S.x0 = +$('x0').value; S.preset = null; S.plan = null; S.idx = -1; S.play = false; upd(); });
+  document.querySelectorAll('#target button').forEach(b => b.addEventListener('click', () => { S.target = +b.dataset.v; placeForTarget(); upd(); }));
+  document.querySelectorAll('#showv button').forEach(b => b.addEventListener('click', () => { S.showV = b.dataset.v === '1'; upd(); }));
+  document.querySelectorAll('#showa button').forEach(b => b.addEventListener('click', () => { S.showA = b.dataset.v === '1'; upd(); }));
+  window.addEventListener('resize', draw);
+  setTab(1);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>

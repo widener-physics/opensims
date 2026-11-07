@@ -20,6 +20,30 @@ window.TOPICS = {
 
 window.SIMS = [
   {
+    slug: 'motion-graphs',
+    thumb: 'thumbs/motion-graphs.svg',
+    title: 'Motion graphs',
+    pageTitle: 'Motion graphs simulation: position, velocity and acceleration',
+    topic: 'kinematics',
+    tags: ['position', 'velocity', 'acceleration', 'graphs', 'slope', 'area under the curve', 'moving man'],
+    blurb: "Walk a person along a sidewalk and watch the position, velocity and acceleration graphs draw themselves; plan a walk from its velocity graph; or try to walk a given position graph. Hide the graphs to predict them first.",
+    level: 'intro',
+    added: '2026-11-07',
+    status: 'ready'
+  },
+  {
+    slug: 'rainbow',
+    thumb: 'thumbs/rainbow.svg',
+    title: 'Rainbows',
+    pageTitle: 'Rainbow simulation: why a rainbow is a circle at 42°',
+    topic: 'optics',
+    tags: ['refraction', 'dispersion', 'reflection', 'rainbow', 'raindrop', 'Descartes', 'secondary rainbow', 'Alexander\'s dark band'],
+    blurb: "Trace sunlight through a raindrop and watch it pile up at 42°. See why the drops that send you that light make a circle around the shadow of your head, why red is on the outside, and where the fainter second bow and the dark band between them come from.",
+    level: 'intro',
+    added: '2026-11-06',
+    status: 'ready'
+  },
+  {
     slug: 'ball-stack',
     thumb: 'thumbs/ball-stack.svg',
     title: 'The bouncing ball stack',

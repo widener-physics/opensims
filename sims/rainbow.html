@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<!--
+  Rainbows - part of Open Physics Sims (https://opensims.wu-physics.net)
+  Copyright (C) 2026 Widener University Physics
+  This program is free software: you can redistribute it and/or modify it under the terms of the
+  GNU General Public License as published by the Free Software Foundation, either version 3 of the
+  License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see
+  https://www.gnu.org/licenses/gpl-3.0.html for details.
+  Provenance: Code drafted with an AI model under the author's direction. The physics block below was
+  tested on its own before the interface existed, and is included here unchanged. Water's refractive index
+  reproduces the IAPWS release's verification values and the handbook values relative to air; every ray is traced
+  a second, independent way and agrees with Descartes' formula for the angle out; the bows' angles agree with a
+  brute-force search and with published values; the reflected and transmitted light add up at every angle; and
+  the bow's place in the sky agrees with spherical trigonometry.
+  Credit: the ray theory of the rainbow is Descartes' (1637), the colors Newton's (1704); see the notes.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rainbow simulation: why a rainbow is a circle at 42° | Open Physics Sims</title>
+<meta name="description" content="Trace sunlight through a raindrop and watch it pile up at 42°. See why the drops that send you that light make a circle around the shadow of your head, why red is on the outside, and where the fainter second bow and the dark band between them come from.">
+<style>
+  :root {
+    --paper: #F2F5F7; --panel: #FFFFFF; --ink: #172128; --muted: #5C6B73; --rule: #D3DCE2; --soft: #EEF2F5;
+    --body: #1D4F73; --hot: #C8321E; --curve: #1D4F73; --ray: #C77700; --drop: #DCEBF3; --glass: #8FA3B0;
+    --cloud: #6F7C86; --ground: #8C8A6E; --sky: #C9D9E4;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--serif); font-size: 17px; line-height: 1.55; padding: 32px 20px 64px; }
+  main { max-width: 900px; margin: 0 auto; }
+  .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
+  .home a { color: var(--muted); text-decoration: none; }
+  .home a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .home a::before { content: "\2190\00a0"; }
+  h1 { font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+  p.lede { margin: 0 0 14px; max-width: 68ch; min-height: 3em; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--ink); margin: 0 0 16px; font-family: var(--sans); font-size: 15px; }
+  .tabs button { font: inherit; padding: 8px 14px; background: transparent; color: var(--muted); border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; cursor: pointer; border-radius: 0; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+  .tabs button span { color: var(--muted); font-weight: 400; margin-right: 8px; }
+
+  canvas { display: block; width: 100%; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  #scene { aspect-ratio: 900 / 400; }
+  #scene.t2 { aspect-ratio: 900 / 440; }
+  #graph { aspect-ratio: 900 / 220; margin-top: 12px; }
+
+  .row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; font-family: var(--sans); font-size: 14px; }
+  .row2 .hint { color: var(--muted); }
+  button { font: inherit; font-family: var(--sans); font-size: 14px; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); border-left: 1px solid var(--ink); padding: 6px 10px; }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 24px; margin-top: 14px; font-family: var(--sans); font-size: 14px; }
+  .readout > div { padding: 12px 14px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .readout .k { color: var(--muted); margin-bottom: 4px; }
+  .readout .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readout .f { color: var(--muted); margin-top: 4px; font-family: var(--serif); font-size: 15px; }
+
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px 28px; font-family: var(--sans); font-size: 14px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; margin-top: 14px; }
+  .controls label { display: block; }
+  .controls .row { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 2px; }
+  .controls .val { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .controls input[type=range] { width: 100%; }
+  .controls .grp > div:first-child { margin-bottom: 6px; }
+  input[type=range] { height: 28px; margin: 0; accent-color: var(--body); cursor: pointer; }
+
+  .notes { margin-top: 18px; font-size: 16px; color: var(--muted); max-width: 72ch; }
+  .notes p { margin: 0 0 8px; }
+  .notes b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 700px) {
+    body { padding: 20px 14px 48px; }
+    #scene { aspect-ratio: 1 / 0.95; }
+    #scene.t2 { aspect-ratio: 1 / 1.72; }
+    #graph { aspect-ratio: 1 / 0.7; }
+    .readout { grid-template-columns: 1fr; }
+    .controls { grid-template-columns: 1fr; padding: 14px 16px; }
+    .tabs button { padding: 8px 4px; font-size: 13px; flex: 1 1 auto; }
+    .tabs button span { display: none; }
+  }
+
+  /* ---- wide screens: laid out like an app ---------------------------------------------------------
+     The workspace (canvases, and the buttons directly under them) sits on the left and the sidebar
+     (sliders, toggles, readouts) on the right, so everything needed to run the simulation is on
+     screen at once. Canvases keep their natural shape; if that would push the workspace past the
+     bottom of the window, the script at the end of the page shrinks them together until it fits.
+     The explanation follows underneath. Phones and narrow windows keep the stacked layout above,
+     unchanged: this block only rearranges the same elements. */
+  .about { display: none; }
+  @media (min-width: 1200px) and (min-height: 620px) {
+    body { padding: 0 24px 48px; }
+    main.app { max-width: 1200px; display: grid; column-gap: 20px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: 58px auto auto minmax(0, 1fr); align-items: start;
+      grid-template-areas: "bar bar" "stage panel" "lede panel" "notes panel"; }   /* the text runs straight on under the canvases */
+    .topbar { grid-area: bar; align-self: stretch; display: flex; align-items: center; gap: 24px; min-width: 0; }
+    .topbar .home { margin: 0; white-space: nowrap; }
+    .topbar h1 { font-size: 22px; line-height: 1.1; margin: 0; min-width: 0; overflow: hidden;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }   /* long titles wrap onto a second line */
+    .topbar .tabs { margin: 0 0 0 auto; border-bottom: 0; flex: none; }
+    .topbar .about { display: inline; margin-left: auto; font-family: var(--sans); font-size: 14px; color: var(--muted); white-space: nowrap; }
+    .topbar .tabs + .about { margin-left: 0; }
+    .workspace { grid-area: stage; display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-bottom: 16px; }
+    .workspace > * { flex: none; margin-top: 0 !important; margin-bottom: 0 !important; }
+    .sidebar { grid-area: panel; position: sticky; top: 0; max-height: calc(100vh - 58px); overflow-y: auto; padding-bottom: 16px;
+      display: flex; flex-direction: column; gap: 12px; }
+    .sidebar > * { flex: none; margin-top: 0 !important; }
+    .sidebar > .readout, .sidebar > table { order: 1; }   /* sliders first, so they are never pushed off screen */
+    .sidebar .readout, .sidebar .controls { grid-template-columns: 1fr; }
+    .sidebar .readout > div { padding: 10px 14px; }
+    .sidebar .readout .f { font-size: 14.5px; line-height: 1.45; }
+    .sidebar .toggles { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sidebar table { width: 100%; }
+    .sidebar .toggles > label:has(> input[type=checkbox]) { display: block; padding-left: 22px; text-indent: -22px; }
+    .sidebar .toggles > label > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -2px; }
+    .sidebar .toggles > label:has(.seg) { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    main.app > section:not([hidden]) { display: contents; }
+    p.lede { grid-area: lede; margin: 12px 0 10px; min-height: 0; }
+    .notes { grid-area: notes; margin-top: 0; }
+  }
+  /* shorter screens (a 1366x768 laptop, or a 1080p laptop at 125%): the same layout, packed tighter */
+  @media (min-width: 1200px) and (min-height: 620px) and (max-height: 820px) {
+    main.app { grid-template-rows: 50px auto auto minmax(0, 1fr); }
+    .workspace { gap: 8px; padding-bottom: 10px; }
+    .sidebar { max-height: calc(100vh - 50px); padding-bottom: 10px; gap: 8px; }
+    .sidebar .readout { gap: 8px; }
+    .sidebar .readout > div { padding: 7px 12px; }
+    .sidebar .readout .k { margin-bottom: 1px; }
+    .sidebar .readout .v { font-size: 16px; }
+    .sidebar .readout .f { font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    .sidebar .controls { padding: 10px 14px; gap: 2px 20px; }
+    .sidebar .controls input[type=range] { height: 24px; }
+  }
+</style>
+
+<!-- site tags: written by tools/page-meta.js from sims.js (npm run meta); edits here are replaced -->
+<link rel="canonical" href="https://opensims.wu-physics.net/sims/rainbow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Open Physics Sims">
+<meta property="og:title" content="Rainbow simulation: why a rainbow is a circle at 42°">
+<meta property="og:description" content="Trace sunlight through a raindrop and watch it pile up at 42°. See why the drops that send you that light make a circle around the shadow of your head, why red is on the outside, and where the fainter second bow and the dark band between them come from.">
+<meta property="og:url" content="https://opensims.wu-physics.net/sims/rainbow">
+<meta property="og:image" content="https://opensims.wu-physics.net/share.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Open Physics Sims: free interactive physics simulations for teaching">
+<meta name="twitter:card" content="summary_large_image">
+<!-- Privacy-friendly analytics by Plausible -->
+<script async src="https://plausible.io/js/pa-RIyzwHpiR6eo6nzLty9EI.js"></script>
+<script>
+  window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+  plausible.init()
+</script>
+<!-- /site tags -->
+</head>
+<body>
+<main class="app">
+  <div class="topbar">
+  <nav class="home" aria-label="Site"><a href="../">Open Physics Sims</a></nav>
+  <h1>Rainbows</h1>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab1" aria-selected="true"><span>1</span>One drop</button>
+    <button role="tab" id="tab2" aria-selected="false"><span>2</span>Why it’s a circle</button>
+    <button role="tab" id="tab3" aria-selected="false"><span>3</span>The colors</button>
+    <button role="tab" id="tab4" aria-selected="false"><span>4</span>The second bow</button>
+  </div>
+  <a class="about" href="#lede">How to use it ↓</a>
+  </div>
+
+  <p class="lede" id="lede"></p>
+
+  <div class="workspace">
+  <canvas id="scene" aria-label="A raindrop with a ray of sunlight passing through it"></canvas>
+  <div class="row2" id="row2">
+    <button id="many" class="secondary">Send in many rays</button>
+    <button id="show">Show the drops that send you light</button>
+    <span class="hint" id="hint"></span>
+  </div>
+  <canvas id="graph" aria-label="Angle out against where the ray enters"></canvas>
+  </div>
+
+  <div class="sidebar">
+  <div class="readout" id="readout"></div>
+
+  <div class="controls">
+    <label id="lab_b"><div class="row"><span>Where the ray enters the drop</span><span class="val" id="b_v"></span></div><input type="range" id="b" min="0" max="1" step="0.005"></label>
+    <div class="grp" id="lab_k"><div>Bounces inside the drop</div><div class="seg" id="kseg" role="group" aria-label="Bounces inside the drop"><button data-v="1">once</button><button data-v="2">twice</button></div></div>
+    <label id="lab_h"><div class="row"><span>The Sun’s height above the horizon</span><span class="val" id="h_v"></span></div><input type="range" id="h" min="0" max="60" step="1"></label>
+    <div class="grp" id="lab_where"><div>Where you are</div><div class="seg" id="where" role="group" aria-label="Where you are"><button data-v="ground">on the ground</button><button data-v="plane">in an airplane</button></div></div>
+  </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  const css = getComputedStyle(document.documentElement), C = v => css.getPropertyValue(v).trim();
+  const $ = id => document.getElementById(id);
+  const TAU = 2 * Math.PI;
+
+  // ================================================================
+  // 1. PHYSICS (tested on its own; see tests/rainbow.test.js)
+  // ================================================================
+  // ---- physics core: rainbows ----
+  // Angles in radians unless a name says deg; wavelengths in nanometers. A drop is a sphere of radius 1, and
+  // sunlight comes in along +x. A ray that enters at height b (from -1 to 1, in units of the radius) leaves after
+  // bouncing k times inside. Its "angle out" is the angle between the light coming out and the line pointing back
+  // along the sunlight: that is the angle, seen from the ground, between the drop and the shadow of your head.
+  const DEG = Math.PI / 180;
+
+  // ---- water's refractive index ----
+  // The IAPWS formulation (Harvey et al. 1998, IAPWS R9-97), for liquid water at 20 °C and 998.21 kg/m³
+  const IAPWS = { a: [0.244257733, 9.74634476e-3, -3.73234996e-3, 2.68678472e-4, 1.58920570e-3, 2.45934259e-3, 0.900704920, -1.66626219e-2],
+                  luv: 0.2292020, lir: 5.432937 };   // the last two already divided by 0.589 µm
+  function nWater(nm, tC, rho) {
+    const T = ((tC === undefined ? 20 : tC) + 273.15) / 273.15, d = (rho === undefined ? 998.21 : rho) / 1000, L = nm / 589, a = IAPWS.a, L2 = L * L;
+    const A = d * (a[0] + a[1] * d + a[2] * T + a[3] * L2 * T + a[4] / L2 + a[5] / (L2 - IAPWS.luv * IAPWS.luv) + a[6] / (L2 - IAPWS.lir * IAPWS.lir) + a[7] * d * d);
+    return Math.sqrt((2 * A + 1) / (1 - A));                 // from (n² - 1)/(n² + 2) = A
+  }
+  // air's refractive index (Ciddor 1996, standard dry air at 15 °C and 101 325 Pa), wavelength in vacuum
+  const nAir = nm => { const s2 = (1000 / nm) ** 2; return 1 + 1e-8 * (5792105 / (238.0185 - s2) + 167917 / (57.362 - s2)); };
+  // what bends the light in a raindrop: water's index relative to the air around it
+  const nDrop = nm => nWater(nm) / nAir(nm);
+  // the colors of the spectrum the sim draws rays in, violet to red
+  const SPECTRUM = Array.from({ length: 16 }, (_, j) => 400 + 20 * j);
+
+  // ---- one ray through a drop ----
+  // the angles at the surface: in from the air at i, bent to r inside
+  function angles(b, n) { const i = Math.asin(Math.min(1, Math.abs(b))); return { i, r: Math.asin(Math.sin(i) / n) }; }
+  // how far the ray has turned after k bounces inside (Descartes): bent at the way in, turned back at each bounce, bent on the way out
+  const turn = (b, n, k) => { const { i, r } = angles(b, n); return 2 * (i - r) + k * (Math.PI - 2 * r); };
+  // the angle out: between the light coming out and the line pointing back toward the Sun (0 to π)
+  const angleOut = (b, n, k) => Math.acos(Math.max(-1, Math.min(1, -Math.cos(turn(b, n, k)))));
+  // the rainbow: the ray whose angle out stops changing, where the light piles up. There cos² i = (n² - 1)/(k² + 2k).
+  function bow(n, k) { const i = Math.acos(Math.sqrt((n * n - 1) / (k * k + 2 * k))), b = Math.sin(i); return { b, i, deg: angleOut(b, n, k) / DEG }; }
+  // the ray's path for drawing: the points where it meets the drop's surface, and the direction it leaves in
+  function path(b, n, k) {
+    const x0 = -Math.sqrt(Math.max(0, 1 - b * b)), pts = [[-3, b], [x0, b]];
+    let p = [x0, b], d = [1, 0];
+    const refract = (d, nrm, eta) => { const c = -(d[0] * nrm[0] + d[1] * nrm[1]), s2 = eta * eta * (1 - c * c); if (s2 > 1) return null; const t = eta * c - Math.sqrt(1 - s2); return [eta * d[0] + t * nrm[0], eta * d[1] + t * nrm[1]]; };
+    d = refract(d, p, 1 / n);                                  // the outward normal of a unit sphere at p is p itself
+    for (let j = 0; j <= k; j++) {
+      const s = -2 * (p[0] * d[0] + p[1] * d[1]); p = [p[0] + s * d[0], p[1] + s * d[1]]; pts.push(p);   // across the drop to the far side
+      if (j < k) { const dn = p[0] * d[0] + p[1] * d[1]; d = [d[0] - 2 * dn * p[0], d[1] - 2 * dn * p[1]]; }   // a bounce
+    }
+    const nIn = [-p[0], -p[1]]; d = refract(d, nIn, n);         // out into the air
+    return { pts, out: d };
+  }
+
+  // ---- how much light each ray keeps ----
+  // Fresnel: the share reflected at a water surface for light arriving from the air at angle i, for the two polarizations
+  function fresnel(i, n) {
+    const r = Math.asin(Math.sin(i) / n), ci = Math.cos(i), cr = Math.cos(r);
+    const rs = (ci - n * cr) / (ci + n * cr), rp = (n * ci - cr) / (n * ci + cr);
+    return { s: rs * rs, p: rp * rp };
+  }
+  // the share of a ray's light that comes out after k bounces: let through on the way in, reflected k times, let
+  // through on the way out (inside, the ray meets the surface at r, which reflects the same share as i outside)
+  function kept(b, n, k) { const { i } = angles(b, n), R = fresnel(i, n); return 0.5 * ((1 - R.s) ** 2 * R.s ** k + (1 - R.p) ** 2 * R.p ** k); }
+
+  // ---- the brightness of the sky in each direction ----
+  // Light from all the drops sent out at each angle from the shadow of your head, per unit of sky (solid angle), for
+  // one color: sunlight falling evenly on each drop's face, each ray weighted by the light it keeps. Bins of width
+  // step degrees from 0 to 180. Geometric optics: the true peak at the bow is rounded off by diffraction (see notes).
+  function brightness(n, k, step) {
+    const nb = Math.round(180 / step), out = new Float64Array(nb), N = 40000;
+    for (let j = 0; j < N; j++) {
+      const b = Math.sqrt((j + 0.5) / N), w = kept(b, n, k) / N, th = angleOut(b, n, k) / DEG;   // b = √u: an even spread over the drop's face
+      out[Math.min(nb - 1, Math.floor(th / step))] += w;
+    }
+    for (let m = 0; m < nb; m++) { const a = (m + 0.5) * step * DEG; out[m] /= 2 * Math.PI * Math.sin(a) * step * DEG; }
+    return out;
+  }
+  // the same for evenly spaced rays across a drop's middle, counted rather than weighed: what the drawing of a drop shows
+  function rayCount(n, k, step, N) {
+    const nb = Math.round(180 / step), out = new Array(nb).fill(0);
+    for (let j = 0; j < N; j++) { const b = (j + 0.5) / N; out[Math.min(nb - 1, Math.floor(angleOut(b, n, k) / DEG / step))]++; }
+    return out;
+  }
+
+  // ---- where the bow is in the sky ----
+  // Directions as (azimuth, elevation), with azimuth 0 straight away from the Sun. With the Sun at height h, the
+  // shadow of your head is at elevation -h; the bow is the circle of drops at angle a (degrees) from it.
+  const unit = (az, el) => [Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)];
+  function bowCircle(hDeg, aDeg, n) {
+    const h = hDeg * DEG, a = aDeg * DEG, pts = [];
+    const A = unit(0, -h), U = unit(0, Math.PI / 2 - h), V = [0, 1, 0];      // the shadow point, and two directions at right angles to it
+    for (let j = 0; j <= n; j++) { const f = 2 * Math.PI * j / n, v = [0, 1, 2].map(q => Math.cos(a) * A[q] + Math.sin(a) * (Math.cos(f) * U[q] + Math.sin(f) * V[q]));
+      pts.push({ az: Math.atan2(v[1], v[0]) / DEG, el: Math.asin(Math.max(-1, Math.min(1, v[2]))) / DEG }); }
+    return pts;
+  }
+  const bowTop = (hDeg, aDeg) => aDeg - hDeg;                 // the top of the bow, in degrees above the horizon
+  // the angle between a direction and the shadow of your head
+  const fromShadow = (az, el, hDeg) => { const A = unit(0, -hDeg * DEG), v = unit(az * DEG, el * DEG); return Math.acos(Math.max(-1, Math.min(1, A[0] * v[0] + A[1] * v[1] + A[2] * v[2]))) / DEG; };
+
+  // ---- the colors the eye sees ----
+  // CIE 1931 color-matching functions, as the multi-lobe fit of Wyman, Sloan and Shirley (2013)
+  const lobe = (x, mu, s1, s2) => { const t = (x - mu) / (x < mu ? s1 : s2); return Math.exp(-0.5 * t * t); };
+  const cmf = nm => [1.056 * lobe(nm, 599.8, 37.9, 31.0) + 0.362 * lobe(nm, 442.0, 16.0, 26.7) - 0.065 * lobe(nm, 501.1, 20.4, 26.2),
+                     0.821 * lobe(nm, 568.8, 46.9, 40.5) + 0.286 * lobe(nm, 530.9, 16.3, 31.1),
+                     1.217 * lobe(nm, 437.0, 11.8, 36.0) + 0.681 * lobe(nm, 459.0, 26.0, 13.8)];
+  // sunlight's spectrum, as a 5772 K blackbody (relative)
+  const sun = nm => { const l = nm * 1e-9; return 1 / (Math.pow(l / 5e-7, 5) * Math.expm1(0.0143877688 / (l * 5772))); };
+  // screen red, green and blue before gamma, from X, Y, Z
+  const linRGB = (X, Y, Z) => [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z];
+  const gamma = v => Math.round(255 * Math.max(0, Math.min(1, v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055)));
+  // the color of one wavelength, as bright as the screen allows (colors the screen can't show are mixed with white)
+  function hue(nm) { let c = linRGB(...cmf(nm)); const lo = Math.min(...c); if (lo < 0) c = c.map(v => v - lo); const hi = Math.max(...c); return c.map(v => gamma(v / hi)); }
+  // ---- end of core ----
+
+  // ================================================================
+  // 2. SETTINGS AND STATE
+  // ================================================================
+  const NM1 = 589, N1 = nDrop(NM1);                     // tabs 1 and 4: one color of light (yellow-orange)
+  const NS = SPECTRUM.map(nDrop), RED = SPECTRUM.length - 1;
+  const STEPS = 200;                                    // the slider's positions across the drop
+  const S = { b: { 1: 0.5, 3: 0.5, 4: 0.5 }, many: { 1: false, 3: false, 4: false }, k: 2, h: 20, where: 'ground', show: false, sky: false };
+  // the rays sent in so far on each tab, by slider position, so the graph fills in as you go
+  const seen = { 1: new Uint8Array(STEPS + 1), 3: new Uint8Array(STEPS + 1), 4: { 1: new Uint8Array(STEPS + 1), 2: new Uint8Array(STEPS + 1) } };
+  const seenOf = t => t === 4 ? seen[4][S.k] : seen[t];
+  let tab = 1;
+
+  // the color of the sky at each angle from the shadow of your head, worked out once: all the colors of sunlight,
+  // through drops, smeared by the Sun's own width (half a degree), over a gray rain cloud
+  const SKY_STEP = 0.1, SUN_W = 0.53;
+  let skyLUT = null;
+  function buildSky() {
+    if (skyLUT) return skyLUT;
+    const nb = Math.round(180 / SKY_STEP), XYZ = [1, 2].map(() => [new Float64Array(nb), new Float64Array(nb), new Float64Array(nb)]);
+    SPECTRUM.forEach((nm, j) => { const c = cmf(nm), s = sun(nm);
+      [1, 2].forEach((k, q) => { const B = brightness(NS[j], k, SKY_STEP); for (let m = 0; m < nb; m++) for (let a = 0; a < 3; a++) XYZ[q][a][m] += B[m] * s * c[a]; }); });
+    const half = Math.round(SUN_W / 2 / SKY_STEP);
+    const smear = arr => { const o = new Float64Array(nb); for (let m = 0; m < nb; m++) { let s = 0, w = 0; for (let d = -half; d <= half; d++) { const q = m + d; if (q < 0 || q >= nb) continue; const f = Math.sqrt(Math.max(0, 1 - (d / (half + 0.5)) ** 2)); s += f * arr[q]; w += f; } o[m] = s / w; } return o; };
+    const L = XYZ.map(set => set.map(smear));
+    let peak = 0; for (let m = 0; m < nb; m++) peak = Math.max(peak, L[0][1][m]);
+    const bg = [0.12, 0.135, 0.15], toColor = (set, m) => { const c = linRGB(set[0][m] / peak, set[1][m] / peak, set[2][m] / peak); return c.map((v, a) => Math.max(0, 0.8 * v + bg[a])); };
+    skyLUT = { nb, one: [], both: [] };
+    for (let m = 0; m < nb; m++) {
+      const a = toColor(L[0], m), b = toColor(L[1], m);
+      skyLUT.one.push('rgb(' + a.map(gamma).join(',') + ')');
+      skyLUT.both.push('rgb(' + a.map((v, i) => gamma(v + b[i] - bg[i])).join(',') + ')');
+    }
+    return skyLUT;
+  }
+
+  // ================================================================
+  // 3. DRAWING
+  // ================================================================
+  function fit(canvas) {
+    const dpr = window.devicePixelRatio || 1, r = canvas.getBoundingClientRect();
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, W: r.width, H: r.height, compact: r.width < 560 };
+  }
+  const font = (ctx, px, wt) => { ctx.font = (wt || '') + ' ' + px + 'px ' + C('--sans'); };
+  function label(ctx, txt, x, y, bg) { ctx.save(); ctx.strokeStyle = bg || C('--panel'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y); ctx.restore(); ctx.fillText(txt, x, y); }
+  const rgb = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (a === undefined ? 1 : a) + ')';
+  const HUES = SPECTRUM.map(hue);
+  const deg = a => a.toFixed(1) + '°';
+
+  // ---- a drop, with rays through it ----
+  function dropGeom(W, H, compact) { const R = compact ? Math.min(W * 0.25, H * 0.27) : Math.min(H * 0.3, W * 0.18); return { R, cx: compact ? W * 0.66 : W * 0.7, cy: compact ? H * 0.32 : H * 0.36 }; }
+  // a ray through the drop; fromEntry: start it where it enters (for the colors split out of white light)
+  function drawRay(ctx, g, b, n, k, col, w, len, fromEntry) {
+    const p = path(b, n, k), X = q => g.cx + q[0] * g.R, Y = q => g.cy - q[1] * g.R;
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineJoin = 'round'; ctx.beginPath();
+    if (fromEntry) ctx.moveTo(X(p.pts[1]), Y(p.pts[1])); else ctx.moveTo(0, Y(p.pts[0]));
+    p.pts.slice(fromEntry ? 2 : 1).forEach(q => ctx.lineTo(X(q), Y(q)));
+    const e = p.pts[p.pts.length - 1]; ctx.lineTo(X(e) + p.out[0] * len, Y(e) - p.out[1] * len); ctx.stroke();
+    return { e: [X(e), Y(e)], out: p.out };
+  }
+  // the angle out, drawn where the ray leaves: between the light coming out and the line back along the sunlight
+  function angleMark(ctx, at, out, txt) {
+    const [x, y] = at, a1 = Math.PI, a2 = Math.atan2(-out[1], out[0]), r = 46;
+    ctx.strokeStyle = C('--muted'); ctx.lineWidth = 1.2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 110, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = C('--ink'); ctx.beginPath(); a2 > 0 ? ctx.arc(x, y, r, a2, a1) : ctx.arc(x, y, r, a1, a2 + TAU); ctx.stroke();
+    const am = a2 > 0 ? (a1 + a2) / 2 : (a1 + a2 + TAU) / 2;
+    font(ctx, 12, 600); ctx.fillStyle = C('--ink'); ctx.textAlign = 'right'; label(ctx, txt, x + Math.cos(am) * (r + 8), y + Math.sin(am) * (r + 8) + 4);
+  }
+  function drawDrop(ctx, W, H, compact) {
+    const g = dropGeom(W, H, compact), b = S.b[tab], k = tab === 4 ? S.k : 1, sb = k === 2 ? -b : b, len = 3 * W;
+    ctx.fillStyle = C('--drop'); ctx.beginPath(); ctx.arc(g.cx, g.cy, g.R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = C('--glass'); ctx.lineWidth = 1.5; ctx.stroke();
+    const ray = C('--ray');
+    if (S.many[tab]) {
+      const nr = tab === 3 ? 12 : 60;
+      for (let j = 0; j < nr; j++) { const bb = (j + 0.5) / nr, s = k === 2 ? -bb : bb;
+        if (tab === 3) { const e = path(s, NS[0], 1).pts[1]; ctx.strokeStyle = 'rgba(23,33,40,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, g.cy - s * g.R); ctx.lineTo(g.cx + e[0] * g.R, g.cy - s * g.R); ctx.stroke();
+          SPECTRUM.forEach((nm, q) => drawRay(ctx, g, s, NS[q], 1, rgb(HUES[q], 0.35), 1, len, true)); }
+        else drawRay(ctx, g, s, N1, k, rgb([199, 119, 0], 0.4), 1, len); }
+    }
+    let r;
+    if (tab === 3) { // white light in, a fan of colors out
+      const p = path(b, NS[0], 1); ctx.strokeStyle = C('--ink'); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0, g.cy - b * g.R); ctx.lineTo(g.cx + p.pts[1][0] * g.R, g.cy - b * g.R); ctx.stroke();
+      SPECTRUM.forEach((nm, q) => { const o = drawRay(ctx, g, b, NS[q], 1, rgb(HUES[q]), 1.6, len, true); if (q === RED) r = o; });
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, 'white sunlight', 8, g.cy - b * g.R + 15);
+    } else {
+      r = drawRay(ctx, g, sb, N1, k, ray, 2.4, len);
+      font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left'; label(ctx, 'sunlight', 8, g.cy - sb * g.R + 15);
+    }
+    angleMark(ctx, r.e, r.out, tab === 3 ? 'red ' + deg(angleOut(b, NS[RED], 1) / DEG) : deg(angleOut(sb, N1, k) / DEG));
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    const t = tab === 1 ? 'one color of light, bouncing once off the back of the drop' : tab === 3 ? 'white light: 16 colors from violet (400 nm) to red (700 nm)' : k === 1 ? 'bouncing once inside' : 'bouncing twice inside';
+    label(ctx, compact ? t.replace(', bouncing once off the back of the drop', '') : t + '; dashed: the line back toward the Sun', 10, 16);
+  }
+
+  // ---- the graph: angle out against where the ray enters, filling in as rays are sent ----
+  function drawCurve(ctx, W, H, compact) {
+    const zoom = tab === 3, k = tab === 4 ? S.k : 1, sky = tab === 4, ys = seenOf(tab);
+    const right = sky ? (compact ? 0.34 : 0.3) : (compact ? 0.3 : 0.26), b = { x: compact ? 38 : 48, y: 24, w: 0, h: H - 24 - 34 }; b.w = (W - b.x - 14) * (1 - right) - 16;
+    const x0 = zoom ? 0.5 : 0, y0 = zoom ? 34 : sky ? 30 : 0, y1 = zoom ? 44 : sky ? 66 : 45;
+    const X = v => b.x + (v - x0) / (1 - x0) * b.w, Y = a => b.y + b.h - (a - y0) / (y1 - y0) * b.h;
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right';
+    const st = zoom ? 2 : sky ? 6 : 10; for (let a = y0; a <= y1 + 1e-9; a += st) { ctx.strokeStyle = C('--soft'); ctx.beginPath(); ctx.moveTo(b.x, Y(a)); ctx.lineTo(b.x + b.w, Y(a)); ctx.stroke(); ctx.fillText(a + '°', b.x - 4, Y(a) + 3); }
+    ctx.textAlign = 'center'; [x0, (x0 + 1) / 2, 1].forEach(v => ctx.fillText(v === 0 ? 'middle' : v === 1 ? 'edge' : v.toFixed(2), X(v), b.y + b.h + 13));
+    ctx.textAlign = 'right'; ctx.fillText('where the ray enters', b.x + b.w, b.y + b.h + 26);
+    ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
+    const curves = zoom ? SPECTRUM.map((nm, q) => [NS[q], rgb(HUES[q]), 1.6]) : [[N1, C('--ray'), 2.2]];
+    curves.forEach(([n, col, lw]) => {
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw;
+      for (let j = 0; j <= STEPS; j++) { if (!ys[j]) continue; const v = j / STEPS, a = angleOut(k === 2 ? -v : v, n, k) / DEG;
+        if (j > 0 && ys[j - 1]) { const a0 = angleOut(k === 2 ? -(j - 1) / STEPS : (j - 1) / STEPS, n, k) / DEG; ctx.beginPath(); ctx.moveTo(X((j - 1) / STEPS), Y(a0)); ctx.lineTo(X(v), Y(a)); ctx.stroke(); }
+        else { ctx.beginPath(); ctx.arc(X(v), Y(a), 1.6, 0, TAU); ctx.fill(); } }
+    });
+    const v = S.b[tab]; (zoom ? [[NS[RED], C('--hot')], [NS[0], '#6A2BD9']] : [[N1, C('--hot')]]).forEach(([n, col]) => { const a = angleOut(k === 2 ? -v : v, n, k) / DEG; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(v), Y(a), 4.5, 0, TAU); ctx.fill(); });
+    ctx.restore();
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left';
+    ctx.fillText(compact ? 'angle out' + (zoom ? ' (near the top)' : '') : 'angle out against where each ray you’ve sent entered' + (zoom ? ', zoomed in near the top' : ''), b.x + 2, b.y - 7);
+    // on the right, the same angles: how many rays came out at each, or what the sky looks like
+    const rx = b.x + b.w + 16, rw = W - rx - 14;
+    if (sky) drawSkyStrip(ctx, rx, b.y, rw, b.h, Y, compact);
+    else drawCount(ctx, rx, b.y, rw, b.h, Y, y0, y1, zoom, compact);
+  }
+  // how many of the rays sent so far come out in each slice of angle
+  function drawCount(ctx, x, y, w, h, Y, y0, y1, zoom, compact) {
+    const ys = seenOf(tab), bin = zoom ? 0.25 : 1, nbin = Math.round((y1 - y0) / bin);
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+    const sets = zoom ? SPECTRUM.map((nm, q) => [NS[q], HUES[q]]) : [[N1, [199, 119, 0]]];
+    const counts = sets.map(([n]) => { const c = new Array(nbin).fill(0); for (let j = 0; j <= STEPS; j++) if (ys[j]) { const a = angleOut(j / STEPS, n, 1) / DEG, m = Math.floor((a - y0) / bin); if (m >= 0 && m < nbin) c[m]++; } return c; });
+    const top = zoom ? 24 : 30;                          // fixed scale: rays per slice across the box
+    sets.forEach(([n, col], q) => { const c = counts[q];
+      if (zoom) { ctx.strokeStyle = rgb(col, 0.9); ctx.lineWidth = 1.4; ctx.beginPath(); c.forEach((v, m) => { const yy = Y(y0 + (m + 0.5) * bin), xx = x + Math.min(1, v / top) * w; m ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }); ctx.stroke(); }
+      else { ctx.fillStyle = rgb(col, 0.75); c.forEach((v, m) => { if (v) ctx.fillRect(x, Y(y0 + (m + 1) * bin), Math.min(1, v / top) * w, Math.max(1, Y(y0 + m * bin) - Y(y0 + (m + 1) * bin) - 0.5)); }); } });
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'rays at each angle' : 'how many come out at each angle', x, y - 7);
+    font(ctx, 10); ctx.fillStyle = C('--muted'); ctx.textAlign = 'right'; ctx.fillText(top + ' rays', x + w, y + h + 13);
+  }
+  // the sky, at each angle from the shadow of your head
+  function drawSkyStrip(ctx, x, y, w, h, Y, compact) {
+    font(ctx, 11); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; ctx.fillText(compact ? 'the sky' : 'the sky at each angle', x, y - 7);
+    if (!S.sky) { ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h); font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'center';
+      ctx.fillText('press', x + w / 2, y + h / 2 - 8); ctx.fillText('“Show the sky”', x + w / 2, y + h / 2 + 8); return; }
+    const L = buildSky();
+    for (let m = Math.round(30 / SKY_STEP); m < Math.round(66 / SKY_STEP); m++) { const y1 = Y(m * SKY_STEP), y2 = Y((m + 1) * SKY_STEP); ctx.fillStyle = L.both[m]; ctx.fillRect(x, y2, w, y1 - y2 + 0.6); }
+    ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+    font(ctx, 10); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText('↓ toward the', x + 4, y + h - 16); ctx.fillText('head’s shadow', x + 4, y + h - 4);
+  }
+
+  // ---- tab 2: the side view and what you see ----
+  function drawCircle(ctx, W, H, compact) {
+    const side = compact ? { x: 0, y: 0, w: W, h: H * 0.44 } : { x: 0, y: 0, w: W * 0.5 - 6, h: H };
+    const view = compact ? { x: 0, y: H * 0.44 + 10, w: W, h: H * 0.56 - 10 } : { x: W * 0.5 + 6, y: 0, w: W * 0.5 - 6, h: H };
+    drawSide(ctx, side, compact); drawView(ctx, view, compact);
+    if (!compact) { ctx.strokeStyle = C('--rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke(); }
+    else { ctx.strokeStyle = C('--rule'); ctx.beginPath(); ctx.moveTo(0, H * 0.44 + 5); ctx.lineTo(W, H * 0.44 + 5); ctx.stroke(); }
+  }
+  // drops in a shower, in the same places every time
+  const DROPS = Array.from({ length: 260 }, (_, j) => { const r = Math.sin(j * 91.7) * 43758.5, s = Math.sin(j * 12.9 + 4.1) * 23421.6; return [r - Math.floor(r), s - Math.floor(s)]; });
+  function drawSide(ctx, p, compact) {
+    const plane = S.where === 'plane', h = S.h * DEG;
+    ctx.save(); ctx.beginPath(); ctx.rect(p.x, p.y, p.w, p.h); ctx.clip();
+    const gy = plane ? p.y + p.h + 999 : p.y + p.h - 22, eye = plane ? [p.x + 34, p.y + p.h * 0.45] : [p.x + 34, gy - 26];
+    ctx.fillStyle = C('--panel'); ctx.fillRect(p.x, p.y, p.w, p.h);
+    // the rain: a shower ahead of you (to the right, away from the Sun)
+    const rx0 = p.x + p.w * 0.42, rx1 = p.x + p.w - 6, ry0 = p.y + 22, ry1 = plane ? p.y + p.h - 6 : gy;
+    // sunlight from behind you, at the Sun's height
+    ctx.strokeStyle = 'rgba(199,119,0,0.35)'; ctx.lineWidth = 1;
+    for (let j = -6; j < 14; j++) { const y = p.y + j * 34; ctx.beginPath(); ctx.moveTo(p.x, y); ctx.lineTo(p.x + p.w * 3 * Math.cos(h), y + p.w * 3 * Math.sin(h)); ctx.stroke(); }
+    // which drops send you light: those at the bow's angle from the line toward the shadow of your head
+    const elev = (x, y) => Math.atan2(eye[1] - y, x - eye[0]);       // angle above the horizontal, seen from your eye
+    DROPS.forEach(([u, v]) => { const x = rx0 + u * (rx1 - rx0), y = ry0 + v * (ry1 - ry0);
+      let col = 'rgba(29,79,115,0.35)', r = 2;
+      if (S.show && (plane || elev(x, y) >= 0)) { const a = (elev(x, y) + h) / DEG;      // from the ground, only drops above eye level: the rest are lost against the ground              // the angle from the line toward the shadow (in this plane)
+        for (let q = 0; q < SPECTRUM.length; q++) { const bw = bow(NS[q], 1).deg; if (Math.abs(Math.abs(a) - bw) < 0.9) { col = rgb(HUES[q]); r = 3.2; break; } } }
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); });
+    // the line toward the shadow of your head, and the bow's cone
+    const toward = a => [eye[0] + Math.cos(a) * 2000, eye[1] - Math.sin(a) * 2000];
+    ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]); const sh = toward(-h); ctx.beginPath(); ctx.moveTo(...eye); ctx.lineTo(...sh); ctx.stroke(); ctx.setLineDash([]);
+    if (S.show) {
+      [[RED, 1], [0, 1], [RED, -1], [0, -1]].forEach(([q, sg]) => { const a = -h + sg * bow(NS[q], 1).deg * DEG, e = toward(a); ctx.strokeStyle = rgb(HUES[q], 0.9); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(...eye); ctx.lineTo(...e); ctx.stroke(); });
+      const am = -h + 21 * DEG; ctx.strokeStyle = C('--ink'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(eye[0], eye[1], 60, -(-h + 42 * DEG), h); ctx.stroke();
+      font(ctx, 11, 600); ctx.fillStyle = C('--ink'); ctx.textAlign = 'left'; label(ctx, '42°', eye[0] + Math.cos(am) * 66, eye[1] - Math.sin(am) * 66 + 4);
+    }
+    // the ground, you, and your shadow
+    if (!plane) {
+      ctx.fillStyle = C('--ground'); ctx.fillRect(p.x, gy, p.w, p.h);
+      if (h > 0.02) { const sx = eye[0] + (gy - eye[1]) / Math.tan(h); if (sx < p.x + p.w) { ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.ellipse(sx, gy + 1, 6, 2.5, 0, 0, TAU); ctx.fill(); } }
+      ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.arc(eye[0], eye[1] - 2, 5, 0, TAU); ctx.fill(); ctx.fillRect(eye[0] - 3, eye[1] + 3, 6, gy - eye[1] - 3);
+    } else { ctx.fillStyle = C('--ink'); ctx.beginPath(); ctx.moveTo(eye[0] - 30, eye[1] + 4); ctx.lineTo(eye[0] + 6, eye[1]); ctx.lineTo(eye[0] + 12, eye[1] + 4); ctx.lineTo(eye[0] - 30, eye[1] + 8); ctx.closePath(); ctx.fill(); }
+    font(ctx, 11); ctx.fillStyle = C('--muted'); ctx.textAlign = 'left';
+    label(ctx, compact ? 'from the side: Sun behind you' : 'from the side: the Sun behind you, rain ahead', p.x + 8, p.y + 15);
+    font(ctx, 10); label(ctx, 'toward your shadow', Math.min(p.x + p.w - 110, eye[0] + 70), eye[1] + 70 * Math.tan(h) + (h > 0.3 ? -6 : 14));
+    ctx.restore();
+  }
+  // what you see, looking toward the rain: drawn so that every direction is at its true angle from the shadow of
+  // your head (that point is the center), which makes circles around it come out round
+  function drawView(ctx, p, compact) {
+    const plane = S.where === 'plane', h = S.h, L = buildSky();
+    const span = 92, s = Math.min(p.w, p.h) / span, cx = p.x + p.w / 2;
+    const cy = plane ? p.y + p.h / 2 : p.y + p.h - 14 * s - h * s;     // on the ground, the horizon is fixed 14° above the bottom edge
+    ctx.save(); ctx.beginPath(); ctx.rect(p.x, p.y, p.w, p.h); ctx.clip();
+    ctx.fillStyle = L.one[L.nb - 1]; ctx.fillRect(p.x, p.y, p.w, p.h);
+    // the light of the drops: rings around the center, from the outside in
+    for (let m = Math.round(60 / SKY_STEP); m >= 1; m--) { ctx.fillStyle = L.one[m]; ctx.beginPath(); ctx.arc(cx, cy, m * SKY_STEP * s, 0, TAU); ctx.fill(); }
+    // the ground hides everything below the horizon (directions with elevation below zero)
+    if (!plane) {
+      const A = unit(0, -h * DEG), U = unit(0, Math.PI / 2 - h * DEG), V = [0, 1, 0], pts = [];
+      for (let az = -100; az <= 100; az += 2) { const v = unit(az * DEG, 0), d = Math.acos(Math.max(-1, Math.min(1, v[0] * A[0] + v[1] * A[1] + v[2] * A[2]))), f = Math.atan2(v[0] * V[0] + v[1] * V[1] + v[2] * V[2], v[0] * U[0] + v[1] * U[1] + v[2] * U[2]);
+        pts.push([cx + d / DEG * Math.sin(f) * s, cy - d / DEG * Math.cos(f) * s]); }
+      ctx.fillStyle = C('--ground'); ctx.beginPath(); ctx.moveTo(p.x - 10, p.y + p.h + 10); pts.forEach(q => ctx.lineTo(...q)); ctx.lineTo(p.x + p.w + 10, p.y + p.h + 10); ctx.closePath(); ctx.fill();
+      // where the bow would be, if there were drops below the ground
+      ctx.save(); ctx.beginPath(); ctx.moveTo(p.x - 10, p.y + p.h + 10); pts.forEach(q => ctx.lineTo(...q)); ctx.lineTo(p.x + p.w + 10, p.y + p.h + 10); ctx.closePath(); ctx.clip();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.setLineDash([4, 5]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, bow(NS[RED], 1).deg * s, 0, TAU); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    }
+    // the center: the shadow of your head
+    font(ctx, 10); ctx.textAlign = 'center';
+    if (cy < p.y + p.h - 4) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 6, cy); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx, cy + 6); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.fillText('shadow of your head', cx, cy + 18); }
+    else { ctx.fillStyle = '#fff'; ctx.fillText('↓ shadow of your head, ' + h + '° below the horizon', cx, p.y + p.h - 6); }
+    font(ctx, 11); ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.fillText(compact ? 'what you see' : 'what you see, facing the rain', p.x + 8, p.y + 15);
+    ctx.restore();
+  }
+
+  function draw() {
+    const s = fit($('scene'));
+    s.ctx.clearRect(0, 0, s.W, s.H);
+    if (s.W >= 120 && s.H >= 80) { if (tab === 2) drawCircle(s.ctx, s.W, s.H, s.compact); else drawDrop(s.ctx, s.W, s.H, s.compact); }
+    if (tab !== 2) { const g = fit($('graph')); g.ctx.clearRect(0, 0, g.W, g.H); if (g.W >= 160 && g.H >= 90) drawCurve(g.ctx, g.W, g.H, g.compact); }
+  }
+
+  // ================================================================
+  // 4. READOUTS AND TEXT
+  // ================================================================
+  const card = (k, v, f) => '<div><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="f">' + f + '</div></div>';
+  let lastHTML = '';
+  function readout() {
+    let html = '';
+    if (tab === 1 || tab === 4) {
+      const k = tab === 4 ? S.k : 1, b = S.b[tab], a = angles(b, N1);
+      html = card('Angle in', deg(a.i / DEG), 'between the sunlight and the perpendicular to the drop’s surface, where it enters');
+      if (tab === 1) html += card('Bent to', deg(a.r / DEG), 'inside the water, by Snell’s law: sin ' + deg(a.i / DEG) + ' = ' + N1.toFixed(3) + ' × sin ' + deg(a.r / DEG));
+      else html += card('Light it keeps', (100 * kept(b, N1, k)).toFixed(1) + '%', 'of the ray’s light comes out; the rest goes through the back of the drop or is reflected away where it enters' + (k === 2 ? ', and at the second bounce' : ''));
+      html += card('Angle out', deg(angleOut(k === 2 ? -b : b, N1, k) / DEG), k === 1 ? '= 4 × ' + deg(a.r / DEG) + ' − 2 × ' + deg(a.i / DEG) + ': the angle between the light coming out and the line back toward the Sun' : '= 180° + 2 × ' + deg(a.i / DEG) + ' − 6 × ' + deg(a.r / DEG) + ', between the light coming out and the line back toward the Sun');
+    } else if (tab === 3) {
+      const b = S.b[3], ar = angleOut(b, NS[RED], 1) / DEG, av = angleOut(b, NS[0], 1) / DEG;
+      html = card('Red light comes out at', deg(ar), 'water bends red (700 nm) least: n = ' + NS[RED].toFixed(4));
+      html += card('Violet light comes out at', deg(av), 'and violet (400 nm) most: n = ' + NS[0].toFixed(4));
+      html += card('Red minus violet', (ar - av >= 0 ? '+' : '−') + Math.abs(ar - av).toFixed(2) + '°', 'for this ray; the 14 colors between fall in between');
+    } else {
+      const h = S.h, top = bowTop(h, bow(NS[RED], 1).deg);
+      html = card('The Sun’s height', h + '°', 'above the horizon, behind you');
+      html += card('Shadow of your head', h + '° below the horizon', 'straight away from the Sun: the center of the bow');
+      html += card('Top of the bow', S.where === 'plane' ? 'a full circle' : top > 0 ? top.toFixed(1) + '° above the horizon' : 'below the horizon', S.where === 'plane' ? 'with drops below you as well as ahead, nothing cuts the circle off' : top > 0 ? 'the outer, red edge; the bow is the part of the circle above the ground' : 'with the Sun this high, the whole circle is below the horizon: no rainbow');
+    }
+    if (html !== lastHTML) { $('readout').innerHTML = html; lastHTML = html; }
+  }
+
+  const TEXT = {
+    1: { lede: 'Sunlight enters a raindrop, bounces once off the back, and comes out again. Predict: does the light come out spread evenly in every direction, or bunched up in some directions more than others?',
+         notes: '<p><b>What to try.</b> Move the slider from the middle of the drop to its edge, and watch the angle out, and the graph below, which fills in with every ray you send. A ray through the middle comes straight back. Rays further out come out at bigger angles, but only up to a point; then the angle shrinks again. Look at the count on the right as you go, then send in many rays at once and look where they crowd together.</p>' +
+                '<p><b>Why.</b> The angle out rises, stops, and falls as you move out across the drop. Near the turning point, a whole range of rays come out at almost the same angle, about 42°, so light piles up there: the drop sends out more light at 42° than at any other angle, and none beyond it. Every drop does the same, which is what makes a rainbow: a bright line in the sky, 42° from the point straight opposite the Sun. René Descartes worked this out in 1637 by tracing ten thousand rays by hand.</p>' +
+                '<p><b>The model.</b> Light as rays (geometric optics) through a round drop of water at 20 °C, for one color, yellow-orange light of 589 nm, for which water’s refractive index relative to air is ' + N1.toFixed(4) + ' (the IAPWS formula). Only the light that bounces once off the back is drawn; most of each ray goes straight through, and a little reflects off the front. The size of the drop doesn’t matter to the rays.</p>' },
+    2: { lede: 'You stand with the Sun low behind you, facing a rain shower. Every drop does what you saw on the first screen. Predict: which drops send rainbow light to your eye, and why does the bow come out as part of a circle?',
+         notes: '<p><b>What to try.</b> Press the button to light up the drops that send you light. Then raise the Sun: the bow sinks, and once the Sun is higher than 42°, it disappears below the horizon. That’s why rainbows come in the morning and late afternoon, not at midday in summer. Then go up in an airplane.</p>' +
+                '<p><b>Why.</b> Each drop sends the most light at 42° from the line back toward the Sun. So the drops you see bright are the ones 42° from the point straight opposite the Sun, which, with the Sun behind you, is the shadow of your head. All the directions 42° from one point make a cone, with your eye at its tip, and you see it as a circle around the shadow of your head. The ground cuts it off, so from the ground you see an arc; from an airplane you can see the full circle. Because the bow is a set of directions from your eye, not a thing in one place, everyone sees their own rainbow, made by different drops, and it moves with you as you walk.</p>' +
+                '<p><b>The model.</b> The sky is drawn so that every direction appears at its true angle from the shadow of your head, the center of the picture, which keeps circles around it round; the horizon curves down at the sides because of it. The colors and brightness come from the same rays as the other screens, for all colors of sunlight, smeared by half a degree because the Sun is not a point but a disk that wide. Only the light that bounces once is drawn here. The side view shows drops in one plane only; the drops at 42° to the left and right of you light up the sides of the bow. From the ground, only drops above your eyes are lit: in a distant shower, the drops below eye level all lie just under the horizon. A garden sprinkler, close by, can show you a bow below the horizon, against the ground.</p>' },
+    3: { lede: 'Sunlight is a mix of all colors, and water bends each one a little differently. Predict: in a rainbow, which color is on the outside of the bow, and which on the inside?',
+         notes: '<p><b>What to try.</b> Sweep the slider across the drop, slowly near the edge, and watch the colors in the graph, which is zoomed in to the top of the curves. Each color has its own curve, and each turns at its own angle. Send in many rays to see the whole fan.</p>' +
+                '<p><b>Why.</b> Water bends violet light more than red, so a violet ray turns more sharply on the way in and out, and comes out at a smaller angle. Violet piles up at about 40.6° and red at about 42.4°, so seen in the sky, red is the outer edge of the bow and violet the inner. Isaac Newton explained the colors this way in 1704. Inside the bow, all the colors overlap, which is why the sky just inside a rainbow is brighter and whiter than outside it.</p>' +
+                '<p><b>What the rays leave out.</b> Light is a wave, and near the bow’s angle the rays that come out together interfere. That makes faint extra bands, pink and green, just inside the violet: supernumerary bows, which no ray theory can explain; Thomas Young used them in 1804 as evidence that light is a wave. How far apart they are depends on the size of the drops. Drops a millimeter across give a bright bow with sharp colors; in fog, with drops a hundredth that size, the colors smear into each other and the bow is almost white: a fogbow.</p>' +
+                '<p><b>The model.</b> Rays of 16 colors from 400 to 700 nm, with water’s refractive index relative to air at 20 °C from the IAPWS formula, from ' + NS[RED].toFixed(4) + ' (red) to ' + NS[0].toFixed(4) + ' (violet). The colors on screen are each wavelength’s color as near as a screen can show it.</p>' },
+    4: { lede: 'Sometimes there is a second, fainter rainbow outside the first, with a band of darker sky between them. Predict: where does its light come from, and are its colors in the same order?',
+         notes: '<p><b>What to try.</b> Bounce the ray twice and sweep it across the drop: it enters near the bottom of the drop this time, and the angle out comes down to a smallest value, then rises again. Compare how much light the ray keeps with one bounce and with two. Then show the sky.</p>' +
+                '<p><b>Why.</b> Light that bounces twice inside piles up at about 51°, so it makes a second bow outside the first. Its colors are reversed, red on the inside, because the extra bounce turns the rays back the other way. It’s fainter because some light escapes at every bounce. Between the two bows, at 42° to 51°, no light comes out after either one bounce or two, so that band of sky is darker than either side: Alexander’s dark band, after Alexander of Aphrodisias, who described it around 200 AD. Light bounced three and four times makes bows too, but they lie toward the Sun and are almost never seen.</p>' +
+                '<p><b>The model.</b> One color (589 nm) for the rays and the graph; the sky uses 16 colors of sunlight, with the light each ray keeps from Fresnel’s equations for both polarizations, smeared by the Sun’s half-degree width, over a gray rain cloud. Rays alone would make each bow infinitely sharp at its edge; in real drops, light’s wave nature rounds it off (see the notes on the previous screen).</p>' }
+  };
+
+  // ================================================================
+  // 5. CONTROLS
+  // ================================================================
+  function visibility() {
+    const drop = tab !== 2;
+    $('lab_b').hidden = !drop; $('lab_k').hidden = tab !== 4; $('lab_h').hidden = tab !== 2; $('lab_where').hidden = tab !== 2;
+    $('many').hidden = !drop; $('many').textContent = S.many[tab] ? 'Back to one ray' : 'Send in many rays';
+    $('show').hidden = tab !== 2 && tab !== 4;
+    $('show').textContent = tab === 2 ? (S.show ? 'Hide which drops' : 'Show the drops that send you light') : (S.sky ? 'Hide the sky' : 'Show the sky');
+    $('show').className = (tab === 2 ? S.show : S.sky) ? 'secondary' : '';
+    const ys = seenOf(tab), n = drop ? ys.reduce((s, v) => s + v, 0) : 0;
+    $('hint').textContent = drop && n < 40 && !S.many[tab] ? 'move the slider to send in more rays' : '';
+    $('graph').hidden = tab === 2; $('scene').classList.toggle('t2', tab === 2);
+    document.querySelectorAll('#kseg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.k)));
+    document.querySelectorAll('#where button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.where)));
+    $('scene').setAttribute('aria-label', tab === 2 ? 'A person facing a rain shower with the Sun behind, seen from the side, and the rainbow they see' : 'A raindrop with sunlight passing through it');
+    $('graph').setAttribute('aria-label', tab === 4 ? 'Angle out against where the ray enters, and the sky at each angle' : 'Angle out against where the ray enters, and how many rays come out at each angle');
+  }
+  function vals() {
+    const b = S.b[tab] || 0; $('b').value = String(b);
+    $('b_v').textContent = b === 0 ? 'the middle' : b === 1 ? 'the very edge' : b.toFixed(3) + ' of the way to the edge';
+    $('h').value = String(S.h); $('h_v').textContent = S.h + '°';
+  }
+  function mark() { if (tab === 2) return; seenOf(tab)[Math.round(S.b[tab] * STEPS)] = 1; }
+  function upd() { mark(); visibility(); vals(); draw(); readout(); }
+  function setTab(k) { tab = k; [1, 2, 3, 4].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k))); $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes; upd(); }
+  [1, 2, 3, 4].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
+  $('b').addEventListener('input', () => { S.b[tab] = +$('b').value; upd(); });
+  $('h').addEventListener('input', () => { S.h = +$('h').value; upd(); });
+  document.querySelectorAll('#kseg button').forEach(b => b.addEventListener('click', () => { S.k = +b.dataset.v; upd(); }));
+  document.querySelectorAll('#where button').forEach(b => b.addEventListener('click', () => { S.where = b.dataset.v; upd(); }));
+  $('many').addEventListener('click', () => { S.many[tab] = !S.many[tab]; if (S.many[tab]) seenOf(tab).fill(1); upd(); });
+  $('show').addEventListener('click', () => { if (tab === 2) S.show = !S.show; else S.sky = !S.sky; upd(); });
+  window.addEventListener('resize', draw);
+  setTab(1);
+})();
+</script>
+<script>
+// Wide screens only: canvases keep their natural shape, but if that would push the workspace (and the
+// buttons under the canvases) past the bottom of the window, shrink the canvases together, keeping
+// their shape, until it fits. Phones and narrow windows are left alone.
+(function () {
+  const wide = window.matchMedia('(min-width: 1200px) and (min-height: 620px)');
+  let busy = false;
+  function fitStage() {
+    if (busy) return; busy = true;
+    let changed = false;
+    document.querySelectorAll('.workspace').forEach(ws => {
+      const kids = [...ws.children].filter(k => k.matches('canvas') || k.querySelector('canvas'));
+      const before = kids.map(k => k.style.width);
+      const set = f => kids.forEach(k => { const w = f < 0.999 ? (100 * f).toFixed(1) + '%' : ''; k.style.width = w; k.style.alignSelf = w ? 'center' : ''; });
+      const done = () => { if (kids.some((k, i) => k.style.width !== before[i])) changed = true; };
+      set(1);
+      if (!wide.matches || !ws.offsetParent) { done(); return; }
+      const top = ws.getBoundingClientRect().top + window.scrollY;
+      const avail = window.innerHeight - top;
+      // a sim can set --min-fit on its workspace when its drawing gets unreadable below some size
+      const minFit = parseFloat(getComputedStyle(ws).getPropertyValue('--min-fit')) || 0.5;
+      let f = 1;
+      for (let i = 0; i < 4; i++) {
+        const total = ws.getBoundingClientRect().height;
+        if (total <= avail + 1) break;
+        const C = kids.reduce((s, k) => s + k.getBoundingClientRect().height, 0);
+        if (C <= 0) break;
+        f = Math.max(minFit, f * (avail - (total - C)) / C);
+        set(f);
+      }
+      done();
+    });
+    busy = false;
+    if (changed) window.dispatchEvent(new Event('resize'));   // let the sim redraw at the new size
+  }
+  window.addEventListener('resize', fitStage);
+  document.addEventListener('click', () => requestAnimationFrame(fitStage));
+  if (wide.addEventListener) wide.addEventListener('change', fitStage);
+  fitStage();
+})();
+</script>
+</body>
+</html>
