@@ -538,7 +538,6 @@
     readout(); draw();
     requestAnimationFrame(frame);
   }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { st.playing = false; $('play').textContent = 'Play'; }
   fitForceRange(); setTab(1);
   if (st.playing) requestAnimationFrame(frame);
 })();

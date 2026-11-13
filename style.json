@@ -127,7 +127,8 @@
     "touch-action: pan-y on the canvas."
   ],
   "accessibility_rules": [
-    "Respect prefers-reduced-motion: start paused or animate only on user action.",
+    "Anything that moves on its own has a visible pause control (Pause/Play or Freeze the wave).",
+    "Do not read prefers-reduced-motion: the sim behaves the same whatever the operating system's animation setting (Windows turns it on whenever Animation effects is off).",
     "Real HTML controls with labels; aria-pressed on segmented buttons; role=tab/aria-selected on tabs.",
     "Never distinguish two things by color alone; vary line style or shape too.",
     "Visible focus rings."
@@ -158,7 +159,7 @@
     "Assumptions, units, time acceleration, exaggerations stated on the page",
     "Usable at 390px wide with readable labels",
     "At 1920x950, 1536x730 and 1366x650 every slider and button is on screen without scrolling",
-    "Reduced motion respected; loop pauses when hidden",
+    "Anything that moves on its own can be paused; behaves the same with reduced motion on; loop pauses when hidden",
     "Home link, GPL header, 'What to try', readouts with formulas present",
     "sims.js entry added with a real date",
     "Tried by someone other than the author for two minutes without instructions"

@@ -834,7 +834,6 @@
     if (!document.hidden) screens[active].frame(dt);
     requestAnimationFrame(loop);
   }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { [S1, S2, S3].forEach(s => { s.st.playing = false; }); ['play1', 'play2', 'play3'].forEach(id => { $(id).textContent = 'Play'; }); }
   requestAnimationFrame(loop);
 })();
 </script>

@@ -530,10 +530,9 @@
   // 6. LOOP
   // ================================================================
   let last = null, lastRead = 0;
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function frame(ts) {
     const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
-    if (dt > 0 && !document.hidden && !reduced) {
+    if (dt > 0 && !document.hidden) {
       t += dt;
       if (moving) {
         if (tab === 1) { S.fine += MOVE_RATE * dt * 1e6; if (S.fine > 1.5) { S.d += 1e-6; S.fine -= 1; } vals(); }

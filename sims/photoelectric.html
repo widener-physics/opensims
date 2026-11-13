@@ -200,6 +200,7 @@
   <div class="workspace">
   <canvas id="scene" aria-label="A lamp shines on a metal plate in a vacuum tube; electrons knocked out of it cross to a second plate, and a meter in the circuit reads the current"></canvas>
   <div class="row2">
+    <button id="hold" class="secondary">Pause</button>
     <button id="rec">Record stopping voltage</button>
     <button id="fitb" class="secondary">Fit a line</button>
     <button id="clr" class="secondary">Clear graph</button>
@@ -710,10 +711,12 @@
   // 4. LOOP: the electrons fly; everything else redraws only when something changes
   // ================================================================
   let last = null;
+  let held = false;
+  $('hold').addEventListener('click', () => { held = !held; $('hold').textContent = held ? 'Play' : 'Pause'; });
   function frame(ts) {
     const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
     last = ts;
-    if (!document.hidden && dt > 0) { spawn(dt); step(dt); drawScene(); }
+    if (!document.hidden && dt > 0) { if (!held) { spawn(dt); step(dt); } drawScene(); }   // paused: the electrons hold still
     requestAnimationFrame(frame);
   }
   newMystery();

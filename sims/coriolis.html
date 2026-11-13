@@ -182,6 +182,7 @@
   <div class="row2">
     <button id="go">Slide the puck</button>
     <button id="step" class="secondary">Step 0.1 s</button>
+    <button id="hold" class="secondary">Pause</button>
     <button id="clear" class="secondary">Clear</button>
     <button id="aimme" class="secondary">Aim for me</button>
     <label><input type="checkbox" id="slow"> slow motion (¼ speed)</label>
@@ -277,7 +278,7 @@
 
   const R = PLATFORM.R, PUCK = 0.17, CATCH = 0.3;
   const S = { spin: 8, from: 0.5, speed: 2.5, aim: 0, setup: 'out', tspeed: 4, taim: 0, slow: false };
-  let tab = 1, theta = 0, run = null, playing = true;   // theta: the platform's angle; run: the launch in flight
+  let tab = 1, theta = 0, run = null, playing = true, held = false;   // held: everything paused with the Pause button   // theta: the platform's angle; run: the launch in flight
   const w = () => fromRpm(S.spin);
   const fmtA = a => (a > 0 ? '+' : a < 0 ? '−' : '') + Math.abs(a).toFixed(0) + '°';
 
@@ -471,6 +472,8 @@
     $('aim_t').textContent = tab === 2 ? 'Aimed, from straight at the friend' : 'Aimed, from straight at the flag';
     $('go').textContent = tab === 2 ? (run && run.t < run.tEnd ? 'Throwing…' : 'Throw') : (run && run.t < run.tEnd ? (playing ? 'Pause' : 'Resume') : 'Slide the puck');
     $('go').disabled = tab === 2 && !!(run && run.t < run.tEnd);
+    $('hold').hidden = tab !== 2 && !!(run && run.t < run.tEnd);   // while a puck slides, the main button pauses
+    $('hold').textContent = held ? 'Play' : 'Pause';
     document.querySelectorAll('#from button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.from)));
     document.querySelectorAll('#setup button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.setup)));
     $('hint').textContent = '';
@@ -483,7 +486,7 @@
   function sync() { $('spin').value = String(S.spin); $('speed').value = String(tab === 2 ? S.tspeed : S.speed); $('aim').value = String(tab === 2 ? S.taim : S.aim); vals(); }
   function upd() { visibility(); vals(); readout(); drawScene(); }
   function setTab(k) {
-    tab = k; run = null; playing = true;
+    tab = k; run = null; playing = true; held = false;
     [1, 2, 3].forEach(j => $('tab' + j).setAttribute('aria-selected', String(j === k)));
     $('lede').innerHTML = TEXT[k].lede; $('notes').innerHTML = TEXT[k].notes;
     sync(); upd();
@@ -494,7 +497,9 @@
   $('aim').addEventListener('input', () => { if (tab === 2) S.taim = +$('aim').value; else S.aim = +$('aim').value; run = null; upd(); });
   document.querySelectorAll('#from button').forEach(b => b.addEventListener('click', () => { S.from = +b.dataset.v; run = null; upd(); }));
   document.querySelectorAll('#setup button').forEach(b => b.addEventListener('click', () => { S.setup = b.dataset.v; run = null; upd(); }));
+  $('hold').addEventListener('click', () => { held = !held; upd(); });
   $('go').addEventListener('click', () => {
+    held = false;
     if (tab !== 2 && run && run.t < run.tEnd) { playing = !playing; upd(); return; }
     start(); upd();
   });
@@ -513,7 +518,7 @@
     last = ts;
     if (dt > 0 && !document.hidden) {
       const flying = run && run.t < run.tEnd;
-      if (!flying || playing) {
+      if (!held && (!flying || playing)) {
         theta = (theta + w() * dt) % TAU;
         if (flying) { run.t = Math.min(run.tEnd, run.t + dt); if (run.t >= run.tEnd) visibility(); }
       }

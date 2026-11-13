@@ -669,7 +669,6 @@
     if (!frozen && !document.hidden && dt > 0) { wt += dt * 2.5; drawScene(); }
     requestAnimationFrame(frame);
   }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) frozen = true;
   setTab(1);
   requestAnimationFrame(frame);
 })();

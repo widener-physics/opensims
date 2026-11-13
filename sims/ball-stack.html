@@ -586,12 +586,11 @@
   // 6. LOOP
   // ================================================================
   let last = null;
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function frame(ts) {
     const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
     if (playing && dt > 0 && !document.hidden) {
-      if (tab === 3) { TS = Math.min(1000, TS + (reduced ? 1000 : dt * 1000 / 4)); if (TS >= 1000) playing = false; }   // the whole bounce in about 4 s
-      else { const r = RUN[tab]; PLAY[tab] = reduced ? r.end : Math.min(r.end, PLAY[tab] + dt * (S.slow ? 0.1 : 1)); if (PLAY[tab] >= r.end) { playing = false; DONE[tab] = true; } }
+      if (tab === 3) { TS = Math.min(1000, TS + dt * 1000 / 4); if (TS >= 1000) playing = false; }   // the whole bounce in about 4 s
+      else { const r = RUN[tab]; PLAY[tab] = Math.min(r.end, PLAY[tab] + dt * (S.slow ? 0.1 : 1)); if (PLAY[tab] >= r.end) { playing = false; DONE[tab] = true; } }
       upd();
     }
     requestAnimationFrame(frame);

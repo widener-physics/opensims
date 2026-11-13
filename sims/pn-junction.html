@@ -57,6 +57,8 @@
   .voltage .row { display: flex; justify-content: space-between; gap: 12px; }
   .voltage .val { font-variant-numeric: tabular-nums; }
   .voltage input[type=range] { width: 100%; }
+  .row2 { margin-top: 10px; font-family: var(--sans); font-size: 14px; }
+  #play { font: inherit; padding: 6px 14px; border-radius: 4px; border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; }
   button:focus-visible, input:focus-visible { outline: 3px solid #BFD7E2; outline-offset: 2px; }
 
   .lower { display: grid; grid-template-columns: 1fr 300px; gap: 20px 28px; margin-top: 18px; align-items: start; }
@@ -70,9 +72,11 @@
   .readout .legend .e { background: var(--electron); }
   .readout .legend .h { border: 2px solid var(--hole); width: 7px; height: 7px; }
   .readout .legend .d { background: var(--ion); }
-  @media (max-width: 720px) {
+  @media (max-width: 900px) {
     .regions { grid-template-columns: 1fr; }
     .regions .group.right { justify-content: flex-start; }
+  }
+  @media (max-width: 720px) {
     .lower { grid-template-columns: 1fr; }
   }
   .home { font-family: var(--sans); font-size: 14px; margin: 0 0 18px; }
@@ -200,6 +204,7 @@
   </div>
 
   <canvas id="bands"></canvas>
+  <div class="row2"><button id="play">Pause</button></div>
   </div>
 
   <div class="sidebar">
@@ -724,22 +729,21 @@
     const dt = last === null ? 0.016 : Math.min(0.05, (ts - last) / 1000);
     last = ts;
     if (!document.hidden) {
-      stepCarriers(dt);
+      if (running) stepCarriers(dt);   // paused: the carriers hold still, but the pictures still follow the controls
       drawCircuit();
       drawBands();
     }
     requestAnimationFrame(frame);
   }
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // the carriers move on their own; Pause stops them
+  let running = true;
+  const playLabel = () => { $('play').textContent = running ? 'Pause' : 'Play'; };
+  $('play').addEventListener('click', () => { running = !running; playLabel(); }); playLabel();
 
   setSeg('segL', 0); setSeg('segR', 1);
   rebuild();
   window.addEventListener('resize', () => { drawIV(); });
-  if (reduce) { drawCircuit(); drawBands(); } else requestAnimationFrame(frame);
-  if (reduce) {
-    // still animate, but only on user action
-    ['input', 'click'].forEach(ev => document.addEventListener(ev, () => { for (let k = 0; k < 60; k++) stepCarriers(0.016); drawCircuit(); drawBands(); }));
-  }
+  drawCircuit(); drawBands(); requestAnimationFrame(frame);
 })();
 </script>
 <script>

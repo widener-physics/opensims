@@ -834,8 +834,6 @@
   buildString(false); buildPipe(false);
   run(s1, 1e-4, false); run(s2, 1e-5, true);
   $('f1').value = String(s1.f); $('f2').value = String(s2.f);
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setPlay(false); s1.speed = s2.speed = 'slow';
-    document.querySelectorAll('.seg[aria-label="Playback"] button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === 'slow'))); }
   setTab(1);
   requestAnimationFrame(frame);
 })();

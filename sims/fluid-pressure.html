@@ -534,13 +534,11 @@
   // 6. LOOP: only the released block moves
   // ================================================================
   let last = null;
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function frame(ts) {
     const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
     if (tab === 3 && free && dt > 0 && !document.hidden) {
       const L = liquid(S.liq[3]), M = material(S.mat); let st = { d: S.d, v: vel };
-      if (reduced) { for (let i = 0; i < 20000; i++) st = cubeStep(st, 1e-3, CUBE, L.rho, M.rho, TANK.h); }
-      else for (let i = 0; i < Math.round(dt / 1e-3); i++) st = cubeStep(st, 1e-3, CUBE, L.rho, M.rho, TANK.h);
+      for (let i = 0; i < Math.round(dt / 1e-3); i++) st = cubeStep(st, 1e-3, CUBE, L.rho, M.rho, TANK.h);
       S.d = Math.max(-0.12, st.d); vel = st.v; if (S.d === -0.12 && vel < 0) vel = 0;
       upd();
     }

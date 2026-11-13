@@ -57,7 +57,8 @@ Use the CSS custom properties exactly as named in `style.json`; every sim shares
 
 ## 6. Accessibility and motion
 
-- Respect `prefers-reduced-motion`: start paused, or animate only in response to user actions.
+- Anything that moves on its own has a visible way to pause it (Pause/Play, or "Freeze the wave"). That is how a visitor who finds motion uncomfortable stops it.
+- Don't read `prefers-reduced-motion`: a sim moves the same way whatever the operating system's animation setting. Windows turns that setting on for every browser when *Animation effects* is off, which is common on classroom, school-managed and remote-desktop machines for reasons that have nothing to do with motion, and a demonstration that opens frozen there looks broken.
 - All controls are real HTML controls with labels; tabs use `role="tab"` and `aria-selected`; segmented buttons use `aria-pressed`.
 - Pause the animation loop when the tab is hidden (`document.hidden`).
 - Don't rely on color alone to distinguish two things: vary line style (solid/dashed) or shape as well.
@@ -105,7 +106,7 @@ Below those sizes the page is the stacked column described next, identical to th
 - [ ] Assumptions, units, and any time acceleration or exaggeration are stated on the page.
 - [ ] Works at 390px wide with readable labels and usable sliders.
 - [ ] At 1920x950, 1536x730 and 1366x650, every slider and button is on screen without scrolling, and no canvas label overlaps another.
-- [ ] Reduced-motion respected; loop pauses when hidden.
+- [ ] Anything that moves on its own can be paused; the sim behaves the same with the system's reduced-motion setting on; the loop pauses when the tab is hidden.
 - [ ] Home link, license header, "What to try", readouts with formulas.
 - [ ] Entry added to `sims.js` with a real `added` date, and a `pageTitle` in the words a teacher would search for if the title alone doesn't have them; then `npm run meta` to write the page's title and description.
 - [ ] Someone other than the author has tried it for two minutes without instructions.

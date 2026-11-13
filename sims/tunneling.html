@@ -184,6 +184,7 @@
   <div class="row2">
     <button id="go">Go</button>
     <button id="reset" class="secondary">Reset</button>
+    <button id="spin" class="secondary">Freeze the wave</button>
     <label id="lab_reim"><input type="checkbox" id="reim"> show real and imaginary parts</label>
     <span class="hint" id="hint"></span>
   </div>
@@ -360,7 +361,7 @@
   // ---- end of core ----
 
   const S = { E: 3, V: 5, a: 0.3, sig: 1.2, where: 'stm', mode: 'current', gap: 0.6, nuc: 0 };
-  let tab = 1, phase = 0, playing = false;
+  let tab = 1, phase = 0, playing = false, spin = true;   // the wave's phase turning (Freeze the wave stops it)
   // the packet: a grid wider than the view so nothing reaches the edges while it is shown
   const PK = { g: null, step: null, psi: null, t: 0, key: '' };
   const DT = 0.004, X0 = -8, VIEW = [-14, 14];
@@ -628,7 +629,7 @@
     const show = (id, on) => { $(id).hidden = !on; };
     show('lab_E', tab !== 3); show('lab_V', tab !== 3); show('lab_a', tab !== 3); show('lab_sig', tab === 2);
     show('lab_where', tab === 3); show('lab_mode', tab === 3 && S.where === 'stm'); show('lab_gap', tab === 3 && S.where === 'stm' && S.mode === 'height'); show('lab_nuc', tab === 3 && S.where === 'alpha');
-    show('lab_reim', tab !== 3); show('go', tab === 2 || (tab === 3 && S.where === 'stm')); show('reset', tab === 2 || (tab === 3 && S.where === 'stm'));
+    show('lab_reim', tab !== 3); show('go', tab === 2 || (tab === 3 && S.where === 'stm')); show('reset', tab === 2 || (tab === 3 && S.where === 'stm')); show('spin', (tab === 1 && $('reim').checked) || (tab === 3 && S.where === 'alpha')); $('spin').textContent = spin ? 'Freeze the wave' : 'Let the wave move';
     $('E_t').textContent = tab === 2 ? 'Packet\'s average energy' : 'Electron\'s energy';
     if (tab === 2) $('go').textContent = PK.done ? 'Run again' : playing ? 'Pause' : PK.t > 0 ? 'Resume' : 'Go';
     if (tab === 3) $('go').textContent = SCAN.on ? 'Stop' : 'Scan';
@@ -653,10 +654,11 @@
   [1, 2, 3].forEach(k => $('tab' + k).addEventListener('click', () => setTab(k)));
   ['E', 'V', 'a', 'sig'].forEach(id => $(id).addEventListener('input', () => { S[id] = +$(id).value; if (tab === 2) { playing = false; setupPacket(); } upd(); }));
   $('gap').addEventListener('input', () => { S.gap = +$('gap').value; SCAN.tipZ = S.gap; upd(); });
-  $('reim').addEventListener('change', draw);
+  $('reim').addEventListener('change', () => { visibility(); draw(); });
   ALPHA.forEach((n, i) => { const b = document.createElement('button'); b.dataset.v = String(i); b.textContent = n.sym; $('nuc').appendChild(b); b.addEventListener('click', () => { S.nuc = i; upd(); }); });
   document.querySelectorAll('#where button').forEach(b => b.addEventListener('click', () => { S.where = b.dataset.v; SCAN.on = false; upd(); }));
   document.querySelectorAll('#mode button').forEach(b => b.addEventListener('click', () => { S.mode = b.dataset.v; SCAN.trace = []; if (S.mode === 'height') SCAN.tipZ = S.gap; upd(); }));
+  $('spin').addEventListener('click', () => { spin = !spin; visibility(); });
   $('go').addEventListener('click', () => {
     if (tab === 2) { if (PK.done) { setupPacket(); playing = true; } else playing = !playing; }
     else { SCAN.on = !SCAN.on; if (SCAN.on && SCAN.x >= 1.75) { SCAN.x = -1.75; SCAN.trace = []; } }
@@ -669,13 +671,12 @@
   // 4. LOOP
   // ================================================================
   let last = null;
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function frame(ts) {
     const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000);
     last = ts;
     if (dt > 0 && !document.hidden) {
       let busy = false;
-      if (!reduced) { phase = (phase + dt * TAU / 1.6) % (TAU * 1000); busy = tab === 1 || (tab === 3 && S.where === 'alpha'); }
+      if (spin) { phase = (phase + dt * TAU / 1.6) % (TAU * 1000); busy = tab === 1 || (tab === 3 && S.where === 'alpha'); }
       if (tab === 2 && playing) {
         // about 2.5 fs of electron time per second on screen
         const n = Math.max(1, Math.round(2.5 * dt / DT));

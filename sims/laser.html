@@ -691,7 +691,6 @@
     readout(); drawAll();
     requestAnimationFrame(frame);
   }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { st.playing = false; $('play').textContent = 'Play'; }
   setTab(1);
   if (st.playing) requestAnimationFrame(frame);
 })();

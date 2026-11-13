@@ -823,11 +823,10 @@
   // 9. LOOP (only the microlensing tab moves)
   // ================================================================
   let last = null, lastRead = 0;
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function frame(ts) {
     const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
     if (tab === 3 && mu && mu.playing && dt > 0 && !document.hidden) {
-      stepMicro(reduced ? 2 * MU.span : dt * 8);        // 8 days per second
+      stepMicro(dt * 8);        // 8 days per second
       draw(); if (ts - lastRead > 120 || !mu.playing) { readout(); visibility(); lastRead = ts; }
     }
     requestAnimationFrame(frame);

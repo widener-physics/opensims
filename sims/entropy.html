@@ -186,6 +186,7 @@
   <canvas id="scene" aria-label="A box of gas molecules"></canvas>
   <div class="row2">
     <button id="go">Remove the partition</button>
+    <button id="still" class="secondary">Pause</button>
     <button id="rev" class="secondary">Reverse every velocity</button>
     <button id="reset" class="secondary">Start over</button>
     <span class="hint" id="hint"></span>
@@ -328,7 +329,7 @@
   const GS = { 1: null, 3: null };
   function newGas(k) {
     const g = makeGas(nOf(k), { seed: (Date.now() ^ (k * 7919)) >>> 0 });
-    GS[k] = { g, released: false, playing: false, t: 0, hist: [], tRev: null, nudged: -1, back: false, lastRec: -1 };
+    GS[k] = { g, released: false, still: false, playing: false, t: 0, hist: [], tRev: null, nudged: -1, back: false, lastRec: -1 };
   }
   // the two solids (tab 2)
   const SO = { st: null, playing: false, hist: [], t: 0, acc: 0, moves: [], ab: 0, ba: 0 };
@@ -514,6 +515,7 @@
     $('lab_na').hidden = tab !== 2; $('lab_nb').hidden = tab !== 2; $('lab_q').hidden = tab !== 2; $('lab_spd').hidden = tab !== 2;
     document.querySelectorAll('#spd button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.spd)));
     $('rev').hidden = tab !== 3;
+    $('still').hidden = !gas || G.released; if (gas) $('still').textContent = G.still ? 'Play' : 'Pause';   // before the partition comes out, the gas can be paused too
     $('go').textContent = gas ? (!G.released ? 'Remove the partition' : G.playing ? 'Pause' : 'Play') : (SO.playing ? 'Pause' : 'Play');
     $('go').disabled = tab === 3 && G.back;
     if (tab === 3) $('rev').disabled = !G.released || G.tRev !== null;
@@ -538,8 +540,10 @@
   ['na', 'nb', 'q'].forEach(id => $(id).addEventListener('input', () => { S[{ na: 'NA', nb: 'NB', q: 'q' }[id]] = +$(id).value; resetSolids(); upd(); }));
   $('go').addEventListener('click', () => {
     if (tab === 2) { SO.playing = !SO.playing; upd(); return; }
+    if (!GS[tab].released) GS[tab].still = false;
     const G = GS[tab]; if (!G.released) { G.released = true; G.g.wall = false; G.playing = true; G.hist = [[0, countLeft(G.g)]]; G.g.steps = 0; G.t = 0; G.elapsed = 0; G.lastRec = 0; } else G.playing = !G.playing; upd();
   });
+  $('still').addEventListener('click', () => { const G = GS[tab]; G.still = !G.still; upd(); });
   $('rev').addEventListener('click', () => { const G = GS[3]; if (!G.released || G.tRev !== null) return;
     if (S.nudge) { const i = Math.floor(Math.random() * G.g.N); G.g.x[i] += 1; G.g.px[i] += 1; G.nudged = i; }
     reverseGas(G.g); G.tRev = G.t; G.playing = true; G.elapsed = G.t; upd(); });
@@ -550,7 +554,6 @@
   // 6. LOOP
   // ================================================================
   let last = null, msPerStep = 0.05, lastRead = 0;
-  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   function advanceGas(G, dt) {
     // as much of real time as the computer can manage in about 9 ms
     let want = Math.round(dt * STEPS_PER_S); want = Math.max(1, Math.min(want, Math.floor(9 / msPerStep)));
@@ -569,9 +572,9 @@
     const dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
     if (dt > 0 && !document.hidden) {
       let moved = false;
-      if (tab === 1 || tab === 3) { const G = GS[tab]; if (G.released && G.playing && !reduced) { advanceGas(G, dt); moved = true; if (G.back) upd(); }
-        else if (!G.released && !reduced) { advanceGas(G, dt); moved = true; } }
-      else if (tab === 2 && SO.playing && !reduced) { runSolids(dt); moved = true; }
+      if (tab === 1 || tab === 3) { const G = GS[tab]; if (G.released && G.playing) { advanceGas(G, dt); moved = true; if (G.back) upd(); }
+        else if (!G.released && !G.still) { advanceGas(G, dt); moved = true; } }
+      else if (tab === 2 && SO.playing) { runSolids(dt); moved = true; }
       if (moved) { draw(); if (ts - lastRead > 150) { readout(); lastRead = ts; } }
     }
     requestAnimationFrame(frame);
